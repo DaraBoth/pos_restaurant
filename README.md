@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cambodian Restaurant POS System
 
-## Getting Started
+A high-performance, strictly offline, local-first Point of Sale system built with **Tauri v2**, **Rust**, **SQLite (SQLCipher)**, and **Next.js (React)**.
 
-First, run the development server:
+## Quick Start (Zero-Config Build)
+
+This project has been configured so that anyone can clone it and run it immediately **without needing to set up a database, configure `.env` files, or manually create tables.** The Rust backend will automatically initialize, encrypt, and migrate the local SQLite database upon launch.
+
+### Prerequisites
+
+You only need the two standard compiler toolchains for Tauri:
+
+1. **[Node.js](https://nodejs.org/)** (v18 or higher)
+2. **[Rust](https://rustup.rs/)** (v1.75 or higher)
+   * _Windows Users:_ The Rust installer will ask you to install the C++ Build Tools for Visual Studio 2022. Please accept this, as Native desktop apps require it.
+
+> **Note:** If you just installed Rust, please **restart your terminal or Visual Studio Code** before continuing so the `cargo` command is recognized.
+
+### Running the App
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/DaraBoth/pos_restaurant.git
+   cd pos_restaurant
+   ```
+
+2. **Install frontend dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Start the Development Desktop App:**
+   ```bash
+   npm run tauri:dev
+   ```
+   *The very first time you run this, Rust will download and compile all the backend dependencies. This may take 2-5 minutes depending on your internet and CPU speed. Subsequent runs will be nearly instant.*
+
+### Building an Installer (.msi / .exe)
+
+To package the application into a standalone installer that you can put on a USB drive and install gracefully on the restaurant's tablets:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run tauri:build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The installer will be generated in `src-tauri/target/release/bundle/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architecture Details
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+* **Frontend:** Next.js configured in pure static export mode (`output: 'export'`), styled with TailwindCSS, executing completely offline.
+* **Backend:** Tauri Rust shell handling all OS-level operations and hosting the SQLite driver.
+* **Database:** Embedded SQLite database (`%AppData%/summer/local.db`) transparently encrypted at rest natively using AES-256 (via `sqlx` and `sqlcipher`).
+* **Security:** Passwords are mathematically hashed locally using the memory-hard `Argon2` algorithm.
+* **Calculations:** Dual-currency USD/KHR checkout logic with integrated 10% VAT and 3% PLT auto-calculation. KHR calculations implement the required Base-100 roundings specified by the GDT/NBC.
