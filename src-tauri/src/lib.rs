@@ -2,7 +2,6 @@ mod commands;
 mod db;
 mod models;
 
-use sqlx::SqlitePool;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
