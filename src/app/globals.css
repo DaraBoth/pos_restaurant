@@ -1,0 +1,133 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Khmer:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-dark: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-sidebar: #13161e;
+  --bg-elevated: #21263a;
+  --accent: #f59e0b;
+  --accent-hover: #d97706;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --text-primary: #f0f2f8;
+  --text-secondary: #8b92a8;
+  --border: #2a2f45;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Inter', 'Noto Sans Khmer', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Khmer font boosting */
+[lang="km"], .khmer {
+  font-family: 'Noto Sans Khmer', sans-serif;
+  line-height: 1.8;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4060; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+  50%       { box-shadow: 0 0 14px rgba(16, 185, 129, 0.8); }
+}
+
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+.animate-slide-up { animation: slideUp 0.25s ease-out; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+/* Glass card */
+.glass {
+  background: rgba(26, 29, 39, 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+
+/* Product card hover */
+.product-card {
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.product-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2);
+}
+.product-card:active {
+  transform: translateY(0);
+}
+
+/* Button styles */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #e08b00);
+  color: #000;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); filter: brightness(0.95); }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+.btn-ghost:hover { background: var(--bg-elevated); border-color: #3a4060; color: var(--text-primary); }
+
+/* Status badge */
+.status-local {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.status-offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Input */
+.input-dark {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input-dark:focus { border-color: var(--accent); }
+.input-dark::placeholder { color: var(--text-secondary); }
+
+/* Modal overlay */
+.modal-overlay {
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+}
