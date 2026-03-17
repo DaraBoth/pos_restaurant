@@ -55,6 +55,9 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-white">
                         KH POS
                     </h1>
+                    <div className="mt-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] uppercase tracking-widest font-bold text-[var(--accent)]">
+                        v0.1.0-cloud-test
+                    </div>
                     <p className="text-sm mt-2 font-medium text-[var(--text-secondary)]">
                         Sign in to your dashboard
                     </p>
