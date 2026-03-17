@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote } from 'lucide-react';
+import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight } from 'lucide-react';
 import { getRestaurant, RestaurantInput, updateRestaurant } from '@/lib/tauri-commands';
 
 const DEFAULT: RestaurantInput = {
@@ -16,9 +16,22 @@ const DEFAULT: RestaurantInput = {
     receipt_footer: 'Thank you for dining with us!',
 };
 
+const SAMPLE_SETUP_INFO: RestaurantInput = {
+    name: 'Volt Burger Phnom Penh',
+    khmer_name: 'វ៉ុល ប៊ឺហ្គឺ ភ្នំពេញ',
+    address: 'No. 123, Monivong Blvd, Phnom Penh',
+    address_kh: 'ផ្ទះលេខ ១២៣ មហាវិថីមុនីវង្ស ភ្នំពេញ',
+    phone: '+855 12 345 678',
+    tin: 'K000-123456789',
+    vat_number: 'VAT-PP-2026-001',
+    website: 'www.voltburger.kh',
+    receipt_footer: 'Thank you for dining with us!\nPlease come again.',
+};
+
 interface RestaurantSettingsFormProps {
     mode: 'setup' | 'manage';
     onSaved?: () => void;
+    onNext?: () => void;
 }
 
 interface FormFieldProps {
@@ -58,7 +71,7 @@ function FormField({ label, value, placeholder, icon: Icon, multiline, onChange 
     );
 }
 
-export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSettingsFormProps) {
+export default function RestaurantSettingsForm({ mode, onSaved, onNext }: RestaurantSettingsFormProps) {
     const [info, setInfo] = useState<RestaurantInput>(DEFAULT);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -71,7 +84,7 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
             try {
                 const restaurant = await getRestaurant();
                 if (!cancelled) {
-                    setInfo({
+                    const loadedInfo = {
                         name: restaurant.name || '',
                         khmer_name: restaurant.khmer_name || '',
                         address: restaurant.address || '',
@@ -81,7 +94,29 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
                         vat_number: restaurant.vat_number || '',
                         website: restaurant.website || '',
                         receipt_footer: restaurant.receipt_footer || DEFAULT.receipt_footer,
-                    });
+                    };
+
+                    const isSetupTemplate =
+                        !loadedInfo.name ||
+                        loadedInfo.name === 'My Restaurant' ||
+                        !loadedInfo.address ||
+                        !loadedInfo.phone;
+
+                    if (mode === 'setup' && isSetupTemplate) {
+                        setInfo({
+                            name: loadedInfo.name && loadedInfo.name !== 'My Restaurant' ? loadedInfo.name : SAMPLE_SETUP_INFO.name,
+                            khmer_name: loadedInfo.khmer_name || SAMPLE_SETUP_INFO.khmer_name,
+                            address: loadedInfo.address || SAMPLE_SETUP_INFO.address,
+                            address_kh: loadedInfo.address_kh || SAMPLE_SETUP_INFO.address_kh,
+                            phone: loadedInfo.phone || SAMPLE_SETUP_INFO.phone,
+                            tin: loadedInfo.tin || SAMPLE_SETUP_INFO.tin,
+                            vat_number: loadedInfo.vat_number || SAMPLE_SETUP_INFO.vat_number,
+                            website: loadedInfo.website || SAMPLE_SETUP_INFO.website,
+                            receipt_footer: loadedInfo.receipt_footer || SAMPLE_SETUP_INFO.receipt_footer,
+                        });
+                    } else {
+                        setInfo(loadedInfo);
+                    }
                 }
             } catch (error) {
                 console.error(error);
@@ -101,6 +136,11 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
 
     function update(field: keyof RestaurantInput, value: string) {
         setInfo(prev => ({ ...prev, [field]: value }));
+        setSaved(false);
+    }
+
+    function handleFillSample() {
+        setInfo(SAMPLE_SETUP_INFO);
         setSaved(false);
     }
 
@@ -161,8 +201,33 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
                     }`}
                 >
                     {saving ? <RefreshCw size={18} className="animate-spin" /> : saved ? <RefreshCw size={18} /> : <Save size={18} />}
-                    {saved ? 'Saved' : mode === 'setup' ? 'Save And Continue' : 'Update Settings'}
+                    {saved ? 'Saved' : mode === 'setup' ? 'Save Information' : 'Update Settings'}
                 </button>
+
+                {mode === 'setup' && (
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleFillSample}
+                            type="button"
+                            className="px-5 py-3 rounded-xl border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all font-bold text-xs uppercase tracking-widest"
+                        >
+                            Fill Sample Data
+                        </button>
+                        <button
+                            onClick={onNext}
+                            type="button"
+                            disabled={!saved || saving}
+                            className={`px-8 py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-3 transition-all ${
+                                saved && !saving
+                                    ? 'bg-green-500 text-black hover:brightness-110'
+                                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                            }`}
+                        >
+                            <ArrowRight size={18} />
+                            Next
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -8,7 +8,7 @@ export default function SetupPage() {
 
     return (
         <div className="min-h-screen bg-[#0f1115] px-6 py-10">
-            <RestaurantSettingsForm mode="setup" onSaved={() => router.replace('/pos/tables')} />
+            <RestaurantSettingsForm mode="setup" onNext={() => router.replace('/pos/tables')} />
         </div>
     );
 }
