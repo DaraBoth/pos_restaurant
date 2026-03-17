@@ -176,6 +176,24 @@ pub async fn checkout_order(
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
+    // Deduct stock for each item sold
+    let sold_items: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0"
+    )
+    .bind(&order_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    for (p_id, qty) in sold_items {
+        sqlx::query("UPDATE products SET stock_quantity = stock_quantity - ?, updated_at=datetime('now') WHERE id = ?")
+            .bind(qty)
+            .bind(&p_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| format!("Stock deduction error: {}", e))?;
+    }
+
     // Record payments
     for p in &payments {
         let pid = uuid::Uuid::new_v4().to_string();

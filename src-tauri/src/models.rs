@@ -37,9 +37,17 @@ pub struct Product {
     pub name: String,
     pub khmer_name: Option<String>,
     pub price_cents: i64,
+    pub stock_quantity: i64,
     pub is_available: i64,
     pub category_name: Option<String>,
     pub category_khmer: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct FloorTable {
+    pub id: String,
+    pub name: String,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

@@ -40,6 +40,7 @@ pub fn run() {
             commands::products::get_products,
             commands::products::create_product,
             commands::products::update_product,
+            commands::products::update_stock,
             commands::products::delete_product,
             commands::products::create_category,
             // Orders
@@ -55,6 +56,10 @@ pub fn run() {
             commands::exchange::set_exchange_rate,
             commands::exchange::get_db_status,
             commands::exchange::get_payments_for_order,
+            // Tables
+            commands::tables::get_tables,
+            commands::tables::create_table,
+            commands::tables::delete_table,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

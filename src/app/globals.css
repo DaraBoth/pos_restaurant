@@ -1,232 +1,109 @@
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/Inter-Regular.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/Inter-Bold.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Noto Sans Khmer';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/NotoSansKhmer-Regular.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Noto Sans Khmer';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/NotoSansKhmer-Bold.ttf') format('truetype');
-}
-
 @import "tailwindcss";
 
+@theme {
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-accent: var(--accent);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-green: var(--accent-green);
+  --color-accent-red: var(--accent-red);
+  --color-accent-pink: var(--accent-pink);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-space: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+}
+
 :root {
-  --bg-dark: #0f1117;
-  --bg-card: #1a1d27;
-  --bg-sidebar: #13161e;
-  --bg-elevated: #21263a;
-  --accent: #f59e0b;
-  --accent-hover: #d97706;
-  --accent-green: #10b981;
-  --accent-red: #ef4444;
+  /* Clean Professional Dark Theme */
+  --background: #0f1115;
+  --foreground: #f8fafc;
+
+  /* Card / Layering */
+  --bg-card: #181a20;
+  --bg-elevated: #22252d;
+  --bg-dark: #090a0c;
+
+  /* Professional Accents */
+  --accent: #3b82f6; /* Trust blue */
   --accent-blue: #3b82f6;
-  --accent-purple: #8b5cf6;
-  --text-primary: #f0f2f8;
-  --text-secondary: #8b92a8;
-  --border: #2a2f45;
+  --accent-green: #10b981; 
+  --accent-red: #ef4444; 
+  --accent-pink: #d946ef; 
+  
+  --text-secondary: #94a3b8;
+  --border: rgba(255, 255, 255, 0.08);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
 body {
-  height: 100%;
-  background: var(--bg-dark);
-  color: var(--text-primary);
-  font-family: 'Inter', 'Noto Sans Khmer', sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  user-select: none;
-  overflow: hidden;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Khmer font boosting */
-[lang="km"],
-.khmer {
-  font-family: 'Noto Sans Khmer', sans-serif;
-  line-height: 1.8;
-}
-
-/* Scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #3a4060;
+/* Base Typographic Overrides */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse-glow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
-  }
-
-  50% {
-    box-shadow: 0 0 14px rgba(16, 185, 129, 0.8);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn 0.2s ease-out forwards;
 }
 
-.animate-slide-up {
-  animation: slideUp 0.25s ease-out;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Glass card */
-.glass {
-  background: rgba(26, 29, 39, 0.8);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
-}
-
-/* Product card hover */
-.product-card {
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-
-.product-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2);
-}
-
-.product-card:active {
-  transform: translateY(0);
-}
-
-/* Button styles */
+/* Base Primary Button - Clean & Professional */
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #e08b00);
-  color: #000;
-  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  cursor: pointer;
   transition: all 0.15s ease;
 }
-
-.btn-primary:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.btn-primary:active {
-  transform: translateY(0);
-  filter: brightness(0.95);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  transition: all 0.15s ease;
-}
-
-.btn-ghost:hover {
-  background: var(--bg-elevated);
-  border-color: #3a4060;
-  color: var(--text-primary);
-}
-
-/* Status badge */
-.status-local {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--accent-green);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.status-offline {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--accent-red);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-/* Input */
-.input-dark {
+/* Inputs */
+.input-bento {
   background: var(--bg-dark);
   border: 1px solid var(--border);
-  color: var(--text-primary);
+  color: var(--foreground);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+.input-bento:focus {
   outline: none;
-  transition: border-color 0.15s;
-}
-
-.input-dark:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-.input-dark::placeholder {
-  color: var(--text-secondary);
-}
+/* Hide scrollbars for aesthetic */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-/* Modal overlay */
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.15s ease;
+/* Khmer font specific fix */
+.khmer {
+  font-family: "Siemreap", "Suwannaphum", sans-serif;
+  letter-spacing: 0;
 }

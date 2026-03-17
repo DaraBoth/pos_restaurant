@@ -40,9 +40,16 @@ export interface Product {
     name: string;
     khmer_name?: string;
     price_cents: number;
+    stock_quantity: number;
     is_available: number;
     category_name?: string;
     category_khmer?: string;
+}
+
+export interface FloorTable {
+    id: string;
+    name: string;
+    status: string;
 }
 
 export interface OrderItem {
@@ -122,16 +129,19 @@ export const getProducts = (category_id?: string) =>
 
 export const createProduct = (
     category_id: string, name: string,
-    khmer_name?: string, price_cents?: number
-) => call<string>('create_product', { categoryId: category_id, name, khmerName: khmer_name, priceCents: price_cents });
+    khmer_name?: string, price_cents?: number, stock_quantity?: number
+) => call<string>('create_product', { categoryId: category_id, name, khmerName: khmer_name, priceCents: price_cents || 0, stockQuantity: stock_quantity || 0 });
 
 export const updateProduct = (
     id: string, name: string, khmer_name: string | undefined,
-    price_cents: number, category_id: string, is_available: boolean
+    price_cents: number, stock_quantity: number, category_id: string, is_available: boolean
 ) => call<void>('update_product', {
-    id, name, khmerName: khmer_name, priceCents: price_cents,
+    id, name, khmerName: khmer_name, priceCents: price_cents, stockQuantity: stock_quantity,
     categoryId: category_id, isAvailable: is_available
 });
+
+export const updateStock = (id: string, delta: number) =>
+    call<void>('update_stock', { id, delta });
 
 export const deleteProduct = (id: string) => call<void>('delete_product', { id });
 
@@ -171,3 +181,8 @@ export const getDbStatus = () => call<DbStatus>('get_db_status');
 
 export const getPaymentsForOrder = (order_id: string) =>
     call<Payment[]>('get_payments_for_order', { orderId: order_id });
+
+// --------------- Table Commands ---------------
+export const getTables = () => call<FloorTable[]>('get_tables');
+export const createTable = (name: string) => call<FloorTable>('create_table', { name });
+export const deleteTable = (id: string) => call<void>('delete_table', { id });

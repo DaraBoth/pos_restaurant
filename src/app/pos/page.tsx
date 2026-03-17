@@ -9,9 +9,9 @@ export default function POSPage() {
 
     return (
         <>
-            <div className="flex h-full w-full bg-[var(--bg-dark)]">
+            <div className="flex flex-1 w-full min-h-0" style={{ background: 'var(--bg-dark)' }}>
                 {/* Main Product Area */}
-                <div className="flex-1 flex flex-col relative">
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
                     <ProductGrid />
                 </div>
 

@@ -2,3 +2,4 @@ pub mod auth;
 pub mod products;
 pub mod orders;
 pub mod exchange;
+pub mod tables;

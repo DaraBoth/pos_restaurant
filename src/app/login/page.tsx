@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { login } from '@/lib/tauri-commands';
-import { ShoppingBag, Lock, User, Globe } from 'lucide-react';
+import { ArrowRight, Lock, User, Globe, ChefHat } from 'lucide-react';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('admin');
@@ -31,101 +31,121 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #0f1117 0%, #13161e 50%, #1a1030 100%)' }}>
-
-            {/* Background decorations */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-10"
-                    style={{ background: 'radial-gradient(circle, #f59e0b, transparent)' }} />
-                <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full opacity-10"
-                    style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }} />
-            </div>
-
+        <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#0f1115]">
+            
             {/* Language toggle */}
             <button
                 onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-                className="absolute top-6 right-6 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all btn-ghost"
+                className="absolute top-6 right-6 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all z-10 bg-[#181a20] border border-white/5 hover:bg-white/5"
             >
-                <Globe size={14} />
-                {lang === 'en' ? 'ខ្មែរ' : 'English'}
+                <Globe size={16} className="text-[var(--accent)]"/>
+                {lang === 'en' ? 'ភាសាខ្មែរ' : 'English'}
             </button>
 
-            {/* Login card */}
-            <div className="glass rounded-2xl p-8 w-full max-w-md relative z-10 animate-slide-up">
-                {/* Logo */}
-                <div className="flex items-center justify-center gap-3 mb-8">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-                        <ShoppingBag size={24} color="#000" />
+            {/* Main Login Container */}
+            <div className="relative z-10 w-full max-w-sm mx-auto px-4 animate-fade-in">
+                
+                {/* Logo & Headline */}
+                <div className="flex flex-col items-center mb-10">
+                    <div className="relative mb-6">
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--accent)] shadow-lg shadow-[var(--accent)]/20">
+                            <ChefHat size={32} color="#fff" strokeWidth={2} />
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>KH POS</h1>
-                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Cambodia Restaurant System</p>
-                    </div>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">
+                        KH POS
+                    </h1>
+                    <p className="text-sm mt-2 font-medium text-[var(--text-secondary)]">
+                        Sign in to your dashboard
+                    </p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-5">
-                    <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                            {t('username')}
-                        </label>
-                        <div className="relative">
-                            <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: 'var(--text-secondary)' }} />
-                            <input
-                                type="text"
-                                value={username}
-                                onChange={e => setUsername(e.target.value)}
-                                required
-                                className="input-dark w-full pl-10 pr-4 py-3 rounded-xl text-sm"
-                                placeholder="admin"
-                                autoComplete="username"
-                            />
+                {/* Login Card */}
+                <div className="bg-[#181a20] border border-white/10 rounded-2xl p-8 shadow-2xl">
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        {/* Username */}
+                        <div className="space-y-2">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                                {t('username')}
+                            </label>
+                            <div className="relative">
+                                <User
+                                    size={18}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]"
+                                />
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={e => setUsername(e.target.value)}
+                                    required
+                                    className="input-bento w-full pl-12 pr-4 py-3 text-sm font-medium"
+                                    placeholder="admin"
+                                    autoComplete="username"
+                                />
+                            </div>
                         </div>
+
+                        {/* Password */}
+                        <div className="space-y-2">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                                {t('password')}
+                            </label>
+                            <div className="relative">
+                                <Lock
+                                    size={18}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]"
+                                />
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    required
+                                    className="input-bento w-full pl-12 pr-4 py-3 text-sm font-medium"
+                                    placeholder="••••••••"
+                                    autoComplete="current-password"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Error Bubble */}
+                        {error && (
+                            <div className="rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400">
+                                <span>⚠</span> {error}
+                            </div>
+                        )}
+
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="btn-primary w-full py-3.5 text-sm mt-2 flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    {t('loading')}
+                                </div>
+                            ) : (
+                                <>
+                                    {t('login')}
+                                    <ArrowRight size={16} />
+                                </>
+                            )}
+                        </button>
+                    </form>
+                </div>
+
+                {/* Bottom Footer Hint */}
+                <div className="mt-8 text-center space-y-2">
+                    <p className="text-xs font-medium text-[var(--text-secondary)]">
+                        Default Credentials
+                    </p>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/5 bg-[#181a20]">
+                        <span className="font-mono text-xs font-semibold text-white">admin</span>
+                        <span className="text-[var(--text-secondary)]">/</span>
+                        <span className="font-mono text-xs font-semibold text-[var(--accent)]">admin123</span>
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                            {t('password')}
-                        </label>
-                        <div className="relative">
-                            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: 'var(--text-secondary)' }} />
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                required
-                                className="input-dark w-full pl-10 pr-4 py-3 rounded-xl text-sm"
-                                placeholder="••••••••"
-                                autoComplete="current-password"
-                            />
-                        </div>
-                    </div>
-
-                    {error && (
-                        <div className="rounded-xl p-3 text-sm animate-fade-in"
-                            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
-                            {error}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="btn-primary w-full py-3 rounded-xl text-base flex items-center justify-center gap-2 disabled:opacity-60"
-                    >
-                        {loading
-                            ? <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> {t('loading')}</>
-                            : t('login')
-                        }
-                    </button>
-                </form>
-
-                <p className="text-center text-xs mt-6" style={{ color: 'var(--text-secondary)' }}>
-                    Default: <span className="font-mono">admin / admin123</span>
-                </p>
+                </div>
             </div>
         </div>
     );

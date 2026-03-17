@@ -26,13 +26,19 @@ pub async fn init_db(db_path: PathBuf, key: &str) -> anyhow::Result<SqlitePool> 
 }
 
 async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
-    let migration_sql = include_str!("migrations/001_initial_schema.sql");
+    let migrations = [
+        include_str!("migrations/001_initial_schema.sql"),
+        include_str!("migrations/002_add_features.sql"),
+    ];
 
-    // Split on semicolons and execute each statement
-    for stmt in migration_sql.split(';') {
-        let trimmed = stmt.trim();
-        if !trimmed.is_empty() {
-            sqlx::query(trimmed).execute(pool).await?;
+    for migration_sql in migrations {
+        // Split on semicolons and execute each statement
+        for stmt in migration_sql.split(';') {
+            let trimmed = stmt.trim();
+            if !trimmed.is_empty() {
+                // Ignore errors for things like adding columns that already exist
+                let _ = sqlx::query(trimmed).execute(pool).await;
+            }
         }
     }
 

@@ -20,7 +20,7 @@ pub async fn get_products(
 ) -> Result<Vec<Product>, String> {
     let products = if let Some(cat_id) = category_id {
         sqlx::query_as::<_, Product>(
-            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available,
+            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available,
                     c.name AS category_name, c.khmer_name AS category_khmer
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.category_id = ?
@@ -31,7 +31,7 @@ pub async fn get_products(
         .await
     } else {
         sqlx::query_as::<_, Product>(
-            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available,
+            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available,
                     c.name AS category_name, c.khmer_name AS category_khmer
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.is_available = 1
@@ -50,17 +50,19 @@ pub async fn create_product(
     name: String,
     khmer_name: Option<String>,
     price_cents: i64,
+    stock_quantity: i64,
     pool: State<'_, SqlitePool>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity) VALUES (?, ?, ?, ?, ?, ?)"
     )
     .bind(&id)
     .bind(&category_id)
     .bind(&name)
     .bind(&khmer_name)
     .bind(price_cents)
+    .bind(stock_quantity)
     .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -73,19 +75,38 @@ pub async fn update_product(
     name: String,
     khmer_name: Option<String>,
     price_cents: i64,
+    stock_quantity: i64,
     category_id: String,
     is_available: bool,
     pool: State<'_, SqlitePool>,
 ) -> Result<(), String> {
     sqlx::query(
-        "UPDATE products SET name=?, khmer_name=?, price_cents=?, category_id=?, is_available=?, updated_at=datetime('now')
+        "UPDATE products SET name=?, khmer_name=?, price_cents=?, stock_quantity=?, category_id=?, is_available=?, updated_at=datetime('now')
          WHERE id=?"
     )
     .bind(&name)
     .bind(&khmer_name)
     .bind(price_cents)
+    .bind(stock_quantity)
     .bind(&category_id)
     .bind(is_available as i64)
+    .bind(&id)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_stock(
+    id: String,
+    delta: i64,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    sqlx::query(
+        "UPDATE products SET stock_quantity = stock_quantity + ?, updated_at=datetime('now') WHERE id=?"
+    )
+    .bind(delta)
     .bind(&id)
     .execute(pool.inner())
     .await
