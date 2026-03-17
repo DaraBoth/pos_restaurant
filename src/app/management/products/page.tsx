@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { getProducts, getCategories, deleteProduct, updateStock, Product, Category } from '@/lib/tauri-commands';
 import { useLanguage } from '@/contexts/LanguageContext';

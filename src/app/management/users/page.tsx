@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { getUsers, deleteUser, UserSession } from '@/lib/tauri-commands';
 import { useLanguage } from '@/contexts/LanguageContext';
