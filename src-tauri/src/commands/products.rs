@@ -1,5 +1,5 @@
 use tauri::State;
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, Row};
 use crate::models::{Category, Product};
 
 #[tauri::command]
@@ -46,7 +46,7 @@ pub async fn get_products(
 
 #[tauri::command]
 pub async fn get_inventory_logs(pool: State<'_, SqlitePool>) -> Result<Vec<serde_json::Value>, String> {
-    let logs = sqlx::query!(
+    let logs = sqlx::query(
         r#"
         SELECT 
             il.id, 
@@ -67,12 +67,12 @@ pub async fn get_inventory_logs(pool: State<'_, SqlitePool>) -> Result<Vec<serde
 
     let result = logs.into_iter().map(|row| {
         serde_json::json!({
-            "id": row.id,
-            "product_id": row.product_id,
-            "product_name": row.product_name,
-            "change_amount": row.change_amount,
-            "reason": row.reason,
-            "created_at": row.created_at
+            "id": row.get::<String, _>("id"),
+            "product_id": row.get::<String, _>("product_id"),
+            "product_name": row.get::<String, _>("product_name"),
+            "change_amount": row.get::<i64, _>("change_amount"),
+            "reason": row.get::<String, _>("reason"),
+            "created_at": row.get::<String, _>("created_at")
         })
     }).collect();
 
