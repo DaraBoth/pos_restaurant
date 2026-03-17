@@ -92,3 +92,46 @@ pub async fn delete_user(id: String, pool: State<'_, SqlitePool>) -> Result<(), 
         .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn update_user(
+    id: String,
+    password: Option<String>,
+    role: String,
+    full_name: Option<String>,
+    khmer_name: Option<String>,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    if let Some(pwd) = password {
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(pwd.as_bytes(), &salt)
+            .map_err(|e| format!("Hash error: {}", e))?
+            .to_string();
+
+        sqlx::query(
+            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?"
+        )
+        .bind(&hash)
+        .bind(&role)
+        .bind(&full_name)
+        .bind(&khmer_name)
+        .bind(&id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+    } else {
+        sqlx::query(
+            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?"
+        )
+        .bind(&role)
+        .bind(&full_name)
+        .bind(&khmer_name)
+        .bind(&id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+    }
+
+    Ok(())
+}

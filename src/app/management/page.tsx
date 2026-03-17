@@ -6,9 +6,16 @@ const QUICK_LINKS = [
     { 
         href: '/management/products', 
         label: 'Products', 
-        desc: 'Manage menu items, categories, and inventory stock.', 
+        desc: 'Manage menu items, prices, and stock levels.', 
         icon: Package, 
-        color: '#3b82f6' // Trust Blue
+        color: '#3b82f6'
+    },
+    { 
+        href: '/management/categories', 
+        label: 'Categories', 
+        desc: 'Organize products into logical groups.', 
+        icon: Building2, 
+        color: '#3b82f6'
     },
     { 
         href: '/management/users', 

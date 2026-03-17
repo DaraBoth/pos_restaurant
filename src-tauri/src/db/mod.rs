@@ -29,6 +29,7 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
     let migrations = [
         include_str!("migrations/001_initial_schema.sql"),
         include_str!("migrations/002_add_features.sql"),
+        include_str!("migrations/003_add_images_and_inventory.sql"),
     ];
 
     for migration_sql in migrations {

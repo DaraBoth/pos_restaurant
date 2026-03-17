@@ -161,6 +161,18 @@ export default function ProductGrid() {
                                         borderRadius: '2rem',
                                     }}
                                 >
+                                    {/* Product Image */}
+                                    {product.image_path && (
+                                        <div className="absolute inset-0 z-0">
+                                            <img 
+                                                src={`https://asset.localhost/${product.image_path}`}
+                                                alt={product.name}
+                                                className="w-full h-full object-cover opacity-20 group-hover:opacity-40 transition-opacity"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/40 to-transparent" />
+                                        </div>
+                                    )}
+
                                     {/* Content Container */}
                                     <div className="p-5 flex-1 flex flex-col relative z-20">
                                         <div className="flex justify-between items-start mb-4">
@@ -168,7 +180,7 @@ export default function ProductGrid() {
                                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
                                                 outOfStock ? 'bg-red-500/20 text-red-500' : 'bg-green-500/10 text-green-400'
                                             }`}>
-                                                {outOfStock ? 'OUT_OF_STOCK' : `${product.stock_quantity} IN_STOCK`}
+                                                {outOfStock ? 'SOLDOUT' : `${product.stock_quantity} IN_STOCK`}
                                             </span>
                                             
                                             {/* Action Icon */}

@@ -39,6 +39,7 @@ pub struct Product {
     pub price_cents: i64,
     pub stock_quantity: i64,
     pub is_available: i64,
+    pub image_path: Option<String>,
     pub category_name: Option<String>,
     pub category_khmer: Option<String>,
 }

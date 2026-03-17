@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
     });
 }
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+export async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     if (typeof invoke === 'undefined') {
         throw new Error('Tauri not available — running outside of desktop app.');
     }
@@ -42,6 +42,7 @@ export interface Product {
     price_cents: number;
     stock_quantity: number;
     is_available: number;
+    image_path?: string;
     category_name?: string;
     category_khmer?: string;
 }
@@ -119,25 +120,38 @@ export const createUser = (
 
 export const getUsers = () => call<UserSession[]>('get_users');
 
+export const updateUser = (
+    id: string, password: string | undefined, role: string,
+    full_name?: string, khmer_name?: string
+) => call<void>('update_user', { id, password, role, fullName: full_name, khmerName: khmer_name });
+
 export const deleteUser = (id: string) => call<void>('delete_user', { id });
 
 // --------------- Product Commands ---------------
 export const getCategories = () => call<Category[]>('get_categories');
+
+export const getInventoryLogs = () => call<any[]>('get_inventory_logs');
 
 export const getProducts = (category_id?: string) =>
     call<Product[]>('get_products', { categoryId: category_id });
 
 export const createProduct = (
     category_id: string, name: string,
-    khmer_name?: string, price_cents?: number, stock_quantity?: number
-) => call<string>('create_product', { categoryId: category_id, name, khmerName: khmer_name, priceCents: price_cents || 0, stockQuantity: stock_quantity || 0 });
+    khmer_name?: string, price_cents?: number, stock_quantity?: number,
+    image_path?: string
+) => call<string>('create_product', { 
+    categoryId: category_id, name, khmerName: khmer_name, 
+    priceCents: price_cents || 0, stockQuantity: stock_quantity || 0,
+    imagePath: image_path 
+});
 
 export const updateProduct = (
     id: string, name: string, khmer_name: string | undefined,
-    price_cents: number, stock_quantity: number, category_id: string, is_available: boolean
+    price_cents: number, stock_quantity: number, category_id: string, 
+    is_available: boolean, image_path?: string
 ) => call<void>('update_product', {
     id, name, khmerName: khmer_name, priceCents: price_cents, stockQuantity: stock_quantity,
-    categoryId: category_id, isAvailable: is_available
+    categoryId: category_id, isAvailable: is_available, imagePath: image_path
 });
 
 export const updateStock = (id: string, delta: number) =>
@@ -147,6 +161,12 @@ export const deleteProduct = (id: string) => call<void>('delete_product', { id }
 
 export const createCategory = (name: string, khmer_name?: string) =>
     call<string>('create_category', { name, khmerName: khmer_name });
+
+export const updateCategory = (id: string, name: string, khmer_name?: string) =>
+    call<void>('update_category', { id, name, khmerName: khmer_name });
+
+export const deleteCategory = (id: string) =>
+    call<void>('delete_category', { id });
 
 // --------------- Order Commands ---------------
 export const createOrder = (user_id: string, table_id?: string) =>
