@@ -21,6 +21,43 @@ interface RestaurantSettingsFormProps {
     onSaved?: () => void;
 }
 
+interface FormFieldProps {
+    label: string;
+    value: string;
+    placeholder?: string;
+    icon?: React.ElementType;
+    multiline?: boolean;
+    onChange: (value: string) => void;
+}
+
+function FormField({ label, value, placeholder, icon: Icon, multiline, onChange }: FormFieldProps) {
+    return (
+        <div className="space-y-3">
+            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#8a8a99]">
+                {Icon && <Icon size={14} className="text-[var(--accent)]" />}
+                {label}
+            </label>
+            {multiline ? (
+                <textarea
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    placeholder={placeholder}
+                    rows={3}
+                    className="w-full bg-black border border-white/10 text-white px-5 py-4 rounded-2xl text-sm font-bold transition-all focus:border-[var(--accent)] focus:outline-none resize-none placeholder:text-white/20"
+                />
+            ) : (
+                <input
+                    type="text"
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    placeholder={placeholder}
+                    className="w-full bg-black border border-white/10 text-white px-5 py-4 rounded-2xl text-sm font-bold transition-all focus:border-[var(--accent)] focus:outline-none placeholder:text-white/20"
+                />
+            )}
+        </div>
+    );
+}
+
 export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSettingsFormProps) {
     const [info, setInfo] = useState<RestaurantInput>(DEFAULT);
     const [loading, setLoading] = useState(true);
@@ -87,41 +124,6 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
         }
     }
 
-    const Field = ({
-        label, value, field, placeholder, icon: Icon, multiline
-    }: {
-        label: string;
-        value: string;
-        field: keyof RestaurantInput;
-        placeholder?: string;
-        icon?: React.ElementType;
-        multiline?: boolean;
-    }) => (
-        <div className="space-y-3">
-            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#8a8a99]">
-                {Icon && <Icon size={14} className="text-[var(--accent)]" />}
-                {label}
-            </label>
-            {multiline ? (
-                <textarea
-                    value={value}
-                    onChange={e => update(field, e.target.value)}
-                    placeholder={placeholder}
-                    rows={3}
-                    className="w-full bg-black border border-white/10 text-white px-5 py-4 rounded-2xl text-sm font-bold transition-all focus:border-[var(--accent)] focus:outline-none resize-none placeholder:text-white/20"
-                />
-            ) : (
-                <input
-                    type="text"
-                    value={value}
-                    onChange={e => update(field, e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full bg-black border border-white/10 text-white px-5 py-4 rounded-2xl text-sm font-bold transition-all focus:border-[var(--accent)] focus:outline-none placeholder:text-white/20"
-                />
-            )}
-        </div>
-    );
-
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
@@ -171,14 +173,14 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
                             Identity & Contact
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                            <Field label="Restaurant Name (English)" value={info.name || ''} field="name" placeholder="Volt Burger" icon={Building2} />
-                            <Field label="Restaurant Name (Khmer)" value={info.khmer_name || ''} field="khmer_name" placeholder="ហាងប៊ឺហ្គឺវ៉ុល" icon={Building2} />
+                            <FormField label="Restaurant Name (English)" value={info.name || ''} onChange={value => update('name', value)} placeholder="Volt Burger" icon={Building2} />
+                            <FormField label="Restaurant Name (Khmer)" value={info.khmer_name || ''} onChange={value => update('khmer_name', value)} placeholder="ហាងប៊ឺហ្គឺវ៉ុល" icon={Building2} />
                             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Field label="Address (English)" value={info.address || ''} field="address" placeholder="123 Neon Ave" icon={MapPin} />
-                                <Field label="Address (Khmer)" value={info.address_kh || ''} field="address_kh" placeholder="១២៣ ផ្លូវនីអុង" icon={MapPin} />
+                                <FormField label="Address (English)" value={info.address || ''} onChange={value => update('address', value)} placeholder="123 Neon Ave" icon={MapPin} />
+                                <FormField label="Address (Khmer)" value={info.address_kh || ''} onChange={value => update('address_kh', value)} placeholder="១២៣ ផ្លូវនីអុង" icon={MapPin} />
                             </div>
-                            <Field label="Phone" value={info.phone || ''} field="phone" placeholder="+855 ..." icon={Phone} />
-                            <Field label="Website" value={info.website || ''} field="website" placeholder="voltburger.kh" icon={Globe} />
+                            <FormField label="Phone" value={info.phone || ''} onChange={value => update('phone', value)} placeholder="+855 ..." icon={Phone} />
+                            <FormField label="Website" value={info.website || ''} onChange={value => update('website', value)} placeholder="voltburger.kh" icon={Globe} />
                         </div>
                     </section>
 
@@ -188,8 +190,8 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
                                 Compliance
                             </h2>
                             <div className="space-y-6">
-                                <Field label="Tax ID (TIN)" value={info.tin || ''} field="tin" placeholder="K000-0000..." icon={Hash} />
-                                <Field label="VAT Number" value={info.vat_number || ''} field="vat_number" placeholder="VAT-..." icon={Hash} />
+                                <FormField label="Tax ID (TIN)" value={info.tin || ''} onChange={value => update('tin', value)} placeholder="K000-0000..." icon={Hash} />
+                                <FormField label="VAT Number" value={info.vat_number || ''} onChange={value => update('vat_number', value)} placeholder="VAT-..." icon={Hash} />
                             </div>
                         </section>
 
@@ -212,10 +214,10 @@ export default function RestaurantSettingsForm({ mode, onSaved }: RestaurantSett
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
                             Receipt Footer
                         </h2>
-                        <Field
+                        <FormField
                             label="Receipt Message"
                             value={info.receipt_footer || ''}
-                            field="receipt_footer"
+                            onChange={value => update('receipt_footer', value)}
                             placeholder="Thank you for your visit."
                             icon={StickyNote}
                             multiline
