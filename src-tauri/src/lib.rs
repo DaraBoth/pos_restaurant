@@ -36,6 +36,9 @@ pub fn run() {
             commands::auth::get_users,
             commands::auth::update_user,
             commands::auth::delete_user,
+            commands::restaurant::get_restaurant,
+            commands::restaurant::get_setup_status,
+            commands::restaurant::update_restaurant,
             // Products & Categories
             commands::products::get_categories,
             commands::products::get_products,
@@ -53,6 +56,8 @@ pub fn run() {
             commands::orders::update_order_item_quantity,
             commands::orders::get_order_items,
             commands::orders::get_orders,
+            commands::orders::get_active_order_for_table,
+            commands::orders::get_orders_for_table,
             commands::orders::checkout_order,
             commands::orders::void_order,
             // Exchange Rates & DB

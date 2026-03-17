@@ -1,7 +1,8 @@
 'use client';
 import SidebarNav from '@/components/layout/SidebarNav';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Package, Users, RefreshCw, ClipboardList, Building2 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -56,6 +57,12 @@ export default function ManagementLayout({ children }: { children: React.ReactNo
 
 function SideNavItems() {
     const pathname = usePathname();
+    const router = useRouter();
+
+    useEffect(() => {
+        NAV_ITEMS.forEach(({ href }) => router.prefetch(href));
+    }, [router]);
+
     return (
         <>
             {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
@@ -64,6 +71,7 @@ function SideNavItems() {
                     <Link
                         key={href}
                         href={href}
+                        prefetch
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all group ${
                             active 
                                 ? 'bg-[var(--accent)] text-white shadow-sm' 

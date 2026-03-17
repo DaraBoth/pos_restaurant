@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS restaurants (
     khmer_name  TEXT,
     tin         TEXT,
     address     TEXT,
+    address_kh  TEXT,
+    phone       TEXT,
+    website     TEXT,
+    vat_number  TEXT,
+    receipt_footer TEXT,
     is_deleted  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT
@@ -137,13 +142,4 @@ INSERT OR IGNORE INTO products (id, category_id, name, khmer_name, price_cents)
 VALUES
     ('prod-0000-0001', 'cat-00000000-0000-0000-0000-000000000001', 'Beef Lok Lak', 'គោឡុកឡាក់', 500),
     ('prod-0000-0002', 'cat-00000000-0000-0000-0000-000000000001', 'Amok Fish', 'អាម៉ុកត្រី', 450),
-    ('prod-0000-0003', 'cat-00000000-0000-0000-0000-000000000001', 'Fried Rice', 'បាយឆា', 300),
-    ('prod-0000-0004', 'cat-00000000-0000-0000-0000-000000000001', 'Spring Rolls', 'នំជ្រូក', 250),
-    ('prod-0000-0005', 'cat-00000000-0000-0000-0000-000000000001', 'Khmer BBQ', 'អាំងខ្មែរ', 800),
-    ('prod-0000-0006', 'cat-00000000-0000-0000-0000-000000000002', 'Angkor Beer', 'បៀអង្គរ', 150),
-    ('prod-0000-0007', 'cat-00000000-0000-0000-0000-000000000002', 'Fresh Coconut', 'ដូងស្រស់', 200),
-    ('prod-0000-0008', 'cat-00000000-0000-0000-0000-000000000002', 'Sugarcane Juice', 'ទឹកអំពៅ', 125),
-    ('prod-0000-0009', 'cat-00000000-0000-0000-0000-000000000002', 'Iced Coffee', 'កាហ្វេទឹកកក', 175),
-    ('prod-0000-0010', 'cat-00000000-0000-0000-0000-000000000003', 'Mango Sticky Rice', 'បាយដំណើបស្វាយ', 350),
-    ('prod-0000-0011', 'cat-00000000-0000-0000-0000-000000000003', 'Num Krok', 'នំក្រក', 200),
-    ('prod-0000-0012', 'cat-00000000-0000-0000-0000-000000000003', 'Black Rice Pudding', 'បបរអង្ករ', 275);
+    ('prod-0000-0003', 'cat-00000000-0000-0000-0000-000000000002', 'Iced Coffee', 'កាហ្វេទឹកកក', 175);

@@ -53,6 +53,35 @@ export interface FloorTable {
     status: string;
 }
 
+export interface Restaurant {
+    id: string;
+    name: string;
+    khmer_name?: string;
+    tin?: string;
+    address?: string;
+    address_kh?: string;
+    phone?: string;
+    website?: string;
+    vat_number?: string;
+    receipt_footer?: string;
+}
+
+export interface RestaurantInput {
+    name: string;
+    khmer_name?: string;
+    tin?: string;
+    address?: string;
+    address_kh?: string;
+    phone?: string;
+    website?: string;
+    vat_number?: string;
+    receipt_footer?: string;
+}
+
+export interface SetupStatus {
+    needs_restaurant_setup: boolean;
+}
+
 export interface OrderItem {
     id: string;
     order_id: string;
@@ -127,6 +156,14 @@ export const updateUser = (
 
 export const deleteUser = (id: string) => call<void>('delete_user', { id });
 
+// --------------- Restaurant Commands ---------------
+export const getRestaurant = () => call<Restaurant>('get_restaurant');
+
+export const getSetupStatus = () => call<SetupStatus>('get_setup_status');
+
+export const updateRestaurant = (input: RestaurantInput) =>
+    call<Restaurant>('update_restaurant', { input });
+
 // --------------- Product Commands ---------------
 export const getCategories = () => call<Category[]>('get_categories');
 
@@ -184,6 +221,12 @@ export const getOrderItems = (order_id: string) =>
 
 export const getOrders = (status?: string) =>
     call<Order[]>('get_orders', { status });
+
+export const getActiveOrderForTable = (table_id: string) =>
+    call<Order | null>('get_active_order_for_table', { tableId: table_id });
+
+export const getOrdersForTable = (table_id: string) =>
+    call<Order[]>('get_orders_for_table', { tableId: table_id });
 
 export const checkoutOrder = (order_id: string, payments: PaymentInput[]) =>
     call<Order>('checkout_order', { orderId: order_id, payments });

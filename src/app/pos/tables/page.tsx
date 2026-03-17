@@ -2,19 +2,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOrder } from '@/contexts/OrderContext';
-import { getOrders, Order, getTables, FloorTable, createTable } from '@/lib/tauri-commands';
+import { getOrders, Order, getTables, FloorTable, createTable, getActiveOrderForTable, getOrderItems } from '@/lib/tauri-commands';
 import { TableProperties, Plus, Users, CheckCircle } from 'lucide-react';
 
 interface CombinedTable {
     id: string;
     dbId: string;
-    status: 'free' | 'occupied';
+    status: 'free' | 'busy';
     orderId?: string;
 }
 
 export default function TablesPage() {
     const router = useRouter();
-    const { setTableId, clearOrder, tableId: activeTableId } = useOrder();
+    const { setTableId, clearOrder, tableId: activeTableId, setOrderId, setItems } = useOrder();
     const [tableData, setTableData] = useState<CombinedTable[]>([]);
     const [customTable, setCustomTable] = useState('');
     const [loading, setLoading] = useState(true);
@@ -42,7 +42,7 @@ export default function TablesPage() {
                 return {
                     id: t.name,
                     dbId: t.id,
-                    status: orderId ? 'occupied' : 'free',
+                    status: orderId ? 'busy' : 'free',
                     orderId,
                 };
             });
@@ -54,8 +54,18 @@ export default function TablesPage() {
         }
     }
 
-    function handleTableSelect(table: CombinedTable) {
-        if (table.status === 'occupied') {
+    async function handleTableSelect(table: CombinedTable) {
+        if (table.status === 'busy') {
+            try {
+                const activeOrder = await getActiveOrderForTable(table.id);
+                if (activeOrder) {
+                    const existingItems = await getOrderItems(activeOrder.id);
+                    setOrderId(activeOrder.id);
+                    setItems(existingItems);
+                }
+            } catch (error) {
+                console.error('Failed to load active table order', error);
+            }
             setTableId(table.id);
             router.push('/pos');
             return;
@@ -81,7 +91,7 @@ export default function TablesPage() {
     }
 
     const freeCount = tableData.filter(t => t.status === 'free').length;
-    const occupiedCount = tableData.filter(t => t.status === 'occupied').length;
+    const occupiedCount = tableData.filter(t => t.status === 'busy').length;
 
     return (
         <div className="h-full overflow-y-auto bg-[#0f1115] flex flex-col items-center">

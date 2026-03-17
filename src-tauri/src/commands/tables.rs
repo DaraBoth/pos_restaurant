@@ -5,7 +5,20 @@ use crate::models::FloorTable;
 #[tauri::command]
 pub async fn get_tables(pool: State<'_, SqlitePool>) -> Result<Vec<FloorTable>, String> {
     let tables: Vec<FloorTable> = sqlx::query_as(
-        "SELECT id, name, status FROM floor_tables WHERE is_deleted=0 ORDER BY name"
+        "SELECT
+            ft.id,
+            ft.name,
+            CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM orders o
+                    WHERE o.table_id = ft.name AND o.status = 'open' AND o.is_deleted = 0
+                ) THEN 'busy'
+                ELSE 'free'
+            END AS status
+         FROM floor_tables ft
+         WHERE ft.is_deleted = 0
+         ORDER BY ft.name"
     )
     .fetch_all(pool.inner())
     .await

@@ -52,6 +52,41 @@ pub struct FloorTable {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Restaurant {
+    pub id: String,
+    pub name: String,
+    pub khmer_name: Option<String>,
+    pub tin: Option<String>,
+    pub address: Option<String>,
+    pub address_kh: Option<String>,
+    pub phone: Option<String>,
+    pub website: Option<String>,
+    pub vat_number: Option<String>,
+    pub receipt_footer: Option<String>,
+    pub is_deleted: i64,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestaurantUpsertInput {
+    pub name: String,
+    pub khmer_name: Option<String>,
+    pub tin: Option<String>,
+    pub address: Option<String>,
+    pub address_kh: Option<String>,
+    pub phone: Option<String>,
+    pub website: Option<String>,
+    pub vat_number: Option<String>,
+    pub receipt_footer: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupStatus {
+    pub needs_restaurant_setup: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Order {
     pub id: String,
     pub user_id: Option<String>,

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Product, Category, createProduct, updateProduct } from '@/lib/tauri-commands';
 import { X, Upload, Save, Package } from 'lucide-react';
+import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -41,6 +42,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         }
     }, [product, categories, isOpen]);
 
+    useOverlayBehavior(isOpen, onClose);
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
@@ -68,7 +71,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="bg-[#181a20] border border-white/10 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
                 <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-[#0f1115]">
                     <div className="flex items-center gap-3">

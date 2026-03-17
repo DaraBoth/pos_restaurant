@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 
 interface SidebarDrawerProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface SidebarDrawerProps {
 export default function SidebarDrawer({ isOpen, onClose, title, subtitle, children }: SidebarDrawerProps) {
   const [shouldRender, setShouldRender] = useState(isOpen);
 
+  useOverlayBehavior(shouldRender, onClose);
+
   useEffect(() => {
     if (isOpen) setShouldRender(true);
   }, [isOpen]);
@@ -24,7 +27,7 @@ export default function SidebarDrawer({ isOpen, onClose, title, subtitle, childr
   if (!shouldRender) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex justify-end overflow-hidden" aria-modal="true" role="dialog">
       {/* Backdrop */}
       <div 
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-out ${isOpen ? 'opacity-100' : 'opacity-0'}`}

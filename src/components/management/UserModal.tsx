@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { UserSession, createUser, updateUser } from '@/lib/tauri-commands';
 import { X, Save, UserCircle, Shield, Key } from 'lucide-react';
+import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 
 interface UserModalProps {
     isOpen: boolean;
@@ -33,6 +34,8 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
             setKhmerName('');
         }
     }, [user, isOpen]);
+
+    useOverlayBehavior(isOpen, onClose);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -69,7 +72,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="bg-[#181a20] border border-white/10 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
                 <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-[#0f1115]">
                     <div className="flex items-center gap-3">

@@ -4,11 +4,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { updateOrderItemQuantity, voidOrder } from '@/lib/tauri-commands';
 import { getOrderItems } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
-import { Trash2, ShoppingCart, Plus, Minus, TableProperties, Ticket } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, ShoppingCart, Plus, Minus, TableProperties, Ticket, History } from 'lucide-react';
+import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
 export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) {
-    const { items, totals, exchangeRate, orderId, tableId, clearOrder, setItems } = useOrder();
+    const { items, totals, orderId, tableId, clearOrder, setItems } = useOrder();
     const { t, lang } = useLanguage();
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
     async function handleQtyChange(id: string, current: number, delta: number) {
         if (!orderId) return;
@@ -38,14 +41,15 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
     const isEmpty = items.length === 0;
 
     return (
-        <div
-            className="flex-shrink-0 flex flex-col min-h-0 bg-[#0f1115] relative"
-            style={{
-                width: 'var(--sidebar-cart-width)',
-                borderLeft: '1px solid var(--border)',
-                boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
-            }}
-        >
+        <>
+            <div
+                className="flex-shrink-0 flex flex-col min-h-0 bg-[#0f1115] relative"
+                style={{
+                    width: 'var(--sidebar-cart-width)',
+                    borderLeft: '1px solid var(--border)',
+                    boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
+                }}
+            >
             {/* Header / Ticket Strip */}
             <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#181a20]">
                 <div className="flex items-center gap-3">
@@ -66,6 +70,15 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                             <TableProperties size={12} />
                             {tableId}
                         </div>
+                    )}
+                    {tableId && (
+                        <button
+                            onClick={() => setIsHistoryOpen(true)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 text-[var(--text-secondary)] hover:text-white"
+                            title="Table order history"
+                        >
+                            <History size={15} />
+                        </button>
                     )}
                     {orderId && (
                         <button
@@ -170,6 +183,13 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     {t('checkout')}
                 </button>
             </div>
-        </div>
+            </div>
+
+            <TableOrderHistoryModal
+                isOpen={isHistoryOpen}
+                tableId={tableId}
+                onClose={() => setIsHistoryOpen(false)}
+            />
+        </>
     );
 }

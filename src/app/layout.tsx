@@ -3,6 +3,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrderProvider } from "@/contexts/OrderContext";
+import RouteGuard from "@/components/auth/RouteGuard";
 
 export const metadata: Metadata = {
   title: "DineOS — Premium POS System",
@@ -20,7 +21,7 @@ export default function RootLayout({
         <LanguageProvider>
           <AuthProvider>
             <OrderProvider>
-              {children}
+              <RouteGuard>{children}</RouteGuard>
             </OrderProvider>
           </AuthProvider>
         </LanguageProvider>

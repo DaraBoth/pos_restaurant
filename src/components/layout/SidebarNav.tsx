@@ -1,15 +1,22 @@
 'use client';
+import { useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { LogOut, LayoutGrid, Settings, History, Globe, TableProperties, ChefHat } from 'lucide-react';
 import OfflineIndicator from '../ui/OfflineIndicator';
 
+const PRIMARY_PATHS = ['/pos', '/pos/tables', '/history', '/management'];
+
 export default function SidebarNav() {
     const { t, lang, setLang } = useLanguage();
     const { user, setUser } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+
+    useEffect(() => {
+        PRIMARY_PATHS.forEach(path => router.prefetch(path));
+    }, [router]);
 
     function handleLogout() {
         setUser(null);

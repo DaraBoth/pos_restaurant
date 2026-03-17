@@ -2,9 +2,11 @@
 import { useState } from 'react';
 import { useOrder } from '@/contexts/OrderContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { checkoutOrder, PaymentInput } from '@/lib/tauri-commands';
+import { checkoutOrder, getRestaurant, PaymentInput } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
 import { X, CheckCircle, CreditCard, Banknote, QrCode } from 'lucide-react';
+import useOverlayBehavior from '@/hooks/useOverlayBehavior';
+import { printReceipt } from '@/lib/receipt';
 
 export default function CheckoutModal({
     onClose,
@@ -13,12 +15,14 @@ export default function CheckoutModal({
     onClose: () => void;
     onComplete: () => void;
 }) {
-    const { orderId, totals, exchangeRate, clearOrder } = useOrder();
-    const { t, lang } = useLanguage();
+    const { orderId, totals, exchangeRate, clearOrder, items, tableId } = useOrder();
+    const { t } = useLanguage();
 
     const [usdInput, setUsdInput] = useState<string>('');
     const [method, setMethod] = useState<'cash' | 'khqr' | 'card'>('cash');
     const [loading, setLoading] = useState(false);
+
+    useOverlayBehavior(true, onClose);
 
     // Split payment logic
     // If user enters $5.00 cash on a $12.50 order, the remaining $7.50 is shown in KHR (or USD)
@@ -67,6 +71,15 @@ export default function CheckoutModal({
             }
 
             await checkoutOrder(orderId, payments);
+            const restaurant = await getRestaurant();
+            printReceipt({
+                restaurant,
+                orderId,
+                tableId,
+                items,
+                payments,
+                totals,
+            });
             clearOrder();
             onComplete();
         } catch (e) {
@@ -78,7 +91,7 @@ export default function CheckoutModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/80 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="glass bg-[var(--bg-card)] rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)]">

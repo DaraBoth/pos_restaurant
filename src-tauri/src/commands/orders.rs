@@ -16,6 +16,20 @@ pub async fn create_order(
     table_id: Option<String>,
     pool: State<'_, SqlitePool>,
 ) -> Result<String, String> {
+    if let Some(table_name) = &table_id {
+        let existing: Option<(String,)> = sqlx::query_as(
+            "SELECT id FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1"
+        )
+        .bind(table_name)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if let Some((existing_id,)) = existing {
+            return Ok(existing_id);
+        }
+    }
+
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO orders (id, user_id, table_id, status) VALUES (?, ?, ?, 'open')"
@@ -26,6 +40,11 @@ pub async fn create_order(
     .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    if let Some(table_name) = &table_id {
+        set_table_status(table_name, "busy", pool.inner()).await?;
+    }
+
     Ok(id)
 }
 
@@ -162,11 +181,58 @@ pub async fn get_orders(
 }
 
 #[tauri::command]
+pub async fn get_active_order_for_table(
+    table_id: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<Option<Order>, String> {
+    let order = sqlx::query_as::<_, Order>(
+        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+                bakong_bill_number, notes, created_at, updated_at, completed_at
+         FROM orders
+         WHERE table_id = ? AND status = 'open' AND is_deleted = 0
+         ORDER BY created_at DESC
+         LIMIT 1"
+    )
+    .bind(&table_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(order)
+}
+
+#[tauri::command]
+pub async fn get_orders_for_table(
+    table_id: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<Vec<Order>, String> {
+    let orders = sqlx::query_as::<_, Order>(
+        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+                bakong_bill_number, notes, created_at, updated_at, completed_at
+         FROM orders
+         WHERE table_id = ? AND is_deleted = 0
+         ORDER BY created_at DESC"
+    )
+    .bind(&table_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(orders)
+}
+
+#[tauri::command]
 pub async fn checkout_order(
     order_id: String,
     payments: Vec<PaymentInput>,
     pool: State<'_, SqlitePool>,
 ) -> Result<Order, String> {
+    let table_id: Option<(Option<String>,)> = sqlx::query_as("SELECT table_id FROM orders WHERE id = ?")
+        .bind(&order_id)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
     // Mark order as completed
     sqlx::query(
         "UPDATE orders SET status='completed', updated_at=datetime('now'), completed_at=datetime('now') WHERE id=?"
@@ -212,6 +278,10 @@ pub async fn checkout_order(
         .map_err(|e| format!("Payment insert error: {}", e))?;
     }
 
+    if let Some((Some(table_name),)) = table_id {
+        release_table_if_no_open_orders(&table_name, pool.inner()).await?;
+    }
+
     // Return the completed order
     let order: Order = sqlx::query_as(
         "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
@@ -228,11 +298,49 @@ pub async fn checkout_order(
 
 #[tauri::command]
 pub async fn void_order(order_id: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
+    let table_id: Option<(Option<String>,)> = sqlx::query_as("SELECT table_id FROM orders WHERE id = ?")
+        .bind(&order_id)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
     sqlx::query("UPDATE orders SET status='void', updated_at=datetime('now') WHERE id=?")
         .bind(&order_id)
         .execute(pool.inner())
         .await
         .map_err(|e| format!("Database error: {}", e))?;
+
+    if let Some((Some(table_name),)) = table_id {
+        release_table_if_no_open_orders(&table_name, pool.inner()).await?;
+    }
+
+    Ok(())
+}
+
+async fn set_table_status(table_name: &str, status: &str, pool: &SqlitePool) -> Result<(), String> {
+    sqlx::query("UPDATE floor_tables SET status = ?, updated_at = datetime('now') WHERE name = ?")
+        .bind(status)
+        .bind(table_name)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Table status error: {}", e))?;
+
+    Ok(())
+}
+
+async fn release_table_if_no_open_orders(table_name: &str, pool: &SqlitePool) -> Result<(), String> {
+    let (open_count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0"
+    )
+    .bind(table_name)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Table release error: {}", e))?;
+
+    if open_count == 0 {
+        set_table_status(table_name, "free", pool).await?;
+    }
+
     Ok(())
 }
 

@@ -30,6 +30,7 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
         include_str!("migrations/001_initial_schema.sql"),
         include_str!("migrations/002_add_features.sql"),
         include_str!("migrations/003_add_images_and_inventory.sql"),
+        include_str!("migrations/004_restaurant_setup_and_minimal_seed.sql"),
     ];
 
     for migration_sql in migrations {
@@ -45,6 +46,7 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
 
     // Ensure default admin user exists
     ensure_default_admin(pool).await?;
+    trim_legacy_seed_data(pool).await?;
 
     Ok(())
 }
@@ -74,6 +76,50 @@ async fn ensure_default_admin(pool: &SqlitePool) -> anyhow::Result<()> {
         .bind(&password_hash)
         .execute(pool)
         .await?;
+    }
+
+    Ok(())
+}
+
+async fn trim_legacy_seed_data(pool: &SqlitePool) -> anyhow::Result<()> {
+    let order_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders")
+        .fetch_one(pool)
+        .await?;
+
+    if order_count.0 > 0 {
+        return Ok(());
+    }
+
+    let legacy_product_ids = [
+        "prod-0000-0004",
+        "prod-0000-0005",
+        "prod-0000-0006",
+        "prod-0000-0007",
+        "prod-0000-0008",
+        "prod-0000-0009",
+        "prod-0000-0010",
+        "prod-0000-0011",
+        "prod-0000-0012",
+    ];
+
+    for product_id in legacy_product_ids {
+        sqlx::query("UPDATE products SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?")
+            .bind(product_id)
+            .execute(pool)
+            .await?;
+    }
+
+    let legacy_table_ids = [
+        "tbl-004", "tbl-005", "tbl-006", "tbl-007", "tbl-008", "tbl-009", "tbl-010",
+        "tbl-011", "tbl-012", "tbl-013", "tbl-014", "tbl-015", "tbl-016", "tbl-017",
+        "tbl-018", "tbl-019", "tbl-020",
+    ];
+
+    for table_id in legacy_table_ids {
+        sqlx::query("UPDATE floor_tables SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?")
+            .bind(table_id)
+            .execute(pool)
+            .await?;
     }
 
     Ok(())
