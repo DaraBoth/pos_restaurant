@@ -1,16 +1,16 @@
 [package]
-name = "kh-pos"
+name = "dineos"
 version = "0.1.0"
-description = "Cambodia Restaurant POS System"
-authors = ["KH POS Team"]
+description = "DineOS — Premium Cambodia Restaurant POS System"
+authors = ["DineOS Team"]
 edition = "2021"
 
 [lib]
-name = "kh_pos_lib"
+name = "dineos_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "kh-pos"
+name = "dineos"
 path = "src/main.rs"
 
 [build-dependencies]

@@ -20,7 +20,7 @@ export default function HomePage() {
       <div className="text-center">
         <div className="w-16 h-16 border-4 rounded-full animate-spin mx-auto mb-4"
           style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent)' }} />
-        <p style={{ color: 'var(--text-secondary)' }}>Loading KH POS...</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading DineOS...</p>
       </div>
     </div>
   );

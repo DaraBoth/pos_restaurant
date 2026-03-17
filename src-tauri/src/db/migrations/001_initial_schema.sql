@@ -1,5 +1,5 @@
 -- Migration: 001_initial_schema
--- Description: Creates all core tables for KH POS System
+-- Description: Creates all core tables for DineOS System
 
 -- Restaurants
 CREATE TABLE IF NOT EXISTS restaurants (

@@ -36,7 +36,7 @@ export default function ManagementLayout({ children }: { children: React.ReactNo
                                 V1
                             </div>
                             <div>
-                                <p className="text-sm font-semibold text-white">KH POS Core</p>
+                                <p className="text-sm font-semibold text-white">DineOS Core</p>
                                 <p className="text-xs font-semibold text-[var(--text-secondary)]">Management</p>
                             </div>
                         </div>

@@ -5,8 +5,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OrderProvider } from "@/contexts/OrderContext";
 
 export const metadata: Metadata = {
-  title: "KH POS — Gen Z Vibe",
-  description: "Next-gen Point of Sale system.",
+  title: "DineOS — Premium POS System",
+  description: "DineOS — Modern, professional Point of Sale system.",
 };
 
 export default function RootLayout({

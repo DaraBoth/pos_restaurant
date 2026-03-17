@@ -46,13 +46,16 @@ export default function SidebarNav() {
             style={{ boxShadow: '10px 0 30px rgba(0,0,0,0.5)' }}
         >
             {/* Logo */}
-            <div className="mb-8">
+            <div className="mb-8 flex flex-col items-center gap-2">
                 <div
                     className="w-12 h-12 rounded-[1rem] flex items-center justify-center"
                     style={{ background: 'var(--accent)' }}
                 >
                     <ChefHat size={24} color="#000" strokeWidth={2.5} />
                 </div>
+                <span className="text-[10px] font-black tracking-tighter text-white uppercase opacity-80">
+                    DineOS
+                </span>
             </div>
 
             {/* Primary Navigation */}
