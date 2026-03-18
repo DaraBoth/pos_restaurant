@@ -15,24 +15,24 @@
 }
 
 :root {
-  /* Summer Vibe Warm Light Theme */
-  --background: #fffcf5; /* Creamy Sunlight */
-  --foreground: #431407; /* Deep Roasted Coffee */
+  /* Premium Black & Titanium Orange Theme */
+  --background: #000000;
+  --foreground: #ffffff;
 
   /* Card / Layering */
-  --bg-card: #ffffff;
-  --bg-elevated: #fff7ed; /* Sunset Glow */
-  --bg-dark: #fed7aa; /* Peach Sorbet */
+  --bg-card: #0a0a0a;
+  --bg-elevated: #121212;
+  --bg-dark: #050505;
 
-  /* Summer Sunset Accents */
-  --accent: #fb923c; /* Orange-400 */
-  --accent-blue: #38bdf8; /* Ocean Blue */
-  --accent-green: #84cc16; /* Lime Green */
-  --accent-red: #ef4444; 
-  --accent-pink: #f472b6; 
-  
-  --text-secondary: #78716c; /* Stone-500 */
-  --border: rgba(249, 115, 22, 0.12);
+  /* Titanium Orange Accents */
+  --accent: #f97316; /* Vibrant Titanium Orange */
+  --accent-blue: #0ea5e9;
+  --accent-green: #22c55e;
+  --accent-red: #ef4444;
+  --accent-pink: #ec4899;
+
+  --text-secondary: #a1a1aa; /* Zinc-400 for better contrast on black */
+  --border: rgba(255, 255, 255, 0.1);
 }
 
 body {
@@ -44,15 +44,27 @@ body {
 }
 
 /* Base Typographic Overrides */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-sans);
   letter-spacing: -0.01em;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -66,17 +78,20 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-sans);
   font-weight: 600;
   border-radius: 0.75rem;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.15s ease;
 }
+
 .btn-primary:hover:not(:disabled) {
-  background: #2563eb;
+  background: #ea580c; /* Darker orange on hover */
 }
+
 .btn-primary:active:not(:disabled) {
   transform: translateY(1px);
 }
+
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -84,23 +99,37 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Inputs */
 .input-bento {
-  background: var(--bg-dark);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--foreground);
   border-radius: 0.75rem;
   transition: all 0.2s ease;
 }
+
 .input-bento:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
 }
 
 /* Hide scrollbars for aesthetic */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
 
 /* Khmer font specific fix */
 .khmer {

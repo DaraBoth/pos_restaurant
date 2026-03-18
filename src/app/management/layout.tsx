@@ -19,27 +19,8 @@ export default function ManagementLayout({ children }: { children: React.ReactNo
         <div className="h-screen w-full flex flex-row bg-[var(--background)] text-[var(--foreground)]">
             <SidebarNav />
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                {/* Management Horizontal Navbar */}
-                <header className="flex-shrink-0 bg-[var(--bg-card)] border-b border-[var(--border)] relative z-20 shadow-sm overflow-x-auto container-snap">
-                    <div className="px-8 flex items-center h-20 gap-8 min-w-max">
-                        <div className="flex flex-col justify-center pr-8 border-r border-[var(--border)]">
-                            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)] leading-none mb-1.5 opacity-80">
-                                Management
-                            </h2>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-black text-[var(--foreground)] whitespace-nowrap">DineOS Core</span>
-                                <span className="px-1.5 py-0.5 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] text-[8px] font-black uppercase border border-[var(--accent)]/20">V1</span>
-                            </div>
-                        </div>
-
-                        <nav className="flex items-center gap-2 p-1 bg-[var(--background)] rounded-2xl border border-[var(--border)]">
-                            <SideNavItems />
-                        </nav>
-                    </div>
-                </header>
-
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-8 lg:p-12 min-w-0 container-snap relative bg-[var(--background)]">
+                <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 min-w-0 container-snap relative bg-[var(--background)]">
                     <div className="relative z-10 max-w-7xl mx-auto">
                         {children}
                     </div>

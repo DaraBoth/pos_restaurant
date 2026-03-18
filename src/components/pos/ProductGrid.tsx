@@ -150,64 +150,70 @@ export default function ProductGrid() {
                                     key={product.id}
                                     onClick={() => handleProductClick(product)}
                                     disabled={unavailable}
-                                    className={`bento-card group flex flex-col text-left relative overflow-hidden transition-all ${
+                                    className={`group flex flex-col text-left relative overflow-hidden transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] ${
                                         unavailable ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
                                     }`}
                                     style={{
                                         animationDelay: `${idx * 20}ms`,
-                                        minHeight: '220px',
+                                        height: '240px',
                                         background: 'var(--bg-card)',
-                                        border: isAdding ? '2px solid var(--accent)' : '2px solid var(--border)',
-                                        borderRadius: '2.5rem',
+                                        border: isAdding ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                        borderRadius: '2rem',
                                     }}
                                 >
-                                    {/* Product Image */}
+                                    {/* Product Image Overlay */}
                                     {product.image_path && (
                                         <div className="absolute inset-0 z-0">
                                             <img 
                                                 src={`https://asset.localhost/${product.image_path}`}
                                                 alt={product.name}
-                                                className="w-full h-full object-cover opacity-10 group-hover:opacity-30 transition-opacity"
+                                                className="w-full h-full object-cover opacity-[0.03] group-hover:opacity-10 transition-opacity duration-700"
                                             />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-[var(--background)] via-[var(--background)]/40 to-transparent" />
                                         </div>
                                     )}
 
-                                    {/* Content Container */}
-                                    <div className="p-6 flex-1 flex flex-col relative z-20">
-                                        <div className="flex justify-between items-start mb-6">
-                                            {/* Stock Badge */}
-                                            <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full ${
-                                                outOfStock ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-600'
-                                            } border border-current/10`}>
-                                                {outOfStock ? 'SOLDOUT' : `${product.stock_quantity} IN STOCK`}
-                                            </span>
+                                    {/* Card Content */}
+                                    <div className="p-5 flex-1 flex flex-col relative z-20">
+                                        <div className="flex justify-between items-start">
+                                            {/* Stock Circle */}
+                                            <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center text-center border transition-transform duration-500 group-hover:scale-110 ${
+                                                outOfStock 
+                                                    ? 'bg-red-500/5 border-red-500/20 text-red-500/80' 
+                                                    : 'bg-green-500/5 border-green-500/20 text-green-500/80'
+                                            }`}>
+                                                <span className="text-[10px] font-black leading-none">{product.stock_quantity}</span>
+                                                <span className="text-[6px] font-black uppercase tracking-tighter opacity-60">STK</span>
+                                            </div>
                                             
-                                            {/* Action Icon */}
-                                            <div className="w-10 h-10 rounded-2xl bg-[var(--background)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--accent)] group-hover:text-white transition-colors shadow-sm">
-                                                <Plus size={18} strokeWidth={3} className={isAdding ? 'scale-125 transition-transform' : ''} />
+                                            {/* Action Pill */}
+                                            <div className="px-2 py-3 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--accent)] group-hover:text-black transition-all duration-300 shadow-xl group-hover:shadow-[var(--accent)]/20">
+                                                <Plus size={16} strokeWidth={3.5} className={isAdding ? 'scale-125 transition-transform' : 'group-hover:rotate-90 transition-transform duration-500'} />
                                             </div>
                                         </div>
 
-                                        <h3 className={`font-black mt-auto mb-1 flex-1 leading-snug line-clamp-2 ${lang === 'km' ? 'khmer text-lg' : 'text-lg text-[var(--foreground)] tracking-tight'}`}>
-                                            {lang === 'km' ? (product.khmer_name || product.name) : product.name}
-                                        </h3>
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-4 truncate opacity-60">
-                                            {lang === 'km' ? (product.category_khmer || product.category_name) : product.category_name}
-                                        </span>
+                                        <div className="mt-auto space-y-1">
+                                            <h1 className={`font-black tracking-tight leading-[1.1] line-clamp-2 transition-colors ${lang === 'km' ? 'khmer text-lg' : 'text-xl text-white group-hover:text-[var(--accent)]'}`}>
+                                                {lang === 'km' ? (product.khmer_name || product.name) : product.name}
+                                            </h1>
+                                            <p className="text-[8px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-50">
+                                                {lang === 'km' ? (product.category_khmer || product.category_name) : product.category_name}
+                                            </p>
+                                        </div>
 
-                                        <div className="font-mono text-xl font-black text-[var(--accent)]">
-                                            {formatUsd(product.price_cents)}
+                                        <div className="mt-4 flex items-baseline gap-1">
+                                            <span className="text-xl font-black text-[var(--accent)] tracking-tighter">
+                                                {formatUsd(product.price_cents)}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    {/* Hover Background Injection */}
-                                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[var(--accent)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" />
-
-                                    {/* Unavailable Strip */}
+                                    {/* OLED Glow Effect */}
+                                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[var(--accent)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                                    
+                                    {/* Status Overlay */}
                                     {unavailable && (
-                                        <div className="absolute inset-0 bg-[var(--background)]/60 z-30 flex items-center justify-center backdrop-blur-sm">
-                                            <div className="bg-red-500 text-white font-black uppercase px-6 py-2 rounded-full transform -rotate-12 border-2 border-[var(--background)] shadow-xl text-sm tracking-widest">
+                                        <div className="absolute inset-0 bg-black/40 z-30 flex items-center justify-center backdrop-blur-[2px]">
+                                            <div className="bg-red-500 text-white font-black uppercase px-6 py-2 rounded-full transform -rotate-12 border-2 border-black shadow-2xl text-xs tracking-[0.2em]">
                                                 {outOfStock ? 'SOLD OUT' : 'UNAVAILABLE'}
                                             </div>
                                         </div>

@@ -47,7 +47,6 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                 style={{
                     width: 'var(--sidebar-cart-width)',
                     borderLeft: '1px solid var(--border)',
-                    boxShadow: '-4px 0 24px rgba(0,0,0,0.05)',
                 }}
             >
             {/* Header / Ticket Strip */}
@@ -150,14 +149,6 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     <div className="flex justify-between items-center">
                         <span>{t('subtotal')}</span>
                         <span className="font-mono text-[var(--foreground)]">{formatUsd(totals.subtotalCents)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span>{t('vat')}</span>
-                        <span className="font-mono text-[var(--foreground)]">{formatUsd(totals.vatCents)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span>{t('plt')}</span>
-                        <span className="font-mono text-[var(--foreground)]">{formatUsd(totals.pltCents)}</span>
                     </div>
                 </div>
 

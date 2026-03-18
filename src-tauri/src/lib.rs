@@ -27,6 +27,30 @@ pub fn run() {
             });
 
             app_handle.manage(pool);
+
+            // Register asset protocol to serve local files from app_data_dir/logos
+            let app_handle_clone = app_handle.clone();
+            app.register_uri_scheme_protocol("asset", move |_app, request| {
+                let path = request.uri().path();
+                // Remove leading slash if present
+                let filename = path.trim_start_matches('/');
+                
+                let app_dir = app_handle_clone.path().app_data_dir().unwrap();
+                let asset_path = app_dir.join("logos").join(filename);
+
+                if let Ok(content) = std::fs::read(asset_path) {
+                    tauri::http::Response::builder()
+                        .header("Access-Control-Allow-Origin", "*")
+                        .body(content)
+                        .unwrap()
+                } else {
+                    tauri::http::Response::builder()
+                        .status(404)
+                        .body(Vec::new())
+                        .unwrap()
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -39,6 +63,7 @@ pub fn run() {
             commands::restaurant::get_restaurant,
             commands::restaurant::get_setup_status,
             commands::restaurant::update_restaurant,
+            commands::restaurant::save_logo,
             // Products & Categories
             commands::products::get_categories,
             commands::products::get_products,

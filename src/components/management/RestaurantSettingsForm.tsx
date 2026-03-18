@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight } from 'lucide-react';
-import { getRestaurant, RestaurantInput, updateRestaurant } from '@/lib/tauri-commands';
+import { getRestaurant, RestaurantInput, updateRestaurant, saveLogo } from '@/lib/tauri-commands';
 
 const DEFAULT: RestaurantInput = {
     name: '',
@@ -237,6 +237,55 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
                             Identity & Contact
                         </h2>
+                        
+                        <div className="flex flex-col md:flex-row gap-10 mb-10 pb-10 border-b border-white/5">
+                            <div className="relative group/logo">
+                                <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-black border-2 border-dashed border-white/10 group-hover:border-[var(--accent)]/50 transition-all flex items-center justify-center overflow-hidden">
+                                    {info.logo_path ? (
+                                        <img src={`https://asset.localhost/${info.logo_path}`} alt="Logo" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="text-[var(--accent)] opacity-20">LOGO</div>
+                                    )}
+                                </div>
+                                <label className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-[var(--accent)] text-black flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 active:scale-95 transition-all">
+                                    <ArrowRight size={18} className="-rotate-90" />
+                                    <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = async (event) => {
+                                                const buffer = event.target?.result as ArrayBuffer;
+                                                if (buffer) {
+                                                    try {
+                                                        const newPath = await saveLogo(file.name, new Uint8Array(buffer));
+                                                        update('logo_path', newPath);
+                                                    } catch (error) {
+                                                        console.error('Failed to save logo:', error);
+                                                        alert('Failed to save logo locally.');
+                                                    }
+                                                }
+                                            };
+                                            reader.readAsArrayBuffer(file);
+                                        }
+                                    }} />
+                                </label>
+                            </div>
+                            <div className="flex-1 space-y-2">
+                                <h3 className="text-xl font-black text-white">Restaurant Logo</h3>
+                                <p className="text-xs font-bold text-[#8a8a99] leading-relaxed uppercase tracking-wider">
+                                    Upload a high-quality logo for receipts<br/>and the POS sidebar.
+                                </p>
+                                {info.logo_path && (
+                                    <button 
+                                        onClick={() => update('logo_path', '')}
+                                        className="text-[10px] font-black text-red-500 uppercase tracking-widest mt-2 hover:text-red-400"
+                                    >
+                                        Remove Logo
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                             <FormField label="Restaurant Name (English)" value={info.name || ''} onChange={value => update('name', value)} placeholder="Volt Burger" icon={Building2} />
                             <FormField label="Restaurant Name (Khmer)" value={info.khmer_name || ''} onChange={value => update('khmer_name', value)} placeholder="ហាងប៊ឺហ្គឺវ៉ុល" icon={Building2} />
@@ -249,31 +298,6 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         </div>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <section className="bg-[#121216] p-8 rounded-[2rem] border border-white/5">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
-                                Compliance
-                            </h2>
-                            <div className="space-y-6">
-                                <FormField label="Tax ID (TIN)" value={info.tin || ''} onChange={value => update('tin', value)} placeholder="K000-0000..." icon={Hash} />
-                                <FormField label="VAT Number" value={info.vat_number || ''} onChange={value => update('vat_number', value)} placeholder="VAT-..." icon={Hash} />
-                            </div>
-                        </section>
-
-                        <section className="bg-[#121216] p-8 rounded-[2rem] border border-white/5">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
-                                Automation
-                            </h2>
-                            <div className="flex items-start gap-4 p-5 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
-                                <div className="mt-1 flex-shrink-0 animate-pulse">
-                                    <div className="w-2 h-2 rounded-full bg-current" />
-                                </div>
-                                <p className="text-xs font-bold leading-relaxed">
-                                    VAT and PLT are calculated automatically on each order. Receipt details below are used by checkout printing.
-                                </p>
-                            </div>
-                        </section>
-                    </div>
 
                     <section className="bg-[#121216] p-8 rounded-[2rem] border border-white/5">
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">

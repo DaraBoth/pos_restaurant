@@ -656,6 +656,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "dineos"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "base64 0.22.1",
+ "chrono",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-shell",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1867,26 +1887,6 @@ dependencies = [
  "bitflags 2.11.0",
  "serde",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "kh-pos"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argon2",
- "base64 0.22.1",
- "chrono",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "sqlx",
- "tauri",
- "tauri-build",
- "tauri-plugin-shell",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
 ]
 
 [[package]]

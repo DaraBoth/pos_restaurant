@@ -157,26 +157,41 @@ pub async fn get_order_items(
 #[tauri::command]
 pub async fn get_orders(
     status: Option<String>,
+    start_date: Option<String>,
+    end_date: Option<String>,
     pool: State<'_, SqlitePool>,
 ) -> Result<Vec<Order>, String> {
-    let orders = if let Some(s) = status {
-        sqlx::query_as::<_, Order>(
-            "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
-                    bakong_bill_number, notes, created_at, updated_at, completed_at
-             FROM orders WHERE status=? AND is_deleted=0 ORDER BY created_at DESC"
-        )
-        .bind(&s)
-        .fetch_all(pool.inner())
-        .await
-    } else {
-        sqlx::query_as::<_, Order>(
-            "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
-                    bakong_bill_number, notes, created_at, updated_at, completed_at
-             FROM orders WHERE is_deleted=0 ORDER BY created_at DESC LIMIT 100"
-        )
-        .fetch_all(pool.inner())
-        .await
-    };
+    let mut query = String::from(
+        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+                bakong_bill_number, notes, created_at, updated_at, completed_at
+         FROM orders WHERE is_deleted = 0"
+    );
+
+    if status.is_some() {
+        query.push_str(" AND status = ?");
+    }
+    if start_date.is_some() {
+        query.push_str(" AND created_at >= ?");
+    }
+    if end_date.is_some() {
+        query.push_str(" AND created_at <= ?");
+    }
+
+    query.push_str(" ORDER BY created_at DESC LIMIT 500");
+
+    let mut sql_query = sqlx::query_as::<_, Order>(&query);
+
+    if let Some(s) = status {
+        sql_query = sql_query.bind(s);
+    }
+    if let Some(sd) = start_date {
+        sql_query = sql_query.bind(format!("{} 00:00:00", sd));
+    }
+    if let Some(ed) = end_date {
+        sql_query = sql_query.bind(format!("{} 23:59:59", ed));
+    }
+
+    let orders = sql_query.fetch_all(pool.inner()).await;
     orders.map_err(|e| format!("Database error: {}", e))
 }
 
@@ -354,12 +369,12 @@ async fn recalculate_order_totals(order_id: &str, pool: &SqlitePool) -> Result<(
     .await
     .map_err(|e| format!("Subtotal error: {}", e))?;
 
-    // VAT: 10% of subtotal
-    let vat = (subtotal as f64 * 0.10).round() as i64;
-    // PLT: 3% of subtotal
-    let plt = (subtotal as f64 * 0.03).round() as i64;
+    // VAT: 0% (Removed per user request)
+    let vat = 0;
+    // PLT: 0% (Removed per user request)
+    let plt = 0;
     // Total USD in cents
-    let total_usd = subtotal + vat + plt;
+    let total_usd = subtotal;
 
     // Get latest exchange rate
     let (rate,): (f64,) = sqlx::query_as(

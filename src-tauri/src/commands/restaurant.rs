@@ -7,7 +7,7 @@ const DEFAULT_RESTAURANT_ID: &str = "rest-00000000-0000-0000-0000-000000000001";
 #[tauri::command]
 pub async fn get_restaurant(pool: State<'_, SqlitePool>) -> Result<Restaurant, String> {
     let restaurant = sqlx::query_as::<_, Restaurant>(
-        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, is_deleted, created_at, updated_at
+        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, is_deleted, created_at, updated_at
          FROM restaurants
          WHERE id = ? AND is_deleted = 0"
     )
@@ -46,6 +46,7 @@ pub async fn update_restaurant(
              website = ?,
              vat_number = ?,
              receipt_footer = ?,
+             logo_path = ?,
              updated_at = datetime('now')
          WHERE id = ?"
     )
@@ -58,10 +59,36 @@ pub async fn update_restaurant(
     .bind(&input.website)
     .bind(&input.vat_number)
     .bind(&input.receipt_footer)
+    .bind(&input.logo_path)
     .bind(DEFAULT_RESTAURANT_ID)
     .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
     get_restaurant(pool).await
+}
+
+#[tauri::command]
+pub async fn save_logo(
+    app: tauri::AppHandle,
+    filename: String,
+    content: Vec<u8>
+) -> Result<String, String> {
+    use tauri::Manager;
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let logos_dir = app_dir.join("logos");
+    
+    std::fs::create_dir_all(&logos_dir).map_err(|e| e.to_string())?;
+    
+    let extension = std::path::Path::new(&filename)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("png");
+        
+    let name = format!("{}.{}", uuid::Uuid::new_v4(), extension);
+    let path = logos_dir.join(&name);
+    
+    std::fs::write(path, content).map_err(|e| e.to_string())?;
+    
+    Ok(name)
 }

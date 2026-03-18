@@ -50,9 +50,10 @@ export default function CategoryModal({ isOpen, onClose, onSave, category }: Cat
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={e => e.target === e.currentTarget && onClose()}>
-            <div className="bg-[#181a20] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-                <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-[#0f1115]">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pl-[100px] lg:pl-[280px] p-4 bg-black/60 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && onClose()}>
+            <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col border border-[var(--border)] animate-fade-in">
+                {/* Header */}
+                <div className="flex items-center justify-between px-8 py-6 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
                             <Layers size={20} className="text-[var(--accent)]" />

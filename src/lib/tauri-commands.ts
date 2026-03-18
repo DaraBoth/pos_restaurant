@@ -64,6 +64,7 @@ export interface Restaurant {
     website?: string;
     vat_number?: string;
     receipt_footer?: string;
+    logo_path?: string;
 }
 
 export interface RestaurantInput {
@@ -76,6 +77,7 @@ export interface RestaurantInput {
     website?: string;
     vat_number?: string;
     receipt_footer?: string;
+    logo_path?: string;
 }
 
 export interface SetupStatus {
@@ -164,6 +166,9 @@ export const getSetupStatus = () => call<SetupStatus>('get_setup_status');
 export const updateRestaurant = (input: RestaurantInput) =>
     call<Restaurant>('update_restaurant', { input });
 
+export const saveLogo = (filename: string, content: Uint8Array) =>
+    call<string>('save_logo', { filename, content: Array.from(content) });
+
 // --------------- Product Commands ---------------
 export const getCategories = () => call<Category[]>('get_categories');
 
@@ -219,8 +224,8 @@ export const updateOrderItemQuantity = (item_id: string, quantity: number) =>
 export const getOrderItems = (order_id: string) =>
     call<OrderItem[]>('get_order_items', { orderId: order_id });
 
-export const getOrders = (status?: string) =>
-    call<Order[]>('get_orders', { status });
+export const getOrders = (status?: string, start_date?: string, end_date?: string) =>
+    call<Order[]>('get_orders', { status, startDate: start_date, endDate: end_date });
 
 export const getActiveOrderForTable = (table_id: string) =>
     call<Order | null>('get_active_order_for_table', { tableId: table_id });

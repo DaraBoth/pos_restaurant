@@ -1,8 +1,10 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, TableProperties, ChefHat } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, TableProperties, ChefHat, Zap } from 'lucide-react';
+import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import Link from 'next/link';
 import OfflineIndicator from '../ui/OfflineIndicator';
 
@@ -35,6 +37,11 @@ export default function SidebarNav() {
     const { user, setUser } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+    const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+
+    useEffect(() => {
+        getRestaurant().then(setRestaurant).catch(console.error);
+    }, []);
 
     function handleLogout() {
         setUser(null);
@@ -43,25 +50,30 @@ export default function SidebarNav() {
 
     return (
         <aside
-            className="w-64 flex-shrink-0 flex flex-col items-start py-8 h-screen sticky top-0 bg-[var(--background)] z-40 border-r border-[var(--border)]"
-            style={{ boxShadow: '15px 0 40px rgba(249,115,22,0.05)' }}
+            className="w-[100px] lg:w-[280px] h-screen bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col relative z-50 transition-all duration-500"
         >
-            {/* Logo */}
-            <div className="mb-10 px-8 flex flex-col items-start gap-3 w-full">
-                <div className="flex items-center gap-4">
-                    <div
-                        className="w-11 h-11 rounded-[1.25rem] flex items-center justify-center shadow-lg"
-                        style={{ background: 'var(--accent)' }}
-                    >
-                        <ChefHat size={22} color="#fff" strokeWidth={2.5} />
+            {/* Logo Area */}
+            <div className="h-24 flex items-center px-6 lg:px-8 border-b border-[var(--border)] mb-4">
+                <div className="flex items-center gap-4 group cursor-pointer overflow-hidden">
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent)]/20 transition-all duration-500 group-hover:rotate-[10deg] shrink-0 border-2 border-white/10 overflow-hidden">
+                        {restaurant?.logo_path ? (
+                            <img 
+                                src={`https://asset.localhost/${restaurant.logo_path}`} 
+                                alt="Logo" 
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <Zap size={28} className="text-black fill-black" strokeWidth={2.5} />
+                        )}
                     </div>
-                    <div className="flex flex-col">
-                        <span className="text-xl font-black tracking-tighter text-[var(--foreground)] leading-none">
-                            DineOS
-                        </span>
-                        <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-[0.2em] mt-1 opacity-80">
-                            Summer Edition
-                        </span>
+                    <div className="hidden lg:flex flex-col min-w-0">
+                        <h1 className="text-xl font-black text-[var(--foreground)] tracking-tight truncate leading-tight group-hover:text-[var(--accent)] transition-colors">
+                            {restaurant?.name || 'DineOS'}
+                        </h1>
+                        <div className="flex items-center gap-1.5 opacity-60">
+                            <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">Titanium Edition</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -102,7 +114,7 @@ export default function SidebarNav() {
 
                 <div className="px-4">
                     <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-40">
-                        Summer v1.0.0
+                        Titanium v1.0.0
                     </p>
                 </div>
             </div>

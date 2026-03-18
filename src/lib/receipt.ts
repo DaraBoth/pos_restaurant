@@ -26,91 +26,154 @@ function escapeHtml(value: string) {
 }
 
 export function printReceipt(payload: ReceiptPrintPayload) {
-    if (typeof window === 'undefined') {
-        return;
-    }
+    if (typeof window === 'undefined') return;
 
-    const printWindow = window.open('', '_blank', 'width=420,height=720');
-    if (!printWindow) {
-        return;
-    }
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) return;
+
+    const logoHtml = payload.restaurant.logo_path 
+        ? `<img src="https://asset.localhost/${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />` 
+        : '';
 
     const itemRows = payload.items.map(item => `
-        <tr>
-            <td>${escapeHtml(item.product_name || '')}</td>
-            <td style="text-align:center;">${item.quantity}</td>
-            <td style="text-align:right;">${formatUsd(item.price_at_order * item.quantity)}</td>
-        </tr>
+        <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px;">
+                <span>${escapeHtml(item.product_name || '')}</span>
+                <span>${formatUsd(item.price_at_order * item.quantity)}</span>
+            </div>
+            ${item.product_khmer ? `<div style="font-size: 12px; color: #444; margin-top: 1px;">${escapeHtml(item.product_khmer)}</div>` : ''}
+            <div style="font-size: 11px; color: #666; font-family: monospace;">
+                ${item.quantity} x ${formatUsd(item.price_at_order)}
+            </div>
+        </div>
     `).join('');
 
     const paymentRows = payload.payments.map(payment => `
-        <div style="display:flex; justify-content:space-between; margin-top:4px;">
-            <span>${escapeHtml(payment.method.toUpperCase())} ${escapeHtml(payment.currency)}</span>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 13px;">
+            <span style="text-transform: uppercase;">${escapeHtml(payment.method)} (${escapeHtml(payment.currency)})</span>
             <span>${payment.currency === 'KHR' ? formatKhr(payment.amount) : formatUsd(payment.amount)}</span>
         </div>
     `).join('');
 
-    const footerLines = (payload.restaurant.receipt_footer || 'Thank you for dining with us!')
+    const footerLines = (payload.restaurant.receipt_footer || 'Thank you for your visit!')
         .split('\n')
         .filter(Boolean)
-        .map(line => `<div>${escapeHtml(line)}</div>`)
+        .map(line => `<div style="margin-top: 2px;">${escapeHtml(line)}</div>`)
         .join('');
 
     printWindow.document.write(`
+        <!DOCTYPE html>
         <html>
             <head>
-                <title>Receipt ${escapeHtml(payload.orderId)}</title>
+                <title>Receipt ${payload.orderId}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 16px; color: #111; }
-                    h1, h2, p { margin: 0; }
+                    @page { margin: 0; }
+                    body { 
+                        font-family: 'Inter', -apple-system, sans-serif; 
+                        padding: 20px; 
+                        width: 80mm; 
+                        margin: 0 auto;
+                        color: #000;
+                        line-height: 1.4;
+                    }
                     .center { text-align: center; }
-                    .muted { color: #555; font-size: 12px; }
-                    .section { margin-top: 16px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-                    td { padding: 4px 0; font-size: 13px; }
-                    .totals div { display: flex; justify-content: space-between; margin-top: 4px; }
-                    .divider { border-top: 1px dashed #999; margin: 12px 0; }
+                    .divider { border-top: 1px dashed #000; margin: 15px 0; }
+                    .header { margin-bottom: 20px; }
+                    .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+                    .header p { margin: 2px 0; font-size: 13px; font-weight: 600; }
+                    .info { font-size: 11px; font-family: monospace; color: #333; }
+                    .totals { margin-top: 10px; }
+                    .totals-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+                    .grand-total { 
+                        font-size: 18px; 
+                        font-weight: 900; 
+                        border-top: 2px solid #000; 
+                        padding-top: 8px; 
+                        margin-top: 8px;
+                    }
+                    .khr-total { font-size: 14px; font-weight: 700; color: #444; }
+                    @media print {
+                        body { width: 100%; padding: 10mm; }
+                        .no-print { display: none; }
+                    }
                 </style>
             </head>
             <body>
-                <div class="center">
-                    <h2>${escapeHtml(payload.restaurant.name)}</h2>
-                    ${payload.restaurant.khmer_name ? `<p>${escapeHtml(payload.restaurant.khmer_name)}</p>` : ''}
-                    ${payload.restaurant.address ? `<p class="muted">${escapeHtml(payload.restaurant.address)}</p>` : ''}
-                    ${payload.restaurant.phone ? `<p class="muted">${escapeHtml(payload.restaurant.phone)}</p>` : ''}
+                <div class="header center">
+                    ${logoHtml}
+                    <h1>${escapeHtml(payload.restaurant.name)}</h1>
+                    ${payload.restaurant.khmer_name ? `<p style="font-size: 18px; margin-top: 4px;">${escapeHtml(payload.restaurant.khmer_name)}</p>` : ''}
+                    <div style="margin-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                        ${payload.restaurant.address ? `<div>${escapeHtml(payload.restaurant.address)}</div>` : ''}
+                        ${payload.restaurant.address_kh ? `<div>${escapeHtml(payload.restaurant.address_kh)}</div>` : ''}
+                        ${payload.restaurant.phone ? `<div style="margin-top: 4px;">TEL: ${escapeHtml(payload.restaurant.phone)}</div>` : ''}
+                    </div>
                 </div>
+
                 <div class="divider"></div>
-                <div class="muted">Order: ${escapeHtml(payload.orderId)}</div>
-                ${payload.tableId ? `<div class="muted">Table: ${escapeHtml(payload.tableId)}</div>` : ''}
-                <div class="muted">Printed: ${new Date().toLocaleString()}</div>
-                <div class="section">
-                    <table>
-                        <tbody>${itemRows}</tbody>
-                    </table>
+
+                <div class="info">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>ORDER: ${payload.orderId.slice(0, 8)}...</span>
+                        <span>${new Date().toLocaleDateString()}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                        <span>TABLE: ${payload.tableId || 'N/A'}</span>
+                        <span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                 </div>
+
                 <div class="divider"></div>
+
+                <div class="items">
+                    ${itemRows}
+                </div>
+
+                <div class="divider" style="border-top-style: solid; border-top-width: 2px;"></div>
+
                 <div class="totals">
-                    <div><span>Subtotal</span><span>${formatUsd(payload.totals.subtotalCents)}</span></div>
-                    <div><span>VAT</span><span>${formatUsd(payload.totals.vatCents)}</span></div>
-                    <div><span>PLT</span><span>${formatUsd(payload.totals.pltCents)}</span></div>
-                    <div><strong>Total</strong><strong>${formatUsd(payload.totals.totalUsdCents)}</strong></div>
-                    <div><span>KHR</span><span>${formatKhr(payload.totals.totalKhr)}</span></div>
+                    <div class="totals-row">
+                        <span>SUBTOTAL </span>
+                        <span>${formatUsd(payload.totals.subtotalCents)}</span>
+                    </div>
+                    <div class="totals-row grand-total">
+                        <span>TOTAL USD</span>
+                        <span>${formatUsd(payload.totals.totalUsdCents)}</span>
+                    </div>
+                    <div class="totals-row khr-total">
+                        <span>TOTAL KHR</span>
+                        <span>${formatKhr(payload.totals.totalKhr)}</span>
+                    </div>
                 </div>
+
                 <div class="divider"></div>
-                <div class="section">
-                    <strong>Payments</strong>
+
+                <div class="payments">
+                    <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin-bottom: 6px;">Payment Details</div>
                     ${paymentRows}
                 </div>
+
                 <div class="divider"></div>
-                <div class="center muted">${footerLines}</div>
+
+                <div class="center" style="font-size: 12px; font-weight: bold;">
+                    ${footerLines}
+                    <div style="margin-top: 15px; font-size: 10px; font-weight: 400; font-family: monospace;">
+                        POWERED BY DINEOS
+                    </div>
+                </div>
+
                 <script>
                     window.onload = function () {
-                        window.print();
-                        setTimeout(function () { window.close(); }, 300);
+                        setTimeout(() => {
+                            window.print();
+                            window.onafterprint = () => window.close();
+                            // Fallback for browsers that don't support onafterprint or if cancelled
+                            setTimeout(() => window.close(), 500);
+                        }, 500);
                     };
                 </script>
             </body>
         </html>
     `);
     printWindow.document.close();
-}
+}

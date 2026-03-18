@@ -46,9 +46,9 @@ export interface OrderTotals {
 }
 
 export function calculateTotals(subtotalCents: number, exchangeRate: number): OrderTotals {
-    const vatCents = Math.round(subtotalCents * 0.10);
-    const pltCents = Math.round(subtotalCents * 0.03);
-    const totalUsdCents = subtotalCents + vatCents + pltCents;
+    const vatCents = 0;
+    const pltCents = 0;
+    const totalUsdCents = subtotalCents;
     const totalKhr = roundKhr(totalUsdCents, exchangeRate);
     return { subtotalCents, vatCents, pltCents, totalUsdCents, totalKhr };
 }

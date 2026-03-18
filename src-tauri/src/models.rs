@@ -63,6 +63,7 @@ pub struct Restaurant {
     pub website: Option<String>,
     pub vat_number: Option<String>,
     pub receipt_footer: Option<String>,
+    pub logo_path: Option<String>,
     pub is_deleted: i64,
     pub created_at: String,
     pub updated_at: Option<String>,
@@ -79,6 +80,7 @@ pub struct RestaurantUpsertInput {
     pub website: Option<String>,
     pub vat_number: Option<String>,
     pub receipt_footer: Option<String>,
+    pub logo_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

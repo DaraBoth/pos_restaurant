@@ -91,7 +91,7 @@ export default function CheckoutModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-[#431407]/40 backdrop-blur-md" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center pl-[100px] lg:pl-[280px] p-4 modal-overlay bg-black/60 backdrop-blur-md" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-[var(--border)]">
                 {/* Header */}
                 <div className="flex items-center justify-between px-8 py-6 border-b border-[var(--border)] bg-[var(--bg-elevated)]">

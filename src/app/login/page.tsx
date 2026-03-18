@@ -31,12 +31,12 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#0f1115]">
+        <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[var(--background)]">
             
             {/* Language toggle */}
             <button
                 onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-                className="absolute top-6 right-6 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all z-10 bg-[#181a20] border border-white/5 hover:bg-white/5"
+                className="absolute top-6 right-6 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all z-10 bg-[var(--bg-card)] border border-white/5 hover:bg-white/10"
             >
                 <Globe size={16} className="text-[var(--accent)]"/>
                 {lang === 'en' ? 'ភាសាខ្មែរ' : 'English'}
@@ -55,7 +55,7 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-white">
                         DineOS
                     </h1>
-                    <div className="mt-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] uppercase tracking-widest font-bold text-[var(--accent)]">
+                    <div className="mt-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] uppercase tracking-widest font-black text-[var(--accent)]">
                         v0.1.0-cloud-test
                     </div>
                     <p className="text-sm mt-2 font-medium text-[var(--text-secondary)]">
@@ -64,7 +64,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-[#181a20] border border-white/10 rounded-2xl p-8 shadow-2xl">
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-3xl p-8 shadow-2xl relative z-20">
                     <form onSubmit={handleLogin} className="space-y-6">
                         {/* Username */}
                         <div className="space-y-2">
@@ -143,7 +143,7 @@ export default function LoginPage() {
                     <p className="text-xs font-medium text-[var(--text-secondary)]">
                         Default Credentials
                     </p>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/5 bg-[#181a20]">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
                         <span className="font-mono text-xs font-semibold text-white">admin</span>
                         <span className="text-[var(--text-secondary)]">/</span>
                         <span className="font-mono text-xs font-semibold text-[var(--accent)]">admin123</span>
