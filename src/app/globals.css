@@ -15,24 +15,24 @@
 }
 
 :root {
-  /* Clean Professional Dark Theme */
-  --background: #0f1115;
-  --foreground: #f8fafc;
+  /* Summer Vibe Warm Light Theme */
+  --background: #fffcf5; /* Creamy Sunlight */
+  --foreground: #431407; /* Deep Roasted Coffee */
 
   /* Card / Layering */
-  --bg-card: #181a20;
-  --bg-elevated: #22252d;
-  --bg-dark: #090a0c;
+  --bg-card: #ffffff;
+  --bg-elevated: #fff7ed; /* Sunset Glow */
+  --bg-dark: #fed7aa; /* Peach Sorbet */
 
-  /* Professional Accents */
-  --accent: #3b82f6; /* Trust blue */
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981; 
+  /* Summer Sunset Accents */
+  --accent: #fb923c; /* Orange-400 */
+  --accent-blue: #38bdf8; /* Ocean Blue */
+  --accent-green: #84cc16; /* Lime Green */
   --accent-red: #ef4444; 
-  --accent-pink: #d946ef; 
+  --accent-pink: #f472b6; 
   
-  --text-secondary: #94a3b8;
-  --border: rgba(255, 255, 255, 0.08);
+  --text-secondary: #78716c; /* Stone-500 */
+  --border: rgba(249, 115, 22, 0.12);
 }
 
 body {

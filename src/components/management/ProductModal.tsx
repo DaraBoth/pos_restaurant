@@ -71,74 +71,74 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={e => e.target === e.currentTarget && onClose()}>
-            <div className="bg-[#181a20] border border-white/10 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
-                <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-[#0f1115]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--foreground)]/40 backdrop-blur-sm animate-fade-in" onClick={e => e.target === e.currentTarget && onClose()}>
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl">
+                <div className="px-8 py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--bg-elevated)]">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
                             <Package size={20} className="text-[var(--accent)]" />
                         </div>
-                        <h2 className="text-xl font-bold text-white">
+                        <h2 className="text-xl font-black text-[var(--foreground)] tracking-tight">
                             {product ? 'Edit Product' : 'Create New Product'}
                         </h2>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 text-[#8a8a99] transition-colors">
-                        <X size={20} />
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--accent)]/10 text-[var(--text-secondary)] transition-colors">
+                        <X size={20} strokeWidth={2.5} />
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2 col-span-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Product Name (EN)</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] ml-1">Product Name (EN)</label>
                             <input
                                 required
                                 value={name}
                                 onChange={e => setName(e.target.value)}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-5 py-3.5 text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all font-bold placeholder:opacity-30"
                                 placeholder="e.g. Fried Rice"
                             />
                         </div>
 
                         <div className="space-y-2 col-span-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Product Name (KH)</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] ml-1">Product Name (KH)</label>
                             <input
                                 value={khmerName}
                                 onChange={e => setKhmerName(e.target.value)}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all khmer"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-5 py-3.5 text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all khmer font-bold placeholder:opacity-30"
                                 placeholder="បាយឆា"
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Price (Cents)</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] ml-1">Price (Cents)</label>
                             <input
                                 type="number"
                                 required
                                 value={priceCents}
                                 onChange={e => setPriceCents(parseInt(e.target.value))}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-mono"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-5 py-3.5 text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all font-black font-mono"
                             />
-                            <p className="text-[10px] text-[#8a8a99] mt-1 ml-1">100 cents = $1.00</p>
+                            <p className="text-[10px] font-bold text-[var(--text-secondary)] mt-1 ml-1 opacity-60 italic">100 cents = $1.00</p>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Initial Stock</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] ml-1">Initial Stock</label>
                             <input
                                 type="number"
                                 required
                                 value={stockQuantity}
                                 onChange={e => setStockQuantity(parseInt(e.target.value))}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-mono"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-5 py-3.5 text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all font-black font-mono"
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Category</label>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] ml-1">Category</label>
                             <select
                                 value={categoryId}
                                 onChange={e => setCategoryId(e.target.value)}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium appearance-none"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-5 py-3.5 text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all font-black appearance-none"
                             >
                                 {categories.map(cat => (
                                     <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -147,19 +147,19 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Status</label>
-                            <div className="flex items-center h-[54px] px-5 bg-[#0f1115] border border-white/5 rounded-2xl">
-                                <label className="flex items-center gap-3 cursor-pointer group">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] ml-1">Status</label>
+                            <div className="flex items-center h-[54px] px-5 bg-[var(--background)] border border-[var(--border)] rounded-2xl">
+                                <label className="flex items-center gap-3 cursor-pointer group w-full">
                                     <input
                                         type="checkbox"
                                         checked={isAvailable}
                                         onChange={e => setIsAvailable(e.target.checked)}
                                         className="hidden"
                                     />
-                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${isAvailable ? 'bg-green-500' : 'bg-[#1c1c24]'}`}>
-                                        <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${isAvailable ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${isAvailable ? 'bg-green-500' : 'bg-[var(--bg-elevated)] border border-[var(--border)]'}`}>
+                                        <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${isAvailable ? 'translate-x-5' : 'translate-x-0'} shadow-sm`} />
                                     </div>
-                                    <span className={`text-sm font-bold ${isAvailable ? 'text-green-400' : 'text-[#8a8a99]'}`}>
+                                    <span className={`text-sm font-black ${isAvailable ? 'text-green-600' : 'text-[var(--text-secondary)]'}`}>
                                         {isAvailable ? 'Available' : 'Unavailable'}
                                     </span>
                                 </label>
@@ -171,21 +171,21 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-3 rounded-2xl text-sm font-bold text-[#8a8a99] hover:text-white transition-colors"
+                            className="px-6 py-3 rounded-2xl text-sm font-black text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="px-8 py-3 rounded-2xl bg-[var(--accent)] text-black font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                            className="px-8 py-3 rounded-2xl bg-[var(--accent)] text-white font-black text-sm shadow-lg shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                         >
                             {loading ? (
-                                <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
-                                <Save size={18} />
+                                <Save size={18} strokeWidth={3} />
                             )}
-                            {product ? 'Save Changes' : 'Create Product'}
+                            {product ? 'Commit Changes' : 'Initialize Asset'}
                         </button>
                     </div>
                 </form>

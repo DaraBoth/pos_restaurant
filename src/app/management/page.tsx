@@ -8,42 +8,42 @@ const QUICK_LINKS = [
         label: 'Products', 
         desc: 'Manage menu items, prices, and stock levels.', 
         icon: Package, 
-        color: '#3b82f6'
+        color: '#f97316' // Orange
     },
     { 
         href: '/management/categories', 
         label: 'Categories', 
         desc: 'Organize products into logical groups.', 
         icon: Building2, 
-        color: '#3b82f6'
+        color: '#fb923c' // Light Orange
     },
     { 
         href: '/management/users', 
         label: 'Staff', 
         desc: 'Manage staff accounts, credentials, and access levels.', 
         icon: Users, 
-        color: '#3b82f6' 
+        color: '#fbbf24' // Amber
     },
     { 
         href: '/management/exchange-rate', 
         label: 'Exchange', 
         desc: 'Update the live USD ↔ KHR calculation rate.', 
         icon: RefreshCw, 
-        color: '#3b82f6' 
+        color: '#84cc16' // Lime
     },
     { 
         href: '/management/orders', 
         label: 'Orders', 
         desc: 'Audit past receipts, refunds, and revenue totals.', 
         icon: ClipboardList, 
-        color: '#3b82f6' 
+        color: '#0ea5e9' // Ocean Blue
     },
     { 
         href: '/management/settings', 
         label: 'Settings', 
         desc: 'Configure restaurant name, receipt headers, and taxes.', 
         icon: Building2, 
-        color: '#3b82f6' 
+        color: '#f43f5e' // Coral/Rose
     },
 ];
 
@@ -52,42 +52,42 @@ export default function ManagementDashboard() {
         <div className="animate-fade-in">
             {/* Header */}
             <div className="mb-10">
-                <h1 className="text-3xl font-bold tracking-tight mb-2 text-white">System Dashboard</h1>
-                <p className="text-[var(--text-secondary)] font-medium">
-                    Core management tools. All changes save instantly to the local datastore.
+                <h1 className="text-4xl font-black tracking-tight mb-2 text-[var(--foreground)]">System Dashboard</h1>
+                <p className="text-[var(--text-secondary)] font-bold uppercase tracking-widest text-xs opacity-60">
+                    Retail Operations & Datastore Control
                 </p>
             </div>
 
             {/* Bento Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {QUICK_LINKS.map(({ href, label, desc, icon: Icon, color }) => (
                     <Link
                         key={href}
                         href={href}
-                        className="group flex flex-col p-6 rounded-2xl transition-all relative overflow-hidden bg-[#181a20] border border-white/5 hover:border-white/10 hover:shadow-lg"
+                        className="group flex flex-col p-8 rounded-[2rem] transition-all relative overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 hover:-translate-y-1"
                     >
                         {/* Top Context */}
-                        <div className="flex items-start justify-between mb-8 relative z-10">
+                        <div className="flex items-start justify-between mb-10 relative z-10">
                             <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                                className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
                                 style={{ 
-                                    background: `color-mix(in srgb, ${color} 15%, transparent)`, 
-                                    border: `1px solid color-mix(in srgb, ${color} 30%, transparent)` 
+                                    background: `color-mix(in srgb, ${color} 10%, #fff)`, 
+                                    border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` 
                                 }}
                             >
-                                <Icon size={22} style={{ color }} strokeWidth={2} />
+                                <Icon size={24} style={{ color }} strokeWidth={2.5} />
                             </div>
                             
                             <div 
-                                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0f1115] border border-white/5 transition-colors group-hover:bg-white/5"
+                                className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-elevated)] border border-[var(--border)] transition-colors group-hover:bg-[var(--accent)] group-hover:text-white"
                             >
-                                <ArrowRight size={16} className="text-[var(--text-secondary)] group-hover:text-white transition-colors" />
+                                <ArrowRight size={18} className="text-[var(--text-secondary)] group-hover:text-white transition-colors" />
                             </div>
                         </div>
 
                         {/* Text Content */}
                         <div className="mt-auto relative z-10">
-                            <h2 className="text-lg font-bold text-white mb-1">
+                            <h2 className="text-xl font-black text-[var(--foreground)] mb-2">
                                 {label}
                             </h2>
                             <p className="text-sm font-medium text-[var(--text-secondary)] leading-relaxed">
@@ -99,12 +99,12 @@ export default function ManagementDashboard() {
             </div>
             
             {/* System Status Pill */}
-            <div className="mt-10 inline-flex items-center gap-2.5 px-4 py-2 rounded-lg bg-[#181a20] border border-white/5">
-                <div className="relative flex h-2 w-2">
+            <div className="mt-12 inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-sm">
+                <div className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </div>
-                <span className="text-xs font-semibold text-[var(--text-secondary)]">Datastore Online</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Database Synchronized</span>
             </div>
         </div>
     );

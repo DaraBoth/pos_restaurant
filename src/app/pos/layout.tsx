@@ -6,7 +6,7 @@ export default function POSLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="h-screen w-full flex flex-row bg-black text-white">
+        <div className="h-screen w-full flex flex-row bg-[var(--background)] text-[var(--foreground)]">
             <SidebarNav />
             <main className="flex-1 overflow-hidden relative flex flex-col">
                 {children}
