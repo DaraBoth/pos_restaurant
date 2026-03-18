@@ -53,16 +53,16 @@ export default function TableOrderHistoryModal({ isOpen, tableId, onClose }: Tab
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#431407]/40 backdrop-blur-md p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="w-full max-w-3xl rounded-[2.5rem] border border-[var(--border)] bg-[var(--bg-card)] shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-10 py-8 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+                <div className="flex items-center justify-between px-[var(--space-unit)] py-8 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
                             <History size={18} className="text-[var(--accent)]" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-[var(--foreground)] uppercase tracking-tight">Table {tableId} History</h2>
-                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Open and completed sessions.</p>
+                            <h2 className="text-[var(--text-xl)] font-black text-[var(--foreground)] uppercase tracking-tight">Table {tableId} History</h2>
+                            <p className="text-[var(--text-xs)] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Open and completed sessions.</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-3 rounded-2xl hover:bg-[var(--accent)]/10 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors">
@@ -85,12 +85,12 @@ export default function TableOrderHistoryModal({ isOpen, tableId, onClose }: Tab
                                 <div key={order.id} className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--bg-elevated)] p-6 hover:border-[var(--accent)]/30 transition-colors">
                                     <div className="flex items-start justify-between gap-4">
                                         <div>
-                                            <p className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">Order #{order.id.split('-')[0].toUpperCase()}</p>
-                                            <p className="text-[11px] font-bold text-[var(--text-secondary)] mt-1 opacity-60">
+                                            <p className="text-[var(--text-sm)] font-black text-[var(--foreground)] uppercase tracking-widest">Order #{order.id.split('-')[0].toUpperCase()}</p>
+                                            <p className="text-[var(--text-xs)] font-bold text-[var(--text-secondary)] mt-1 opacity-60">
                                                 {new Date(order.created_at + 'Z').toLocaleString()}
                                             </p>
                                         </div>
-                                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                                        <span className={`px-4 py-1.5 rounded-full text-[var(--text-xs)] font-black uppercase tracking-[0.2em] border ${
                                             order.status === 'open'
                                                 ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
                                                 : order.status === 'completed'
@@ -103,10 +103,10 @@ export default function TableOrderHistoryModal({ isOpen, tableId, onClose }: Tab
 
                                     <div className="mt-6 flex items-end justify-between">
                                         <div>
-                                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-[var(--text-secondary)] mb-1 opacity-60">Total Paid</p>
-                                            <p className="font-mono text-2xl font-black text-[var(--foreground)]">{formatUsd(order.total_usd)}</p>
+                                            <p className="text-[var(--text-xs)] uppercase font-black tracking-[0.2em] text-[var(--text-secondary)] mb-1 opacity-60">Total Paid</p>
+                                            <p className="font-mono text-[var(--text-2xl)] font-black text-[var(--foreground)]">{formatUsd(order.total_usd)}</p>
                                         </div>
-                                        <p className="font-mono text-base font-bold text-[var(--text-secondary)] opacity-80">{formatKhr(order.total_khr)}</p>
+                                        <p className="font-mono text-[var(--text-base)] font-bold text-[var(--text-secondary)] opacity-80">{formatKhr(order.total_khr)}</p>
                                     </div>
                                 </div>
                             ))}

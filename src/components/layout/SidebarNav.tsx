@@ -15,15 +15,15 @@ const NavItem = ({
     return (
         <Link
             href={path}
-            className={`flex items-center gap-4 w-full px-5 py-3.5 rounded-2xl transition-all group active:scale-95 ${isExactMatch
-                ? 'bg-[var(--accent)] text-black shadow-[0_0_20px_rgba(204,255,0,0.25)] font-bold'
-                : 'text-[#8a8a99] hover:text-white hover:bg-white/5 font-medium'
+            className={`flex items-center gap-3 w-full px-[var(--space-unit)] py-3 rounded-2xl transition-all group active:scale-95 ${isExactMatch
+                ? 'bg-[var(--accent)] text-white shadow-lg font-bold'
+                : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-dark)] font-medium'
                 }`}
         >
-            <div className={`p-2 rounded-xl transition-all ${isExactMatch ? 'bg-black/10' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                <Icon size={20} strokeWidth={isExactMatch ? 2.5 : 2} className={isExactMatch ? 'text-black' : 'group-hover:scale-110 transition-transform'} />
+            <div className={`p-1.5 rounded-xl transition-all ${isExactMatch ? 'bg-white/20' : 'bg-[var(--bg-dark)] group-hover:bg-[var(--border)]'}`}>
+                <Icon size={18} strokeWidth={isExactMatch ? 2.5 : 2} className={isExactMatch ? 'text-white' : 'group-hover:scale-110 transition-transform'} />
             </div>
-            <span className="text-sm tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
+            <span className="text-[var(--text-sm)] tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
                 {label}
             </span>
         </Link>
@@ -43,11 +43,11 @@ export default function SidebarNav() {
 
     return (
         <aside
-            className="w-64 flex-shrink-0 flex flex-col items-start py-8 h-screen sticky top-0 bg-[var(--background)] z-40 border-r border-[var(--border)]"
-            style={{ boxShadow: '15px 0 40px rgba(249,115,22,0.05)' }}
+            className="w-[clamp(14rem,18vw,16rem)] flex-shrink-0 flex flex-col items-start py-8 h-screen sticky top-0 bg-[var(--background)] z-40 border-r border-[var(--border)]"
+            style={{ boxShadow: '1px 0 20px rgba(0,0,0,0.02)' }}
         >
             {/* Logo */}
-            <div className="mb-10 px-8 flex flex-col items-start gap-3 w-full">
+            <div className="mb-10 px-[var(--space-unit)] flex flex-col items-start gap-3 w-full">
                 <div className="flex items-center gap-4">
                     <div
                         className="w-11 h-11 rounded-[1.25rem] flex items-center justify-center shadow-lg"
@@ -67,7 +67,7 @@ export default function SidebarNav() {
             </div>
 
             {/* Primary Navigation */}
-            <nav className="flex flex-col gap-2 w-full px-4 flex-1">
+            <nav className="flex flex-col gap-1 w-full px-[calc(var(--space-unit)/2)] flex-1">
                 <NavItem label={t('pos')} icon={LayoutGrid} path="/pos" pathname={pathname} />
                 <NavItem label="Floor Plan" icon={TableProperties} path="/pos/tables" pathname={pathname} />
                 <NavItem label={t('orderHistory')} icon={History} path="/history" pathname={pathname} />

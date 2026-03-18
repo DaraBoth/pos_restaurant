@@ -95,44 +95,44 @@ export default function TablesPage() {
 
     return (
         <div className="h-full overflow-y-auto bg-[var(--background)] flex flex-col items-center">
-            <div className="w-full max-w-6xl px-8 py-10 space-y-8 animate-fade-in">
+            <div className="w-full max-w-6xl px-[var(--space-unit)] py-10 space-y-8 animate-fade-in">
 
                 {/* Header & Stats */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-[var(--bg-card)] p-8 rounded-[2.5rem] border border-[var(--border)] shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-[var(--bg-card)] p-[var(--space-unit)] rounded-[2.5rem] border border-[var(--border)] shadow-sm">
                     <div>
                         <div className="flex items-center gap-4 mb-2">
                             <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent)]/10">
                                 <TableProperties size={28} className="text-[var(--accent)]" strokeWidth={2.5} />
                             </div>
-                            <h1 className="text-4xl font-black text-[var(--foreground)] tracking-tight uppercase">Floor Plan</h1>
+                            <h1 className="text-[var(--text-4xl)] font-black text-[var(--foreground)] tracking-tight uppercase">Floor Plan</h1>
                         </div>
-                        <p className="text-[var(--text-secondary)] font-medium md:ml-16">
+                        <p className="text-[var(--text-secondary)] font-medium md:ml-16 text-[var(--text-sm)]">
                             Select a table to start or continue an active order.
                         </p>
                     </div>
 
                     <div className="flex gap-4">
-                        <div className="px-6 py-4 rounded-2xl min-w-[120px] border border-[var(--border)] bg-[var(--bg-elevated)]">
-                            <p className="text-3xl font-black font-mono text-green-600 tracking-tighter">{freeCount}</p>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1 opacity-60">Free</p>
+                        <div className="px-5 py-4 rounded-2xl min-w-[120px] border border-[var(--border)] bg-[var(--bg-elevated)]">
+                            <p className="text-[var(--text-3xl)] font-black font-mono text-green-600 tracking-tighter leading-none">{freeCount}</p>
+                            <p className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1.5 opacity-60">Free</p>
                         </div>
-                        <div className="px-6 py-4 rounded-2xl min-w-[120px] border border-[var(--border)] bg-[var(--bg-elevated)]">
-                            <p className="text-3xl font-black font-mono text-[var(--accent)] tracking-tighter">{occupiedCount}</p>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1 opacity-60">Occupied</p>
+                        <div className="px-5 py-4 rounded-2xl min-w-[120px] border border-[var(--border)] bg-[var(--bg-elevated)]">
+                            <p className="text-[var(--text-3xl)] font-black font-mono text-[var(--accent)] tracking-tighter leading-none">{occupiedCount}</p>
+                            <p className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1.5 opacity-60">Occupied</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Table Grid */}
-                <div className="bg-[var(--bg-card)] p-8 rounded-[2.5rem] border border-[var(--border)] shadow-sm">
+                <div className="bg-[var(--bg-card)] p-[var(--space-unit)] rounded-[2.5rem] border border-[var(--border)] shadow-sm">
                     {loading ? (
-                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-[calc(var(--space-unit)*0.75)]">
                             {Array.from({ length: 16 }).map((_, i) => (
                                 <div key={i} className="rounded-2xl animate-pulse bg-[var(--bg-elevated)]" style={{ aspectRatio: '1/1' }} />
                             ))}
                         </div>
                     ) : (
-                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-[calc(var(--space-unit)*0.75)]">
                             {tableData.map(table => {
                                 const isCurrent = activeTableId === table.id;
                                 const isFree = table.status === 'free';
@@ -181,7 +181,7 @@ export default function TablesPage() {
                                         ) : (
                                             <Users size={26} color={styleProps.text} strokeWidth={2.5} />
                                         )}
-                                        <span className="text-xs font-black tracking-[0.1em]" style={{ color: styleProps.text }}>
+                                        <span className="text-[var(--text-xs)] font-black tracking-[0.1em]" style={{ color: styleProps.text }}>
                                             {table.id}
                                         </span>
                                     </button>
@@ -196,12 +196,12 @@ export default function TablesPage() {
                                     onChange={e => setCustomTable(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleAddTable()}
                                     placeholder="NEW"
-                                    className="w-full text-center bg-transparent outline-none flex-1 text-xs font-black uppercase text-[var(--foreground)] placeholder-[var(--text-secondary)]/30 tracking-widest"
+                                    className="w-full text-center bg-transparent outline-none flex-1 text-[var(--text-xs)] font-black uppercase text-[var(--foreground)] placeholder-[var(--text-secondary)]/30 tracking-widest"
                                 />
                                 <button
                                     onClick={handleAddTable}
                                     disabled={!customTable.trim()}
-                                    className="w-full py-3 bg-[var(--bg-card)] hover:bg-[var(--accent)] hover:text-white font-black text-[10px] uppercase tracking-widest transition-all border-t border-[var(--border)] group-hover:border-[var(--accent)]/30"
+                                    className="w-full py-3 bg-[var(--bg-card)] hover:bg-[var(--accent)] hover:text-white font-black text-[var(--text-xs)] uppercase tracking-widest transition-all border-t border-[var(--border)] group-hover:border-[var(--accent)]/30"
                                 >
                                     CREATE
                                 </button>

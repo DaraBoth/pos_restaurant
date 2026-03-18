@@ -56,9 +56,9 @@ export default function ProductsManagement() {
     );
 
     return (
-        <div className="max-w-7xl mx-auto animate-fade-in space-y-6">
+        <div className="max-w-7xl mx-auto animate-fade-in space-y-[var(--space-unit)] pb-10">
             {/* Header Area */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-[var(--bg-card)] p-6 lg:p-8 rounded-[2.5rem] border border-[var(--border)] shadow-xl overflow-hidden relative">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-[var(--bg-card)] p-[var(--space-unit)] rounded-[2.5rem] border border-[var(--border)] shadow-xl overflow-hidden relative">
                 {/* Decorative background element */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-[100px] pointer-events-none" />
                 
@@ -67,8 +67,8 @@ export default function ProductsManagement() {
                         <Package size={32} className="text-[var(--accent)]" strokeWidth={2} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black text-[var(--foreground)] tracking-tight leading-none mb-2">Master Roster</h1>
-                        <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-60">
+                        <h1 className="text-[var(--text-3xl)] font-black text-[var(--foreground)] tracking-tight leading-none mb-2">Master Roster</h1>
+                        <p className="text-[var(--text-xs)] font-bold text-[var(--text-secondary)] uppercase tracking-[0.2em] opacity-60">
                             Asset Monitoring & Catalog Control
                         </p>
                     </div>
@@ -88,7 +88,7 @@ export default function ProductsManagement() {
                     
                     <button
                         onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
-                        className="px-6 py-3 rounded-2xl bg-[var(--accent)] text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all"
+                        className="px-6 py-3.5 rounded-[1.25rem] bg-[var(--accent)] text-white font-black text-[var(--text-sm)] flex items-center justify-center gap-2 shadow-xl shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest"
                     >
                         <Plus size={18} strokeWidth={3} />
                         Register New
@@ -102,12 +102,12 @@ export default function ProductsManagement() {
                     <table className="w-full text-left whitespace-nowrap border-collapse">
                         <thead className="bg-[var(--bg-elevated)]">
                             <tr>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Visual</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Product Details</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Category</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-center">In-Stock</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Unit Rate</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Actions</th>
+                                <th className="px-[var(--space-unit)] py-5 text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] opacity-60">Visual</th>
+                                <th className="px-[var(--space-unit)] py-5 text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] opacity-60">Product Details</th>
+                                <th className="px-[var(--space-unit)] py-5 text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] opacity-60">Category</th>
+                                <th className="px-[var(--space-unit)] py-5 text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-center opacity-60">In-Stock</th>
+                                <th className="px-[var(--space-unit)] py-5 text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right opacity-60">Unit Rate</th>
+                                <th className="px-[var(--space-unit)] py-5 text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right opacity-60">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
@@ -118,19 +118,19 @@ export default function ProductsManagement() {
                                            <ImageIcon size={20} className="text-[var(--text-secondary)]/40" />
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5">
+                                    <td className="px-[var(--space-unit)] py-5">
                                         <div className="flex items-center gap-3">
                                             <div className="flex flex-col">
-                                                <div className="font-black text-[var(--foreground)] text-base tracking-tight">{p.name}</div>
-                                                <div className="text-xs font-bold text-[var(--text-secondary)] khmer mt-0.5">{p.khmer_name}</div>
+                                                <div className="font-black text-[var(--foreground)] text-[var(--text-base)] tracking-tight leading-none">{p.name}</div>
+                                                <div className="text-[var(--text-xs)] font-bold text-[var(--text-secondary)] khmer mt-1.5 opacity-60">{p.khmer_name}</div>
                                             </div>
                                             {p.is_available === 0 && (
                                                 <span className="px-2 py-0.5 rounded-md bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">Hidden</span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5">
-                                        <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl bg-[var(--background)] border border-[var(--border)] text-[var(--text-secondary)]">
+                                    <td className="px-[var(--space-unit)] py-5">
+                                        <span className="inline-flex items-center gap-2 text-[var(--text-xs)] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl bg-[var(--background)] border border-[var(--border)] text-[var(--text-secondary)] opacity-80">
                                             <Box size={12} className="text-[var(--accent)]" />
                                             {p.category_name}
                                         </span>
@@ -158,8 +158,8 @@ export default function ProductsManagement() {
                                             </button>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5 text-right">
-                                        <div className="font-mono font-black text-lg text-[var(--accent)]">
+                                    <td className="px-[var(--space-unit)] py-5 text-right">
+                                        <div className="font-mono font-black text-[var(--text-lg)] text-[var(--accent)]">
                                             {formatUsd(p.price_cents)}
                                         </div>
                                     </td>
