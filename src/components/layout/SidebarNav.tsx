@@ -17,15 +17,15 @@ const NavItem = ({
     return (
         <Link
             href={path}
-            className={`flex items-center gap-4 w-full px-5 py-3.5 rounded-2xl transition-all group active:scale-95 ${isExactMatch
-                ? 'bg-[var(--accent)] text-black shadow-[0_0_20px_rgba(204,255,0,0.25)] font-bold'
-                : 'text-[#8a8a99] hover:text-white hover:bg-white/5 font-medium'
+            className={`flex items-center gap-3 w-full px-[var(--space-unit)] py-3 rounded-2xl transition-all group active:scale-95 ${isExactMatch
+                ? 'bg-[var(--accent)] text-white shadow-lg font-bold'
+                : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-dark)] font-medium'
                 }`}
         >
-            <div className={`p-2 rounded-xl transition-all ${isExactMatch ? 'bg-black/10' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                <Icon size={20} strokeWidth={isExactMatch ? 2.5 : 2} className={isExactMatch ? 'text-black' : 'group-hover:scale-110 transition-transform'} />
+            <div className={`p-1.5 rounded-xl transition-all ${isExactMatch ? 'bg-white/20' : 'bg-[var(--bg-dark)] group-hover:bg-[var(--border)]'}`}>
+                <Icon size={18} strokeWidth={isExactMatch ? 2.5 : 2} className={isExactMatch ? 'text-white' : 'group-hover:scale-110 transition-transform'} />
             </div>
-            <span className="text-sm tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
+            <span className="text-[var(--text-sm)] tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
                 {label}
             </span>
         </Link>
@@ -50,12 +50,16 @@ export default function SidebarNav() {
 
     return (
         <aside
-            className="w-[100px] lg:w-[280px] h-screen bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col relative z-50 transition-all duration-500"
+            className="w-[clamp(14rem,18vw,16rem)] flex-shrink-0 flex flex-col items-start py-8 h-screen sticky top-0 bg-[var(--background)] z-40 border-r border-[var(--border)]"
+            style={{ boxShadow: '1px 0 20px rgba(0,0,0,0.02)' }}
         >
-            {/* Logo Area */}
-            <div className="h-24 flex items-center px-6 lg:px-8 border-b border-[var(--border)] mb-4">
-                <div className="flex items-center gap-4 group cursor-pointer overflow-hidden">
-                    <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent)]/20 transition-all duration-500 group-hover:rotate-[10deg] shrink-0 border-2 border-white/10 overflow-hidden">
+            {/* Logo */}
+            <div className="mb-10 px-[var(--space-unit)] flex flex-col items-start gap-3 w-full">
+                <div className="flex items-center gap-4">
+                    <div
+                        className="w-11 h-11 rounded-[1.25rem] flex items-center justify-center shadow-lg overflow-hidden border-2 border-white/10"
+                        style={{ background: 'var(--accent)' }}
+                    >
                         {restaurant?.logo_path ? (
                             <img 
                                 src={`https://asset.localhost/${restaurant.logo_path}`} 
@@ -63,7 +67,7 @@ export default function SidebarNav() {
                                 className="w-full h-full object-cover"
                             />
                         ) : (
-                            <Zap size={28} className="text-black fill-black" strokeWidth={2.5} />
+                            <ChefHat size={22} color="#fff" strokeWidth={2.5} />
                         )}
                     </div>
                     <div className="hidden lg:flex flex-col min-w-0">
@@ -79,7 +83,7 @@ export default function SidebarNav() {
             </div>
 
             {/* Primary Navigation */}
-            <nav className="flex flex-col gap-2 w-full px-4 flex-1">
+            <nav className="flex flex-col gap-1 w-full px-[calc(var(--space-unit)/2)] flex-1">
                 <NavItem label={t('pos')} icon={LayoutGrid} path="/pos" pathname={pathname} />
                 <NavItem label="Floor Plan" icon={TableProperties} path="/pos/tables" pathname={pathname} />
                 <NavItem label={t('orderHistory')} icon={History} path="/history" pathname={pathname} />

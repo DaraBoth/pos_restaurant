@@ -47,17 +47,18 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                 style={{
                     width: 'var(--sidebar-cart-width)',
                     borderLeft: '1px solid var(--border)',
+                    boxShadow: '-1px 0 20px rgba(0,0,0,0.02)',
                 }}
             >
             {/* Header / Ticket Strip */}
-            <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+            <div className="flex-shrink-0 flex items-center justify-between px-[var(--space-unit)] py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--accent)]/10">
                         <Ticket size={16} className="text-[var(--accent)]" />
                     </div>
-                    <span className="font-bold text-base text-[var(--foreground)]">Current Order</span>
+                    <span className="font-bold text-[var(--text-base)] text-[var(--foreground)]">Order</span>
                     {items.length > 0 && (
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-[var(--accent)] text-white">
+                        <span className="text-[var(--text-xs)] font-bold px-2 py-0.5 rounded-md bg-[var(--accent)] text-white">
                             {items.reduce((s, i) => s + i.quantity, 0)}
                         </span>
                     )}
@@ -104,38 +105,38 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     items.map(item => (
                         <div
                             key={item.id}
-                            className="p-4 rounded-xl animate-fade-in bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent)]/30 transition-colors"
+                            className="p-[var(--space-unit)] rounded-2xl animate-fade-in bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent)]/30 transition-colors"
                         >
-                            <div className="flex justify-between items-start gap-3 mb-3">
+                            <div className="flex justify-between items-start gap-3 mb-4">
                                 <div className="flex-1 min-w-0">
-                                    <h3 className={`font-semibold text-sm text-[var(--foreground)] truncate ${lang === 'km' ? 'khmer' : ''}`}>
+                                    <h3 className={`font-bold text-[var(--text-sm)] text-[var(--foreground)] truncate ${lang === 'km' ? 'khmer' : ''}`}>
                                         {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
                                     </h3>
-                                    <p className="text-xs mt-0.5 font-mono text-[var(--text-secondary)]">
+                                    <p className="text-[var(--text-xs)] mt-0.5 font-mono text-[var(--text-secondary)]">
                                         {formatUsd(item.price_at_order)}
                                     </p>
                                 </div>
-                                <span className="font-mono font-bold text-sm text-[var(--accent)]">
+                                <span className="font-mono font-black text-[var(--text-sm)] text-[var(--accent)]">
                                     {formatUsd(item.price_at_order * item.quantity)}
                                 </span>
                             </div>
 
                             {/* Qty Controls */}
-                            <div className="flex items-center justify-between gap-2 p-1 rounded-lg bg-[var(--background)] border border-[var(--border)]">
+                            <div className="flex items-center justify-between gap-1 p-1 rounded-xl bg-[var(--background)] border border-[var(--border)]">
                                 <button
                                     onClick={() => handleQtyChange(item.id, item.quantity, -1)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent)]/5 text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-red-50 text-[var(--text-secondary)] hover:text-red-600"
                                 >
-                                    {item.quantity <= 1 ? <Trash2 size={14} className="text-red-500" /> : <Minus size={14} />}
+                                    {item.quantity <= 1 ? <Trash2 size={13} /> : <Minus size={13} />}
                                 </button>
-                                <span className="font-bold font-mono text-sm flex-1 text-center text-[var(--foreground)]">
+                                <span className="font-black font-mono text-[var(--text-sm)] flex-1 text-center text-[var(--foreground)]">
                                     {item.quantity}
                                 </span>
                                 <button
                                     onClick={() => handleQtyChange(item.id, item.quantity, 1)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent)]/5 text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent)]/10 text-[var(--accent)]"
                                 >
-                                    <Plus size={14} />
+                                    <Plus size={13} />
                                 </button>
                             </div>
                         </div>
@@ -145,22 +146,22 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
 
             {/* Checkout Footer */}
             <div className="flex-shrink-0 p-5 bg-[var(--bg-elevated)] border-t border-[var(--border)]">
-                <div className="space-y-2 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-5">
+                <div className="space-y-2 text-[var(--text-xs)] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-6 opacity-60">
                     <div className="flex justify-between items-center">
                         <span>{t('subtotal')}</span>
                         <span className="font-mono text-[var(--foreground)]">{formatUsd(totals.subtotalCents)}</span>
                     </div>
                 </div>
 
-                <div className="flex items-end justify-between mb-5">
+                <div className="flex items-end justify-between mb-6">
                     <div>
-                        <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">{t('total')}</p>
-                        <p className="text-3xl font-black font-mono text-[var(--foreground)]">
+                        <p className="text-[var(--text-xs)] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1 opacity-60">{t('total')}</p>
+                        <p className="text-[var(--text-3xl)] font-black font-mono text-[var(--foreground)] leading-none">
                             {formatUsd(totals.totalUsdCents)}
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-lg font-bold font-mono text-[var(--text-secondary)] opacity-60">
+                        <p className="text-[var(--text-base)] font-black font-mono text-[var(--text-secondary)] opacity-40">
                             {formatKhr(totals.totalKhr)}
                         </p>
                     </div>

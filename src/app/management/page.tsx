@@ -51,20 +51,20 @@ export default function ManagementDashboard() {
     return (
         <div className="animate-fade-in">
             {/* Header */}
-            <div className="mb-10">
-                <h1 className="text-4xl font-black tracking-tight mb-2 text-[var(--foreground)]">System Dashboard</h1>
-                <p className="text-[var(--text-secondary)] font-bold uppercase tracking-widest text-xs opacity-60">
+            <div className="mb-[var(--space-unit)]">
+                <h1 className="text-[var(--text-4xl)] font-black tracking-tight mb-2 text-[var(--foreground)]">System Dashboard</h1>
+                <p className="text-[var(--text-secondary)] font-bold uppercase tracking-[0.2em] text-[var(--text-xs)] opacity-60">
                     Retail Operations & Datastore Control
                 </p>
             </div>
 
             {/* Bento Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[var(--space-unit)]">
                 {QUICK_LINKS.map(({ href, label, desc, icon: Icon, color }) => (
                     <Link
                         key={href}
                         href={href}
-                        className="group flex flex-col p-8 rounded-[2rem] transition-all relative overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 hover:-translate-y-1"
+                        className="group flex flex-col p-[var(--space-unit)] rounded-[2rem] transition-all relative overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 hover:-translate-y-1"
                     >
                         {/* Top Context */}
                         <div className="flex items-start justify-between mb-10 relative z-10">
@@ -87,10 +87,10 @@ export default function ManagementDashboard() {
 
                         {/* Text Content */}
                         <div className="mt-auto relative z-10">
-                            <h2 className="text-xl font-black text-[var(--foreground)] mb-2">
+                            <h2 className="text-[var(--text-xl)] font-black text-[var(--foreground)] mb-2">
                                 {label}
                             </h2>
-                            <p className="text-sm font-medium text-[var(--text-secondary)] leading-relaxed">
+                            <p className="text-[var(--text-sm)] font-medium text-[var(--text-secondary)] leading-relaxed">
                                 {desc}
                             </p>
                         </div>

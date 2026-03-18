@@ -83,11 +83,11 @@ export default function ProductGrid() {
         <div className="flex flex-col min-h-0 h-full relative bg-[var(--background)]">
 
             {/* Top Toolbar: Search + Categories */}
-            <div className="flex-shrink-0 px-6 pt-20 pb-4 border-b border-[var(--border)] bg-[var(--bg-card)]/80 backdrop-blur-xl z-20">
+            <div className="flex-shrink-0 px-[var(--space-unit)] pt-[calc(var(--space-unit)*4)] pb-[var(--space-unit)] border-b border-[var(--border)] bg-[var(--bg-card)]/80 backdrop-blur-xl z-20">
                 {/* Search */}
                 <div className="relative mb-5" style={{ maxWidth: '600px' }}>
                     <Search
-                        size={20}
+                        size={18}
                         className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]"
                     />
                     <input
@@ -95,15 +95,14 @@ export default function ProductGrid() {
                         placeholder={lang === 'km' ? 'ស្វែងរកផលិតផល...' : 'Search for anything...'}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="w-full bg-[var(--background)] border-2 border-[var(--border)] text-[var(--foreground)] pl-14 pr-6 py-4 rounded-[1.5rem] text-lg font-black transition-all focus:border-[var(--accent)] focus:outline-none focus:bg-[var(--bg-elevated)] placeholder:text-[var(--text-secondary)]/40"
+                        className="w-full bg-[var(--background)] border-2 border-[var(--border)] text-[var(--foreground)] pl-14 pr-6 py-3.5 rounded-[1.5rem] text-[var(--text-lg)] font-black transition-all focus:border-[var(--accent)] focus:outline-none focus:bg-[var(--bg-elevated)] placeholder:text-[var(--text-secondary)]/40"
                     />
                 </div>
 
-                {/* Categories */}
-                <div className="flex items-center gap-3 overflow-x-auto pb-2 container-snap">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 container-snap">
                     <button
                         onClick={() => setSelectedCategory(null)}
-                        className={`whitespace-nowrap px-6 py-3 rounded-full text-sm font-black uppercase tracking-widest transition-all ${
+                        className={`whitespace-nowrap px-5 py-2.5 rounded-full text-[var(--text-xs)] font-black uppercase tracking-widest transition-all ${
                             selectedCategory === null
                                 ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30'
                                 : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card)] border border-[var(--border)]'
@@ -115,7 +114,7 @@ export default function ProductGrid() {
                         <button
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.id)}
-                            className={`whitespace-nowrap px-6 py-3 rounded-full text-sm font-black transition-all ${
+                            className={`whitespace-nowrap px-5 py-2.5 rounded-full text-[var(--text-xs)] font-black transition-all ${
                                 lang === 'km' ? 'khmer font-bold' : 'uppercase tracking-widest'
                             } ${
                                 selectedCategory === cat.id
@@ -130,7 +129,7 @@ export default function ProductGrid() {
             </div>
 
             {/* Product Grid Area */}
-            <div className="flex-1 overflow-y-auto p-6 container-snap z-10 bg-[var(--background)]">
+            <div className="flex-1 overflow-y-auto p-[var(--space-unit)] container-snap z-10 bg-[var(--background)]">
                 {filteredProducts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30">
                         <Boxes size={64} className="text-[var(--text-secondary)]" />
@@ -139,7 +138,7 @@ export default function ProductGrid() {
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-[var(--space-unit)]">
                         {filteredProducts.map((product, idx) => {
                             const isAdding = addingId === product.id;
                             const outOfStock = product.stock_quantity <= 0;
@@ -172,18 +171,15 @@ export default function ProductGrid() {
                                         </div>
                                     )}
 
-                                    {/* Card Content */}
-                                    <div className="p-5 flex-1 flex flex-col relative z-20">
-                                        <div className="flex justify-between items-start">
-                                            {/* Stock Circle */}
-                                            <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center text-center border transition-transform duration-500 group-hover:scale-110 ${
-                                                outOfStock 
-                                                    ? 'bg-red-500/5 border-red-500/20 text-red-500/80' 
-                                                    : 'bg-green-500/5 border-green-500/20 text-green-500/80'
-                                            }`}>
-                                                <span className="text-[10px] font-black leading-none">{product.stock_quantity}</span>
-                                                <span className="text-[6px] font-black uppercase tracking-tighter opacity-60">STK</span>
-                                            </div>
+                                    {/* Content Container */}
+                                    <div className="p-6 flex-1 flex flex-col relative z-20">
+                                        <div className="flex justify-between items-start mb-6">
+                                            {/* Stock Badge */}
+                                            <span className={`text-[var(--text-xs)] font-black uppercase tracking-[0.2em] px-2.5 py-1.5 rounded-full ${
+                                                outOfStock ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-600'
+                                            } border border-current/10`}>
+                                                {outOfStock ? 'SOLDOUT' : `${product.stock_quantity} IN STOCK`}
+                                            </span>
                                             
                                             {/* Action Pill */}
                                             <div className="px-2 py-3 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--accent)] group-hover:text-black transition-all duration-300 shadow-xl group-hover:shadow-[var(--accent)]/20">
@@ -191,19 +187,15 @@ export default function ProductGrid() {
                                             </div>
                                         </div>
 
-                                        <div className="mt-auto space-y-1">
-                                            <h1 className={`font-black tracking-tight leading-[1.1] line-clamp-2 transition-colors ${lang === 'km' ? 'khmer text-lg' : 'text-xl text-white group-hover:text-[var(--accent)]'}`}>
-                                                {lang === 'km' ? (product.khmer_name || product.name) : product.name}
-                                            </h1>
-                                            <p className="text-[8px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-50">
-                                                {lang === 'km' ? (product.category_khmer || product.category_name) : product.category_name}
-                                            </p>
-                                        </div>
+                                        <h3 className={`font-black mt-auto mb-1 flex-1 leading-snug line-clamp-2 ${lang === 'km' ? 'khmer text-[var(--text-lg)]' : 'text-[var(--text-lg)] text-[var(--foreground)] tracking-tight'}`}>
+                                            {lang === 'km' ? (product.khmer_name || product.name) : product.name}
+                                        </h3>
+                                        <span className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-4 truncate opacity-60">
+                                            {lang === 'km' ? (product.category_khmer || product.category_name) : product.category_name}
+                                        </span>
 
-                                        <div className="mt-4 flex items-baseline gap-1">
-                                            <span className="text-xl font-black text-[var(--accent)] tracking-tighter">
-                                                {formatUsd(product.price_cents)}
-                                            </span>
+                                        <div className="font-mono text-[var(--text-xl)] font-black text-[var(--accent)]">
+                                            {formatUsd(product.price_cents)}
                                         </div>
                                     </div>
 

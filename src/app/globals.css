@@ -15,44 +15,55 @@
 }
 
 :root {
-  /* Premium Black & Titanium Orange Theme */
-  --background: #000000;
-  --foreground: #ffffff;
+  /* Premium Solar Light Theme - Clean Slate & Vibrant Orange */
+  --background: #ffffff; 
+  --foreground: #0f172a; /* Slate-900 */
 
   /* Card / Layering */
-  --bg-card: #0a0a0a;
-  --bg-elevated: #121212;
-  --bg-dark: #050505;
+  --bg-card: #f8fafc; /* Slate-50 */
+  --bg-elevated: #ffffff;
+  --bg-dark: #f1f5f9; /* Slate-100 */
 
-  /* Titanium Orange Accents */
-  --accent: #f97316; /* Vibrant Titanium Orange */
-  --accent-blue: #0ea5e9;
-  --accent-green: #22c55e;
-  --accent-red: #ef4444;
-  --accent-pink: #ec4899;
+  /* Professional Accents */
+  --accent: #f97316; /* Orange-500 */
+  --accent-blue: #3b82f6; /* Blue-500 */
+  --accent-green: #10b981; /* Emerald-500 */
+  --accent-red: #ef4444; 
+  --accent-pink: #ec4899; 
+  
+  --text-secondary: #64748b; /* Slate-500 */
+  --border: rgba(15, 23, 42, 0.08);
 
-  --text-secondary: #a1a1aa; /* Zinc-400 for better contrast on black */
-  --border: rgba(255, 255, 255, 0.1);
+  /* Fluid Typography & Spacing */
+  --text-xs: clamp(0.7rem, 0.65rem + 0.25vw, 0.75rem);
+  --text-sm: clamp(0.8rem, 0.75rem + 0.25vw, 0.875rem);
+  --text-base: clamp(0.9rem, 0.85rem + 0.25vw, 1rem);
+  --text-lg: clamp(1.1rem, 1rem + 0.5vw, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 1.35rem + 0.75vw, 1.875rem);
+  --text-3xl: clamp(1.875rem, 1.65rem + 1vw, 2.25rem);
+  --text-4xl: clamp(2.25rem, 2rem + 1.25vw, 3rem);
+
+  --space-unit: clamp(1rem, 2vw, 1.5rem);
+  --sidebar-cart-width: clamp(22rem, 30vw, 26rem);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-sans);
+  font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Base Typographic Overrides */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-sans);
-  letter-spacing: -0.01em;
-}
+/* Fluid Heading Overrides */
+h1 { font-size: var(--text-4xl); font-family: var(--font-sans); letter-spacing: -0.01em; }
+h2 { font-size: var(--text-3xl); font-family: var(--font-sans); letter-spacing: -0.01em; }
+h3 { font-size: var(--text-2xl); font-family: var(--font-sans); letter-spacing: -0.01em; }
+h4 { font-size: var(--text-xl); font-family: var(--font-sans); letter-spacing: -0.01em; }
+h5 { font-size: var(--text-lg); font-family: var(--font-sans); letter-spacing: -0.01em; }
+h6 { font-family: var(--font-sans); letter-spacing: -0.01em; }
 
 /* Animations */
 @keyframes fadeIn {

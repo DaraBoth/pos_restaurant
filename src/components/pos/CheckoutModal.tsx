@@ -91,11 +91,11 @@ export default function CheckoutModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pl-[100px] lg:pl-[280px] p-4 modal-overlay bg-black/60 backdrop-blur-md" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-slate-900/40 backdrop-blur-md" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-[var(--border)]">
                 {/* Header */}
-                <div className="flex items-center justify-between px-8 py-6 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
-                    <h2 className="text-xl font-black text-[var(--foreground)] uppercase tracking-tight">{t('checkout')}</h2>
+                <div className="flex items-center justify-between px-[var(--space-unit)] py-6 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+                    <h2 className="text-[var(--text-xl)] font-black text-[var(--foreground)] uppercase tracking-tight">{t('checkout')}</h2>
                     <button onClick={onClose} className="p-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
                         <X size={20} />
                     </button>
@@ -106,18 +106,18 @@ export default function CheckoutModal({
 
                     {/* Left Summary */}
                     <div className="flex-1 space-y-6">
-                        <div className="bg-[var(--bg-dark)]/50 rounded-3xl p-8 border border-[var(--border)]">
-                            <div className="text-[var(--text-secondary)] text-[10px] font-black uppercase tracking-[0.2em] mb-2">{t('total')}</div>
-                            <div className="text-5xl font-black font-mono text-[var(--foreground)] mb-2 tracking-tighter">
+                        <div className="bg-[var(--bg-dark)]/50 rounded-3xl p-[var(--space-unit)] border border-[var(--border)]">
+                            <div className="text-[var(--text-secondary)] text-[var(--text-xs)] font-black uppercase tracking-[0.2em] mb-2 opacity-60">{t('total')}</div>
+                            <div className="text-[var(--text-4xl)] font-black font-mono text-[var(--foreground)] mb-2 tracking-tighter leading-none">
                                 {formatUsd(totals.totalUsdCents)}
                             </div>
-                            <div className="text-xl font-bold font-mono text-[var(--text-secondary)]">
+                            <div className="text-[var(--text-xl)] font-bold font-mono text-[var(--text-secondary)] opacity-60">
                                 {formatKhr(totals.totalKhr)}
                             </div>
                         </div>
 
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] px-1">{t('paymentMethod')}</label>
+                            <label className="text-[var(--text-xs)] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] px-1 opacity-60">{t('paymentMethod')}</label>
                             <div className="grid grid-cols-3 gap-3">
                                 {[
                                     { id: 'cash', label: t('cash'), icon: Banknote },
@@ -127,13 +127,13 @@ export default function CheckoutModal({
                                     <button
                                         key={m.id}
                                         onClick={() => setMethod(m.id as any)}
-                                        className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all ${method === m.id
+                                        className={`flex flex-col items-center justify-center p-[var(--space-unit)] rounded-2xl border-2 transition-all ${method === m.id
                                                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--foreground)] scale-[1.02] shadow-sm'
                                                 : 'border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent)]/30'
                                             }`}
                                     >
-                                        <m.icon size={28} className={`mb-2 ${method === m.id ? 'text-[var(--accent)]' : ''}`} />
-                                        <span className="text-[11px] font-black uppercase tracking-widest">{m.label}</span>
+                                        <m.icon size={24} className={`mb-2 ${method === m.id ? 'text-[var(--accent)]' : ''}`} />
+                                        <span className="text-[var(--text-xs)] font-black uppercase tracking-widest">{m.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -141,14 +141,14 @@ export default function CheckoutModal({
                     </div>
 
                     {/* Right Split Payment */}
-                    <div className="flex-1 bg-[var(--bg-card)] rounded-3xl p-8 border border-[var(--border)] mt-6 md:mt-0 flex flex-col">
-                        <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-[0.15em] mb-6 px-1">{t('splitPayment')}</h3>
+                    <div className="flex-1 bg-[var(--bg-card)] rounded-3xl p-[var(--space-unit)] border border-[var(--border)] mt-6 md:mt-0 flex flex-col">
+                        <h3 className="text-[var(--text-sm)] font-black text-[var(--foreground)] uppercase tracking-[0.15em] mb-6 px-1">{t('splitPayment')}</h3>
 
                         <div className="space-y-6 flex-1">
                             <div>
-                                <label className="text-[10px] uppercase font-black tracking-[0.2em] text-[var(--text-secondary)] mb-2 block px-1">Cash USD Received</label>
+                                <label className="text-[var(--text-xs)] uppercase font-black tracking-[0.2em] text-[var(--text-secondary)] mb-2 block px-1 opacity-60">Cash USD Received</label>
                                 <div className="relative">
-                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xl font-black text-[var(--text-secondary)]/40">$</span>
+                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-xl)] font-black text-[var(--text-secondary)]/40">$</span>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -156,14 +156,14 @@ export default function CheckoutModal({
                                         placeholder={formatUsdNumeric(totals.totalUsdCents)}
                                         value={usdInput}
                                         onChange={e => setUsdInput(e.target.value)}
-                                        className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] pl-10 pr-4 py-5 rounded-2xl text-2xl font-mono font-black focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
+                                        className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] pl-10 pr-4 py-4 rounded-[1.25rem] text-[var(--text-2xl)] font-mono font-black focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
                                     />
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1.5">
                                         {[5, 10, 20, 50, 100].map(v => (
                                             <button
                                                 key={v}
                                                 onClick={() => setUsdInput(v.toString())}
-                                                className="px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--accent)]/10 text-[10px] font-black border border-[var(--border)] transition-colors text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                                                className="px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--accent)]/10 text-[var(--text-xs)] font-black border border-[var(--border)] transition-colors text-[var(--text-secondary)] hover:text-[var(--accent)]"
                                             >
                                                 {v}
                                             </button>
@@ -173,15 +173,15 @@ export default function CheckoutModal({
                             </div>
 
                             {changeUsdCents > 0 ? (
-                                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400">
-                                    <div className="text-sm">{t('change')}</div>
-                                    <div className="text-2xl font-bold font-mono">{formatUsd(changeUsdCents)}</div>
+                                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-600">
+                                    <div className="text-[var(--text-sm)] font-bold">{t('change')}</div>
+                                    <div className="text-[var(--text-2xl)] font-black font-mono">{formatUsd(changeUsdCents)}</div>
                                 </div>
                             ) : remainingUsdCents > 0 && usdInputCents > 0 ? (
-                                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400">
-                                    <div className="text-sm">Remaining via {method.toUpperCase()}</div>
-                                    <div className="text-2xl font-bold font-mono">{formatUsd(remainingUsdCents)}</div>
-                                    <div className="text-sm font-mono opacity-80">{formatKhr(remainingKhr)}</div>
+                                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-600">
+                                    <div className="text-[var(--text-sm)] font-bold">Remaining via {method.toUpperCase()}</div>
+                                    <div className="text-[var(--text-2xl)] font-black font-mono">{formatUsd(remainingUsdCents)}</div>
+                                    <div className="text-[var(--text-sm)] font-mono opacity-80">{formatKhr(remainingKhr)}</div>
                                 </div>
                             ) : null}
                         </div>
@@ -189,7 +189,7 @@ export default function CheckoutModal({
                         <button
                             onClick={handleConfirm}
                             disabled={loading}
-                            className="btn-primary w-full py-5 rounded-[1.5rem] text-lg font-black flex items-center justify-center gap-3 mt-8 uppercase tracking-[0.2em] shadow-xl shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            className="btn-primary w-full py-5 rounded-[1.25rem] text-[var(--text-lg)] font-black flex items-center justify-center gap-3 mt-8 uppercase tracking-[0.2em] shadow-xl shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                         >
                             {loading ? (
                                 <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
