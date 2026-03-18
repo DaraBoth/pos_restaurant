@@ -58,8 +58,8 @@ export default function OrdersManagement() {
         const data = orders.map(o => ({
             'Order ID': o.id.split('-')[0].toUpperCase(),
             'Table': o.table_id || 'Takeout',
-            'Subtotal ($)': (o.subtotal_cents / 100).toFixed(2),
-            'Total ($)': (o.total_usd_cents / 100).toFixed(2),
+            'Subtotal ($)': ((o.total_usd - o.tax_vat - o.tax_plt) / 100).toFixed(2),
+            'Total ($)': (o.total_usd / 100).toFixed(2),
             'Status': o.status,
             'Date': new Date(o.created_at).toLocaleString(),
         }));
@@ -72,7 +72,7 @@ export default function OrdersManagement() {
         saveAs(blob, `Orders_${startDate}_to_${endDate}.xlsx`);
     };
 
-    const totalRevenue = orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total_usd_cents, 0);
+    const totalRevenue = orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total_usd, 0);
 
     return (
         <div className="max-w-7xl mx-auto animate-fade-in space-y-6">
@@ -198,7 +198,7 @@ export default function OrdersManagement() {
                                             
                                             <td className="px-8 py-6 text-right">
                                                 <div className={`font-black font-mono text-base ${o.status === 'void' ? 'line-through text-[var(--text-secondary)] opacity-40' : 'text-[var(--foreground)]'}`}>
-                                                    {formatUsd(o.total_usd_cents)}
+                                                    {formatUsd(o.total_usd)}
                                                 </div>
                                                 <div className={`text-[10px] font-black font-mono mt-0.5 ${o.status === 'void' ? 'line-through text-[var(--text-secondary)]/30' : 'text-[var(--accent)] opacity-80'}`}>
                                                     {formatKhr(o.total_khr)}
