@@ -234,23 +234,6 @@ export function printReceipt(payload: ReceiptPrintPayload) {
 
 </body>
 </html>`);
-
-  <hr class="d-dash">
-
-  <!-- PAYMENTS -->
-  <div class="pay-title">Payment</div>
-  ${paymentRows}
-
-  <hr class="d-dash">
-
-  <!-- FOOTER -->
-  <div class="footer">
-    <div class="msg">${footerLines}</div>
-    <div class="brand">Powered by DineOS</div>
-  </div>
-
-</body>
-</html>`);
     doc.close();
 
     iframe.onload = () => {
