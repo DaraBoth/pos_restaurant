@@ -1,23 +1,21 @@
-use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
+use sqlx::{SqlitePool, sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions}};
 use std::path::PathBuf;
 
-pub async fn init_db(db_path: PathBuf, key: &str) -> anyhow::Result<SqlitePool> {
-    let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
+pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<SqlitePool> {
+    // Build per-connection options: WAL mode + foreign keys enabled on every connection
+    let opts = SqliteConnectOptions::new()
+        .filename(&db_path)
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .foreign_keys(true);
 
+    // Pre-create all 5 connections eagerly (min = max) so there is zero
+    // pool cold-start latency when management pages fire concurrent IPC calls.
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&db_url)
+        .min_connections(5)
+        .connect_with(opts)
         .await?;
-
-    // Enable WAL mode for better concurrency
-    sqlx::query("PRAGMA journal_mode=WAL;").execute(&pool).await?;
-    // Encrypt with key (SQLite SEE / SQLCipher compatible pragma)
-    if !key.is_empty() {
-        let pragma = format!("PRAGMA key = '{}';", key.replace('\'', "''"));
-        sqlx::query(&pragma).execute(&pool).await?;
-    }
-    // Enable foreign key constraints
-    sqlx::query("PRAGMA foreign_keys = ON;").execute(&pool).await?;
 
     // Run embedded migrations
     run_migrations(&pool).await?;

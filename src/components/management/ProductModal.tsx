@@ -91,7 +91,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
                         className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-5 py-3.5 text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all khmer font-bold placeholder:opacity-30"
-                        placeholder="áž”áž¶áž™áž†áž¶"
+                        placeholder="បាយឆា"
                     />
                 </div>
 

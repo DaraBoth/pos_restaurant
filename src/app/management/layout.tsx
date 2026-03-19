@@ -5,14 +5,14 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Package, Users, RefreshCw, ClipboardList, Building2, TrendingUp, LayoutGrid } from 'lucide-react';
 
 const NAV_ITEMS = [
-    { href: '/management', label: 'Dashboard', labelKm: 'áž•áŸ’áž‘áž¶áŸ†áž„áž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„', icon: LayoutDashboard, exact: true },
-    { href: '/management/analytics', label: 'Analytics', labelKm: 'ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ', icon: TrendingUp },
+    { href: '/management', label: 'Dashboard', labelKm: 'ផ្ទាំងគ្រប់គ្រង', icon: LayoutDashboard, exact: true },
+    { href: '/management/analytics', label: 'Analytics', labelKm: 'របាយការណ៍', icon: TrendingUp },
     { href: '/management/products', label: 'Products', labelKm: 'ផលិតផល', icon: Package },
     { href: '/management/tables', label: 'Tables', labelKm: 'តុ', icon: LayoutGrid },
     { href: '/management/users', label: 'Users', labelKm: 'អ្នកប្រើ', icon: Users },
-    { href: '/management/exchange-rate', label: 'Exchange Rate', labelKm: 'áž¢ážáŸ’ážšáž¶áž”áŸ’ážáž¼ážšáž”áŸ’ážšáž¶áž€áŸ‹', icon: RefreshCw },
-    { href: '/management/orders', label: 'Orders', labelKm: 'áž”áž‰áŸ’áž‡áž¶áž‘áž·áž‰', icon: ClipboardList },
-    { href: '/management/settings', label: 'Settings', labelKm: 'áž€áž¶ážšáž€áŸ†ážŽážáŸ‹', icon: Building2 },
+    { href: '/management/exchange-rate', label: 'Exchange Rate', labelKm: 'អត្រាប្តូរប្រាក់', icon: RefreshCw },
+    { href: '/management/orders', label: 'Orders', labelKm: 'បញ្ជាទិញ', icon: ClipboardList },
+    { href: '/management/settings', label: 'Settings', labelKm: 'ការកំណត់', icon: Building2 },
 ];
 
 export default function ManagementLayout({ children }: { children: React.ReactNode }) {

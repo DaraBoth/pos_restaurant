@@ -145,7 +145,7 @@ export default function ProductGrid() {
                                     key={product.id}
                                     onClick={() => handleProductClick(product)}
                                     disabled={unavailable}
-                                    title={unavailable ? (outOfStock ? (lang === 'km' ? 'áž¢ážŸáŸ‹ážŸáŸ’ážáž»áž€' : 'Out of stock') : (lang === 'km' ? 'áž˜áž·áž“áž˜áž¶áž“' : 'Unavailable')) : displayName}
+                                    title={unavailable ? (outOfStock ? (lang === 'km' ? 'អស់ស្តុក' : 'Out of stock') : (lang === 'km' ? 'មិនមាន' : 'Unavailable')) : displayName}
                                     className={`group flex flex-col text-left relative overflow-hidden rounded-xl transition-all duration-150 active:scale-95 ${
                                         isAdding ? 'scale-95 ring-2 ring-[var(--accent-green)]' : ''
                                     } ${unavailable ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'}`}

@@ -4,12 +4,12 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { Package, Users, RefreshCw, ClipboardList, Building2, ArrowRight, TrendingUp } from 'lucide-react';
 
 const QUICK_LINKS = [
-    { href: '/management/analytics', labelEn: 'Analytics',    labelKm: 'ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ',       descEn: 'Revenue, orders, and earnings reports.', descKm: 'áž…áŸ†ážŽáž¼áž›, áž”áž‰áŸ’áž‡áž¶áž‘áž·áž‰, áž“áž·áž„ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ', icon: TrendingUp, color: '#22c55e' },
-    { href: '/management/products',  labelEn: 'Products',     labelKm: 'áž•áž›áž·ážáž•áž›',          descEn: 'Menu items, pricing, and stock.', descKm: 'áž˜áž»ážáž˜áŸ’áž áž¼áž”, ážáž˜áŸ’áž›áŸƒ, áž“áž·áž„ážŸáŸ’ážáž»áž€', icon: Package, color: '#0ea5e9' },
-    { href: '/management/users',     labelEn: 'Staff',        labelKm: 'áž–áž“áž€áŸ’áž',            descEn: 'Staff accounts and permissions.', descKm: 'áž‚ážŽáž“áž¸áž”áž»áž‚áŸ’áž‚áž›áž·áž€', icon: Users, color: '#a78bfa' },
-    { href: '/management/exchange-rate', labelEn: 'Exchange Rate', labelKm: 'áž¢ážáŸ’ážšáž¶',      descEn: 'USD â†” KHR conversion rate.', descKm: 'áž¢ážáŸ’ážšáž¶áž”áŸ’ážáž¼ážšážšáž¼áž”áž·áž™áž”áŸážŽáŸ’ážŽ', icon: RefreshCw, color: '#fbbf24' },
-    { href: '/management/orders',    labelEn: 'Order History', labelKm: 'áž”áŸ’ážšážœážáŸ’ážáž·áž€áž¶ážšáž›áž€áŸ‹', descEn: 'Past receipts and exported reports.', descKm: 'ážœáž·áž€áŸ’áž€áž™áž”ážáŸ’ážš, áž“áž·áž„ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ', icon: ClipboardList, color: '#f97316' },
-    { href: '/management/settings',  labelEn: 'Settings',     labelKm: 'áž€áž¶ážšáž€áŸ†ážŽážáŸ‹',        descEn: 'Restaurant info, receipt, taxes.', descKm: 'áž–áŸážáŸŒáž˜áž¶áž“áž—áŸ„áž‡áž“áž¸áž™ážŠáŸ’áž‹áž¶áž“', icon: Building2, color: '#f43f5e' },
+    { href: '/management/analytics', labelEn: 'Analytics',    labelKm: 'របាយការណ៍',       descEn: 'Revenue, orders, and earnings reports.', descKm: 'ចំណូល, បញ្ជាទិញ, និងរបាយការណ៍', icon: TrendingUp, color: '#22c55e' },
+    { href: '/management/products',  labelEn: 'Products',     labelKm: 'ផលិតផល',          descEn: 'Menu items, pricing, and stock.', descKm: 'មុខម្ហូប, តម្លៃ, និងស្តុក', icon: Package, color: '#0ea5e9' },
+    { href: '/management/users',     labelEn: 'Staff',        labelKm: 'ពនក្ខ',            descEn: 'Staff accounts and permissions.', descKm: 'គណនីបុគ្គលិក', icon: Users, color: '#a78bfa' },
+    { href: '/management/exchange-rate', labelEn: 'Exchange Rate', labelKm: 'អត្រា',      descEn: 'USD â†” KHR conversion rate.', descKm: 'អត្រាប្តូររូបិយប័ណ្ណ', icon: RefreshCw, color: '#fbbf24' },
+    { href: '/management/orders',    labelEn: 'Order History', labelKm: 'ប្រវត្តិការលក់', descEn: 'Past receipts and exported reports.', descKm: 'វិក្កយបត្រ, និងរបាយការណ៍', icon: ClipboardList, color: '#f97316' },
+    { href: '/management/settings',  labelEn: 'Settings',     labelKm: 'ការកំណត់',        descEn: 'Restaurant info, receipt, taxes.', descKm: 'ព័ត៌មានភោជនីយដ្ឋាន', icon: Building2, color: '#f43f5e' },
 ];
 
 export default function ManagementDashboard() {
@@ -19,10 +19,10 @@ export default function ManagementDashboard() {
         <div className="animate-fade-in">
             <div className="mb-4">
                 <h1 className="text-base font-black text-[var(--foreground)] mb-0.5">
-                    {lang === 'km' ? 'áž•áŸ’áž‘áž¶áŸ†áž„áž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„' : 'Management'}
+                    {lang === 'km' ? 'ផ្ទាំងគ្រប់គ្រង' : 'Management'}
                 </h1>
                 <p className="text-xs text-[var(--text-secondary)]">
-                    {lang === 'km' ? 'áž€áž¶ážšáž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„áž”áŸ’ážšážáž·áž”ážáŸ’ážáž·áž€áž¶ážšáž—áŸ„áž‡áž“áž¸áž™ážŠáŸ’áž‹áž¶áž“' : 'Manage your restaurant operations'}
+                    {lang === 'km' ? 'ការគ្រប់គ្រងប្រតិបត្តិការភោជនីយដ្ឋាន' : 'Manage your restaurant operations'}
                 </p>
             </div>
 

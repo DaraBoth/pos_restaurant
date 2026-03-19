@@ -121,7 +121,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                             value={khmerName}
                             onChange={e => setKhmerName(e.target.value)}
                             className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all khmer"
-                            placeholder="áž…áž“ ážŠáž¼"
+                            placeholder="ចន ដូ"
                         />
                     </div>
                 </div>
