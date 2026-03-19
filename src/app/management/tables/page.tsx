@@ -1,15 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Trash2, Plus, LayoutGrid, Users2 } from 'lucide-react';
-import { getTables, createTable, deleteTable, getOrders } from '@/lib/tauri-commands';
-import type { FloorTable, Order } from '@/types';
+import { getTables, createTable, deleteTable } from '@/lib/tauri-commands';
+import type { FloorTable } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function TablesManagementPage() {
     const { lang } = useLanguage();
     const [tables, setTables] = useState<FloorTable[]>([]);
-    const [busyTableIds, setBusyTableIds] = useState<Set<string>>(new Set());
     const [newName, setNewName] = useState('');
+    const [seatCount, setSeatCount] = useState(4);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState('');
@@ -19,14 +19,7 @@ export default function TablesManagementPage() {
     async function load() {
         setLoading(true);
         try {
-            const [dbTables, openOrders]: [FloorTable[], Order[]] = await Promise.all([
-                getTables(),
-                getOrders('open'),
-            ]);
-            setTables(dbTables);
-            const busy = new Set<string>();
-            openOrders.forEach(o => { if (o.table_id) busy.add(o.table_id); });
-            setBusyTableIds(busy);
+            setTables(await getTables());
         } catch (e) {
             console.error(e);
         } finally {
@@ -44,8 +37,9 @@ export default function TablesManagementPage() {
         setCreating(true);
         setError('');
         try {
-            await createTable(name);
+            await createTable(name, seatCount);
             setNewName('');
+            setSeatCount(4);
             await load();
         } catch (e) {
             setError(lang === 'km' ? 'បរាជ័យក្នុងការបន្ថែមតុ' : 'Failed to create table.');
@@ -56,7 +50,7 @@ export default function TablesManagementPage() {
     }
 
     async function handleDelete(table: FloorTable) {
-        if (busyTableIds.has(table.name)) {
+        if (table.status !== 'available') {
             setError(lang === 'km'
                 ? `តុ ${table.name} មានការបញ្ជាទិញសកម្ម មិនអាចលុបបានទេ`
                 : `Table ${table.name} has an active order and cannot be deleted.`);
@@ -103,6 +97,15 @@ export default function TablesManagementPage() {
                         maxLength={10}
                         className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-bold uppercase text-[var(--foreground)] placeholder-[var(--text-secondary)]/40 outline-none focus:border-[var(--accent-blue)] transition-colors"
                     />
+                    <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={seatCount}
+                        onChange={e => setSeatCount(Math.max(1, parseInt(e.target.value) || 4))}
+                        title={lang === 'km' ? 'ចំនួនកៅអី' : 'Seats'}
+                        className="w-16 px-2 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-bold text-center text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)] transition-colors"
+                    />
                     <button
                         onClick={handleCreate}
                         disabled={!newName.trim() || creating}
@@ -142,34 +145,43 @@ export default function TablesManagementPage() {
                 ) : (
                     <div className="divide-y divide-[var(--border)]">
                         {tables.map(table => {
-                            const isBusy = busyTableIds.has(table.name);
+                            const isActive = table.status !== 'available';
+                            const statusLabel = {
+                                available: { en: 'Free', km: 'ទំនេរ', cls: 'text-green-400' },
+                                ordering:  { en: 'Ordering', km: 'កំពុងបញ្ជាទិញ', cls: 'text-yellow-400' },
+                                serving:   { en: 'Serving', km: 'កំពុងបម្រើ', cls: 'text-red-400' },
+                            }[table.status] ?? { en: 'Free', km: 'ទំនេរ', cls: 'text-green-400' };
                             return (
                                 <div key={table.id} className="flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-elevated)] transition-colors">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
-                                            isBusy
+                                            isActive
                                                 ? 'bg-blue-500/12 border-blue-500/40'
                                                 : 'bg-green-500/10 border-green-500/30'
                                         }`}>
-                                            {isBusy
+                                            {isActive
                                                 ? <Users2 size={14} className="text-blue-400" />
                                                 : <LayoutGrid size={14} className="text-green-400" />
                                             }
                                         </div>
                                         <div>
                                             <p className="text-sm font-bold text-[var(--foreground)]">{table.name}</p>
-                                            <p className={`text-[10px] font-semibold ${isBusy ? 'text-blue-400' : 'text-green-400'}`}>
-                                                {isBusy
-                                                    ? (lang === 'km' ? 'មានភ្ញៀវ' : 'Occupied')
-                                                    : (lang === 'km' ? 'ទំនេរ' : 'Free')}
-                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <p className={`text-[10px] font-semibold ${statusLabel.cls}`}>
+                                                    {lang === 'km' ? statusLabel.km : statusLabel.en}
+                                                </p>
+                                                <span className="text-[10px] text-[var(--text-secondary)]">·</span>
+                                                <p className="text-[10px] text-[var(--text-secondary)] flex items-center gap-0.5">
+                                                    <Users2 size={9} /> {table.seat_count} {lang === 'km' ? 'កៅអី' : 'seats'}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => handleDelete(table)}
-                                        disabled={isBusy}
-                                        title={isBusy
-                                            ? (lang === 'km' ? 'មិនអាចលុបតុដែលមានភ្ញៀវ' : 'Cannot delete occupied table')
+                                        disabled={isActive}
+                                        title={isActive
+                                            ? (lang === 'km' ? 'មិនអាចលុបតុដែលសកម្ម' : 'Cannot delete active table')
                                             : (lang === 'km' ? 'លុបតុ' : 'Delete table')}
                                         className="p-1.5 rounded-lg transition-all hover:bg-red-500/10 text-red-500/50 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed"
                                     >

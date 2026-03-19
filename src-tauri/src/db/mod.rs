@@ -33,6 +33,7 @@ async fn run_migrations(pool: &SqlitePool) -> anyhow::Result<()> {
         include_str!("migrations/004_restaurant_setup_and_minimal_seed.sql"),
         include_str!("migrations/005_add_restaurant_logo.sql"),
         include_str!("migrations/006_recalculate_existing_orders.sql"),
+        include_str!("migrations/007_kitchen_and_tables.sql"),
     ];
 
     for migration_sql in migrations {

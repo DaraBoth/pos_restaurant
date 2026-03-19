@@ -68,7 +68,9 @@ export interface Product {
 export interface FloorTable {
     id: string;
     name: string;
-    status: string;
+    /** available = green, ordering = yellow, serving = red */
+    status: 'available' | 'ordering' | 'serving';
+    seat_count: number;
 }
 
 // --------------- Orders ---------------
@@ -95,8 +97,27 @@ export interface OrderItem {
     quantity: number;
     price_at_order: number;
     note?: string;
+    /** pending = in order queue, cooking = kitchen picked up, done = ready to serve */
+    kitchen_status: 'pending' | 'cooking' | 'done';
     product_name?: string;
     product_khmer?: string;
+}
+
+export interface KitchenOrderItem {
+    id: string;
+    product_name: string;
+    product_khmer?: string;
+    quantity: number;
+    note?: string;
+    kitchen_status: 'pending' | 'cooking' | 'done';
+    created_at: string;
+}
+
+export interface KitchenOrder {
+    order_id: string;
+    table_id?: string;
+    created_at: string;
+    items: KitchenOrderItem[];
 }
 
 export interface PaymentInput {

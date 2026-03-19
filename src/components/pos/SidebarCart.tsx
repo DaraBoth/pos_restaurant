@@ -5,13 +5,20 @@ import { updateOrderItemQuantity, voidOrder } from '@/lib/tauri-commands';
 import { getOrderItems } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useState } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History } from 'lucide-react';
+import { Trash2, ShoppingCart, Plus, Minus, History, UtensilsCrossed, CheckCircle2, CreditCard, PauseCircle, XCircle } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
+
+const KITCHEN_BADGE: Record<string, { label: string; labelKm: string; cls: string }> = {
+    pending: { label: 'Pending', labelKm: '\u179a\u1784\u17d2\u1785\u17b6\u17c6',  cls: 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]' },
+    cooking: { label: 'Cooking', labelKm: '\u1785\u17c6\u17a2\u17b7\u1793',   cls: 'bg-orange-500/15 text-orange-400 border border-orange-500/30' },
+    done:    { label: 'Done',    labelKm: '\u179a\u17bd\u1785\u179a\u17b6\u179b\u17d0', cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
+};
 
 export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) {
     const { items, totals, orderId, tableId, clearOrder, setItems } = useOrder();
     const { t, lang } = useLanguage();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [orderSent, setOrderSent] = useState(false);
 
     async function handleQtyChange(id: string, current: number, delta: number) {
         if (!orderId) return;
@@ -28,7 +35,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
 
     async function handleVoid() {
         if (!orderId) return;
-        const msg = lang === 'km' ? 'áž›áž»áž”áž”áž‰áŸ’áž‡áž¶áž‘áž·áž‰áž‘áž¶áŸ†áž„áž¢ážŸáŸ‹?' : 'Void entire order?';
+        const msg = lang === 'km' ? '\u179b\u17bb\u1794\u1794\u1789\u17d2\u1787\u17b6\u1791\u17b7\u1789\u178f\u17b6\u17c6\u1784\u17a2\u179f\u17d2?' : 'Cancel the entire order?';
         if (confirm(msg)) {
             try {
                 await voidOrder(orderId);
@@ -39,8 +46,16 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
         }
     }
 
+    function handleSendToKitchen() {
+        setOrderSent(true);
+        setTimeout(() => setOrderSent(false), 2500);
+    }
+
     const isEmpty = items.length === 0;
     const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+    const doneItemsCents = items
+        .filter(i => i.kitchen_status === 'done')
+        .reduce((s, i) => s + i.price_at_order * i.quantity, 0);
 
     return (
         <>
@@ -53,7 +68,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     <div className="flex items-center gap-2">
                         <ShoppingCart size={14} className="text-[var(--accent)]" />
                         <span className="text-xs font-bold text-[var(--foreground)]">
-                            {lang === 'km' ? 'áž”áž‰áŸ’áž‡áž¸áž‘áž·áž‰' : 'Order'}
+                            {lang === 'km' ? '\u1794\u1789\u17d2\u1787\u17b8\u1791\u17b7\u1789' : 'Order'}
                         </span>
                         {totalQty > 0 && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[var(--accent)] text-white">
@@ -71,18 +86,9 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                             <button
                                 onClick={() => setIsHistoryOpen(true)}
                                 className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-blue)]/20 text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
-                                title={lang === 'km' ? 'áž”áŸ’ážšážœážáŸ’ážáž·' : 'History'}
+                                title={lang === 'km' ? '\u1794\u17d2\u179a\u179c\u178f\u17d2\u178f\u17b7' : 'History'}
                             >
                                 <History size={13} />
-                            </button>
-                        )}
-                        {orderId && (
-                            <button
-                                onClick={handleVoid}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/10 text-red-400"
-                                title={t('voidOrder')}
-                            >
-                                <Trash2 size={13} />
                             </button>
                         )}
                     </div>
@@ -98,56 +104,88 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                             </p>
                         </div>
                     ) : (
-                        items.map(item => (
-                            <div
-                                key={item.id}
-                                className="p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/30 transition-colors"
-                            >
-                                <div className="flex justify-between items-start gap-2 mb-1.5">
-                                    <div className="flex-1 min-w-0">
-                                        <p className={`text-xs font-semibold text-[var(--foreground)] truncate ${lang === 'km' ? 'khmer' : ''}`}>
-                                            {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
-                                        </p>
-                                        <p className="text-[10px] font-mono text-[var(--text-secondary)]">
-                                            {formatUsd(item.price_at_order)}
-                                        </p>
+                        items.map(item => {
+                            const badge = KITCHEN_BADGE[item.kitchen_status] ?? KITCHEN_BADGE.pending;
+                            const isDone = item.kitchen_status === 'done';
+                            const isCooking = item.kitchen_status === 'cooking';
+                            return (
+                                <div
+                                    key={item.id}
+                                    className={`p-2 rounded-xl border transition-colors ${
+                                        isDone
+                                            ? 'bg-green-500/5 border-green-500/20'
+                                            : isCooking
+                                            ? 'bg-orange-500/5 border-orange-500/20'
+                                            : 'bg-[var(--bg-elevated)] border-[var(--border)]'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                                <p className={`text-xs font-semibold text-[var(--foreground)] truncate ${lang === 'km' ? 'khmer' : ''}`}>
+                                                    {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
+                                                </p>
+                                                {(isDone || isCooking) && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${badge.cls}`}>
+                                                        {lang === 'km' ? badge.labelKm : badge.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.note && (
+                                                <p className="text-[10px] text-[var(--accent-blue)] italic truncate">
+                                                    {item.note}
+                                                </p>
+                                            )}
+                                            <p className="text-[10px] font-mono text-[var(--text-secondary)]">
+                                                {formatUsd(item.price_at_order)}
+                                            </p>
+                                        </div>
+                                        <span className={`text-xs font-bold font-mono flex-shrink-0 ${isDone ? 'text-green-400' : 'text-[var(--accent-green)]'}`}>
+                                            {formatUsd(item.price_at_order * item.quantity)}
+                                        </span>
                                     </div>
-                                    <span className="text-xs font-bold font-mono text-[var(--accent-green)] flex-shrink-0">
-                                        {formatUsd(item.price_at_order * item.quantity)}
-                                    </span>
+                                    <div className={`flex items-center gap-0.5 p-0.5 rounded-lg bg-[#0d1721] border border-[var(--border)] ${isDone || isCooking ? 'opacity-40 pointer-events-none' : ''}`}>
+                                        <button
+                                            onClick={() => handleQtyChange(item.id, item.quantity, -1)}
+                                            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
+                                        >
+                                            {item.quantity <= 1 ? <Trash2 size={11} /> : <Minus size={11} />}
+                                        </button>
+                                        <span className="font-bold font-mono text-xs flex-1 text-center text-[var(--foreground)]">
+                                            {item.quantity}
+                                        </span>
+                                        <button
+                                            onClick={() => handleQtyChange(item.id, item.quantity, 1)}
+                                            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
+                                        >
+                                            <Plus size={11} />
+                                        </button>
+                                    </div>
                                 </div>
-                                {/* Qty Controls */}
-                                <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[#0d1721] border border-[var(--border)]">
-                                    <button
-                                        onClick={() => handleQtyChange(item.id, item.quantity, -1)}
-                                        className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
-                                    >
-                                        {item.quantity <= 1 ? <Trash2 size={11} /> : <Minus size={11} />}
-                                    </button>
-                                    <span className="font-bold font-mono text-xs flex-1 text-center text-[var(--foreground)]">
-                                        {item.quantity}
-                                    </span>
-                                    <button
-                                        onClick={() => handleQtyChange(item.id, item.quantity, 1)}
-                                        className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
-                                    >
-                                        <Plus size={11} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
 
-                {/* Checkout Footer */}
-                <div className="flex-shrink-0 px-3 py-3 bg-[#162230] border-t border-[var(--border)]">
-                    <div className="space-y-1 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-2">
+                {/* Footer */}
+                <div className="flex-shrink-0 px-3 py-3 bg-[#162230] border-t border-[var(--border)] space-y-2.5">
+                    <div className="space-y-0.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                         <div className="flex justify-between">
                             <span>{t('subtotal')}</span>
                             <span className="font-mono text-[var(--foreground)]">{formatUsd(totals.subtotalCents)}</span>
                         </div>
+                        {doneItemsCents > 0 && doneItemsCents !== totals.subtotalCents && (
+                            <div className="flex justify-between text-green-400">
+                                <span className="flex items-center gap-1">
+                                    <CheckCircle2 size={9} />
+                                    {lang === 'km' ? '\u179a\u17bd\u1785\u179a\u17b6\u179b\u17d0' : 'Done items'}
+                                </span>
+                                <span className="font-mono">{formatUsd(doneItemsCents)}</span>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex items-end justify-between mb-3">
+
+                    <div className="flex items-end justify-between">
                         <div>
                             <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-0.5">{t('total')}</p>
                             <p className="text-lg font-black font-mono text-[var(--foreground)] leading-none">
@@ -158,12 +196,52 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                             {formatKhr(totals.totalKhr)}
                         </p>
                     </div>
+
+                    {/* Send to Kitchen */}
                     <button
-                        className="pos-btn-primary w-full py-2.5 text-xs font-bold uppercase tracking-widest"
+                        onClick={handleSendToKitchen}
+                        disabled={isEmpty || !orderId}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                            orderSent
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : 'bg-[var(--accent-blue)] text-white hover:bg-[var(--accent-blue)]/90 disabled:opacity-40'
+                        }`}
+                    >
+                        {orderSent ? (
+                            <><CheckCircle2 size={13} strokeWidth={2.5} />{lang === 'km' ? '\u1794\u17b6\u1793\u1795\u17d2\u1789\u17be\u178f\u17c0\u1795\u17d2\u178f\u17c0\u1794\u17b6\u1799!' : 'Sent to Kitchen!'}</>
+                        ) : (
+                            <><UtensilsCrossed size={13} strokeWidth={2.5} />{lang === 'km' ? '\u1795\u17d2\u1789\u17be\u178f\u17c0\u1795\u17d2\u178f\u17c0\u1794\u17b6\u1799' : 'Send to Kitchen'}</>
+                        )}
+                    </button>
+
+                    {/* Hold + Cancel */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                            onClick={clearOrder}
+                            disabled={!orderId}
+                            className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/40 transition-all disabled:opacity-40 active:scale-95"
+                        >
+                            <PauseCircle size={12} strokeWidth={2.5} />
+                            {lang === 'km' ? '\u179a\u1780\u17d2\u179f\u17b6\u178f\u17bb\u1780' : 'Hold'}
+                        </button>
+                        <button
+                            onClick={handleVoid}
+                            disabled={!orderId}
+                            className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-40 active:scale-95"
+                        >
+                            <XCircle size={12} strokeWidth={2.5} />
+                            {lang === 'km' ? '\u179b\u17bb\u1794' : 'Cancel'}
+                        </button>
+                    </div>
+
+                    {/* Checkout */}
+                    <button
+                        className="w-full py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
                         disabled={isEmpty || !orderId}
                         onClick={onCheckout}
                     >
-                        {t('checkout')}
+                        <CreditCard size={12} strokeWidth={2.5} />
+                        {lang === 'km' ? '\u178f\u17bc\u178f\u17b6\u178f\u17d0' : 'Checkout'}
                     </button>
                 </div>
             </div>

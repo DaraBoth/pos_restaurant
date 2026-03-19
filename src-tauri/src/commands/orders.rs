@@ -84,9 +84,10 @@ pub async fn add_order_item(
     .await
     .map_err(|e| format!("Product not found: {}", e))?;
 
-    // Check if same product already exists in this order → increment quantity
+    // Check if same product already exists in this order with 'pending' status
+    // (items already in the kitchen—cooking or done—get a new row instead of merging)
     let existing: Option<(String, i64)> = sqlx::query_as(
-        "SELECT id, quantity FROM order_items WHERE order_id = ? AND product_id = ? AND is_deleted = 0"
+        "SELECT id, quantity FROM order_items WHERE order_id = ? AND product_id = ? AND is_deleted = 0 AND kitchen_status = 'pending'"
     )
     .bind(&order_id)
     .bind(&product_id)
@@ -112,15 +113,16 @@ pub async fn add_order_item(
             quantity: new_qty,
             price_at_order: price_cents,
             note,
+            kitchen_status: "pending".to_string(),
             product_name: Some(p_name),
             product_khmer: p_khmer,
         });
     }
 
-    // Create new order item
+    // Create new order item (starts as 'pending' — kitchen will see it)
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status) VALUES (?, ?, ?, ?, ?, ?, 'pending')"
     )
     .bind(&id)
     .bind(&order_id)
@@ -141,6 +143,7 @@ pub async fn add_order_item(
         quantity,
         price_at_order: price_cents,
         note,
+        kitchen_status: "pending".to_string(),
         product_name: Some(p_name),
         product_khmer: p_khmer,
     })
@@ -193,6 +196,7 @@ pub async fn get_order_items(
 ) -> Result<Vec<OrderItem>, String> {
     let items: Vec<OrderItem> = sqlx::query_as(
         "SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price_at_order, oi.note,
+                oi.kitchen_status,
                 p.name AS product_name, p.khmer_name AS product_khmer
          FROM order_items oi
          LEFT JOIN products p ON oi.product_id = p.id
@@ -300,18 +304,32 @@ pub async fn checkout_order(
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-    // Mark order as completed
-    sqlx::query(
-        "UPDATE orders SET status='completed', updated_at=datetime('now'), completed_at=datetime('now') WHERE id=?"
+    // Recalculate total using only kitchen-completed ('done') items for the bill
+    let (done_subtotal,): (i64,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(price_at_order * quantity), 0)
+         FROM order_items
+         WHERE order_id = ? AND is_deleted = 0 AND kitchen_status = 'done'"
     )
+    .bind(&order_id)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| format!("Subtotal error: {}", e))?;
+
+    // Update order total to reflect only done items, then mark completed
+    sqlx::query(
+        "UPDATE orders SET total_usd = ?, tax_vat = 0, tax_plt = 0,
+                status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
+         WHERE id = ?"
+    )
+    .bind(done_subtotal)
     .bind(&order_id)
     .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    // Deduct stock for each item sold
+    // Deduct stock only for done items (items never served don't consume stock)
     let sold_items: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0"
+        "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0 AND kitchen_status = 'done'"
     )
     .bind(&order_id)
     .fetch_all(pool.inner())

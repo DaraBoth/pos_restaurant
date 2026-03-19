@@ -49,6 +49,7 @@ pub struct FloorTable {
     pub id: String,
     pub name: String,
     pub status: String,
+    pub seat_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -113,8 +114,28 @@ pub struct OrderItem {
     pub quantity: i64,
     pub price_at_order: i64,
     pub note: Option<String>,
+    pub kitchen_status: String,
     pub product_name: Option<String>,
     pub product_khmer: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct KitchenOrderItem {
+    pub id: String,
+    pub product_name: String,
+    pub product_khmer: Option<String>,
+    pub quantity: i64,
+    pub note: Option<String>,
+    pub kitchen_status: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KitchenOrder {
+    pub order_id: String,
+    pub table_id: Option<String>,
+    pub created_at: String,
+    pub items: Vec<KitchenOrderItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

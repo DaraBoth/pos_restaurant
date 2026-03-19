@@ -4,5 +4,6 @@ export * from './restaurant';
 export * from './products';
 export * from './orders';
 export * from './tables';
+export * from './kitchen';
 export * from './system';
 export * from './analytics';

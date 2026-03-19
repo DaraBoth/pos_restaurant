@@ -2,41 +2,50 @@
 import { useState, useEffect } from 'react';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { getOrders, getTables, getActiveOrderForTable, getOrderItems } from '@/lib/tauri-commands';
-import type { FloorTable, Order } from '@/types';
-import { LayoutGrid, Users2, CheckCircle2, Settings2 } from 'lucide-react';
+import { getTables, getActiveOrderForTable, getOrderItems } from '@/lib/tauri-commands';
+import type { FloorTable } from '@/types';
+import { LayoutGrid, Users2, CheckCircle2, Settings2, UtensilsCrossed, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
 
-interface CombinedTable {
-    id: string;
-    dbId: string;
-    status: 'free' | 'busy';
-}
+// Status color maps
+const STATUS = {
+    available: {
+        bg: 'rgba(34,197,94,0.08)',
+        border: 'rgba(34,197,94,0.35)',
+        text: '#86efac',
+        dot: 'bg-green-500',
+        label: { en: 'Free', km: 'ទំនេរ' },
+    },
+    ordering: {
+        bg: 'rgba(234,179,8,0.10)',
+        border: 'rgba(234,179,8,0.45)',
+        text: '#fde047',
+        dot: 'bg-yellow-400',
+        label: { en: 'Ordering', km: 'កំពុងបញ្ជាទិញ' },
+    },
+    serving: {
+        bg: 'rgba(239,68,68,0.10)',
+        border: 'rgba(239,68,68,0.45)',
+        text: '#fca5a5',
+        dot: 'bg-red-500',
+        label: { en: 'Serving', km: 'កំពុងបម្រើ' },
+    },
+} as const;
 
 export default function FloorPlanView() {
     const { setTableId, clearOrder, tableId: activeTableId, setOrderId, setItems } = useOrder();
     const { lang } = useLanguage();
     const { user } = useAuth();
-    const [tableData, setTableData] = useState<CombinedTable[]>([]);
+    const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => { loadTables(); }, []);
+    useEffect(() => { load(); }, []);
 
-    async function loadTables() {
+    async function load() {
         setLoading(true);
         try {
-            const [dbTables, openOrders]: [FloorTable[], Order[]] = await Promise.all([
-                getTables(),
-                getOrders('open'),
-            ]);
-            const occupiedSet = new Map<string, string>();
-            openOrders.forEach(o => { if (o.table_id) occupiedSet.set(o.table_id, o.id); });
-            setTableData(dbTables.map(t => ({
-                id: t.name,
-                dbId: t.id,
-                status: occupiedSet.has(t.name) ? 'busy' : 'free',
-            })));
+            setTables(await getTables());
         } catch (e) {
             console.error(e);
         } finally {
@@ -44,28 +53,31 @@ export default function FloorPlanView() {
         }
     }
 
-    async function handleTableClick(table: CombinedTable) {
-        if (table.status === 'busy') {
+    async function handleTableClick(table: FloorTable) {
+        if (table.status !== 'available') {
+            // Table has an active order — resume it
             try {
-                const activeOrder = await getActiveOrderForTable(table.id);
-                if (activeOrder) {
-                    const existingItems = await getOrderItems(activeOrder.id);
-                    setOrderId(activeOrder.id);
-                    setItems(existingItems);
+                const order = await getActiveOrderForTable(table.name);
+                if (order) {
+                    const existing = await getOrderItems(order.id);
+                    setOrderId(order.id);
+                    setItems(existing);
                 }
             } catch (e) {
                 console.error(e);
             }
-            setTableId(table.id);
         } else {
             clearOrder();
-            setTableId(table.id);
         }
-        // POSPage re-renders automatically because tableId in context changed
+        setTableId(table.name);
+        // POSPage re-renders because tableId changed
     }
 
-    const freeCount = tableData.filter(t => t.status === 'free').length;
-    const busyCount = tableData.filter(t => t.status === 'busy').length;
+    const counts = {
+        available: tables.filter(t => t.status === 'available').length,
+        ordering: tables.filter(t => t.status === 'ordering').length,
+        serving: tables.filter(t => t.status === 'serving').length,
+    };
     const canManage = user?.role === 'admin' || user?.role === 'manager';
 
     return (
@@ -85,22 +97,24 @@ export default function FloorPlanView() {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    {/* Free count */}
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        <span className="text-[11px] font-bold text-green-400">{freeCount}</span>
-                    </div>
-                    {/* Busy count */}
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
-                        <Users2 size={11} className="text-blue-400" />
-                        <span className="text-[11px] font-bold text-blue-400">{busyCount}</span>
-                    </div>
-                    {/* Manage tables shortcut — admin/manager only */}
+
+                <div className="flex items-center gap-1.5">
+                    {/* Legend counts */}
+                    {[
+                        { key: 'available', count: counts.available, dot: 'bg-green-500' },
+                        { key: 'ordering', count: counts.ordering, dot: 'bg-yellow-400' },
+                        { key: 'serving', count: counts.serving, dot: 'bg-red-500' },
+                    ].map(({ key, count, dot }) => (
+                        <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)]">
+                            <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                            <span className="text-[11px] font-bold text-[var(--text-secondary)]">{count}</span>
+                        </div>
+                    ))}
+                    {/* Manage shortcut — admin/manager only */}
                     {canManage && (
                         <Link
                             href="/management/tables"
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors ml-1"
                             title={lang === 'km' ? 'គ្រប់គ្រងតុ' : 'Manage tables'}
                         >
                             <Settings2 size={11} />
@@ -113,58 +127,82 @@ export default function FloorPlanView() {
             {/* Table Grid */}
             <div className="flex-1 p-3 overflow-y-auto no-scrollbar">
                 {loading ? (
-                    <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 gap-2">
-                        {Array.from({ length: 20 }).map((_, i) => (
-                            <div key={i} className="rounded-xl animate-pulse bg-[var(--bg-elevated)]" style={{ aspectRatio: '1/1' }} />
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+                        {Array.from({ length: 16 }).map((_, i) => (
+                            <div key={i} className="rounded-2xl animate-pulse bg-[var(--bg-elevated)]" style={{ aspectRatio: '1/1.15' }} />
                         ))}
                     </div>
-                ) : tableData.length === 0 ? (
+                ) : tables.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-3 opacity-40">
                         <LayoutGrid size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
                             {lang === 'km' ? 'មិនទាន់មានតុ' : 'No tables yet'}
                         </p>
                         {canManage && (
-                            <Link
-                                href="/management/tables"
-                                className="text-xs text-[var(--accent-blue)] hover:underline"
-                            >
+                            <Link href="/management/tables" className="text-xs text-[var(--accent-blue)] hover:underline">
                                 {lang === 'km' ? 'បន្ថែមតុ' : 'Add tables in Management → Tables'}
                             </Link>
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 gap-2">
-                        {tableData.map(table => {
-                            const isCurrent = activeTableId === table.id;
-                            const isFree = table.status === 'free';
-
-                            let bg = '#141e28', border = 'rgba(148,163,184,0.2)', textColor = '#94a3b8';
-                            if (isCurrent) { bg = 'rgba(14,165,233,0.22)'; border = '#0ea5e9'; textColor = '#fff'; }
-                            else if (!isFree) { bg = 'rgba(59,130,246,0.12)'; border = 'rgba(59,130,246,0.5)'; textColor = '#93c5fd'; }
-                            else { bg = 'rgba(34,197,94,0.08)'; border = 'rgba(34,197,94,0.3)'; textColor = '#86efac'; }
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+                        {tables.map(table => {
+                            const isCurrent = activeTableId === table.name;
+                            const s = isCurrent
+                                ? { bg: 'rgba(14,165,233,0.22)', border: '#0ea5e9', text: '#fff' }
+                                : STATUS[table.status] || STATUS.available;
 
                             return (
                                 <button
                                     key={table.id}
                                     onClick={() => handleTableClick(table)}
-                                    title={isFree
-                                        ? (lang === 'km' ? 'ទំនេរ' : 'Free')
-                                        : (lang === 'km' ? 'មានភ្ញៀវ' : 'Occupied')}
-                                    className="rounded-xl flex flex-col items-center justify-center gap-1 aspect-square transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
-                                    style={{ background: bg, border: `1.5px solid ${border}` }}
+                                    className="rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95 p-2"
+                                    style={{
+                                        aspectRatio: '1/1.15',
+                                        background: s.bg,
+                                        border: `1.5px solid ${s.border}`,
+                                    }}
                                 >
+                                    {/* Icon */}
                                     {isCurrent ? (
-                                        <CheckCircle2 size={18} color={textColor} strokeWidth={2.5} />
-                                    ) : isFree ? (
-                                        <LayoutGrid size={16} color={textColor} strokeWidth={2} />
+                                        <CheckCircle2 size={20} color={s.text} strokeWidth={2.5} />
+                                    ) : table.status === 'available' ? (
+                                        <LayoutGrid size={18} color={s.text} strokeWidth={2} />
+                                    ) : table.status === 'ordering' ? (
+                                        <Clock size={18} color={s.text} strokeWidth={2} />
                                     ) : (
-                                        <Users2 size={16} color={textColor} strokeWidth={2} />
+                                        <UtensilsCrossed size={18} color={s.text} strokeWidth={2} />
                                     )}
-                                    <span className="text-[11px] font-bold" style={{ color: textColor }}>{table.id}</span>
+
+                                    {/* Table name */}
+                                    <span className="text-xs font-black leading-none" style={{ color: s.text }}>
+                                        {table.name}
+                                    </span>
+
+                                    {/* Seat count */}
+                                    <div className="flex items-center gap-0.5 opacity-70">
+                                        <Users2 size={9} color={s.text} strokeWidth={2} />
+                                        <span className="text-[9px] font-bold" style={{ color: s.text }}>
+                                            {table.seat_count}
+                                        </span>
+                                    </div>
                                 </button>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Legend */}
+                {tables.length > 0 && (
+                    <div className="flex items-center gap-4 mt-4 px-1 justify-center">
+                        {(Object.entries(STATUS) as [keyof typeof STATUS, typeof STATUS[keyof typeof STATUS]][]).map(([key, s]) => (
+                            <div key={key} className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                                <span className="text-[10px] font-semibold text-[var(--text-secondary)]">
+                                    {lang === 'km' ? s.label.km : s.label.en}
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

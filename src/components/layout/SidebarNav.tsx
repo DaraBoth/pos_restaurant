@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, ChefHat } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, ChefHat, UtensilsCrossed } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import Link from 'next/link';
 
@@ -73,6 +73,7 @@ export default function SidebarNav() {
             {/* Navigation */}
             <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
                 <NavItem label={lang === 'km' ? 'ផ្នែកលក់' : 'POS'} icon={LayoutGrid} path="/pos" pathname={pathname} />
+                <NavItem label={lang === 'km' ? 'ផ្ទះបាយ' : 'Kitchen'} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} />
                 <NavItem label={lang === 'km' ? 'ប្រវត្តិ' : 'History'} icon={History} path="/history" pathname={pathname} />
                 {(user?.role === 'admin' || user?.role === 'manager') && (
                     <NavItem label={lang === 'km' ? 'គ្រប់គ្រង' : 'Management'} icon={Settings} path="/management" pathname={pathname} />

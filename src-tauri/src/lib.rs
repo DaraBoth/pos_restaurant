@@ -72,6 +72,9 @@ pub fn run() {
             commands::tables::get_tables,
             commands::tables::create_table,
             commands::tables::delete_table,
+            // Kitchen
+            commands::kitchen::get_kitchen_orders,
+            commands::kitchen::update_kitchen_item_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
