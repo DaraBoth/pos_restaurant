@@ -85,7 +85,7 @@ export default function ProductGrid() {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
                     <input
                         type="text"
-                        placeholder={lang === 'km' ? 'ážŸáŸ’ážœáŸ‚áž„ážšáž€áž˜áž»ážáž˜áŸ’áž áž¼áž”...' : 'Search menu...'}
+                        placeholder={lang === 'km' ? 'ស្វែងរកម្ហូប...' : 'Search menu...'}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none focus:border-[var(--accent-blue)]/60 transition-colors"
@@ -128,7 +128,7 @@ export default function ProductGrid() {
                     <div className="flex flex-col items-center justify-center h-48 gap-3 opacity-30">
                         <ShoppingBag size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                            {searchQuery ? (lang === 'km' ? 'ážšáž€áž˜áž·áž“ážƒáž¾áž‰' : 'No results') : (lang === 'km' ? 'áž‚áŸ’áž˜áž¶áž“áž•áž›áž·ážáž•áž›' : 'No products')}
+                            {searchQuery ? (lang === 'km' ? 'គ្មានលទ្ធផល' : 'No results') : (lang === 'km' ? 'គ្មានផលិតផល' : 'No products')}
                         </p>
                     </div>
                 ) : (
@@ -168,7 +168,7 @@ export default function ProductGrid() {
                                         {unavailable && (
                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                                 <span className="text-[10px] font-black text-red-400 uppercase tracking-widest bg-black/60 px-2 py-1 rounded-full">
-                                                    {outOfStock ? (lang === 'km' ? 'áž¢ážŸáŸ‹ážŸáŸ’ážáž»áž€' : 'Sold Out') : (lang === 'km' ? 'áž˜áž·áž“áž˜áž¶áž“' : 'N/A')}
+                                                    {outOfStock ? (lang === 'km' ? 'អស់ស្តុក' : 'Sold Out') : (lang === 'km' ? 'មិនមាន' : 'N/A')}
                                                 </span>
                                             </div>
                                         )}

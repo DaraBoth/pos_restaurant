@@ -1,14 +1,21 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getKitchenOrders, updateKitchenItemStatus } from '@/lib/tauri-commands';
 import type { KitchenOrder, KitchenOrderItem } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { ChefHat, UtensilsCrossed, CheckCircle2, Clock, RefreshCw, Flame } from 'lucide-react';
+import { ChefHat, UtensilsCrossed, CheckCircle2, Clock, RefreshCw, Flame, LayoutList, Layers } from 'lucide-react';
 
-// How many seconds between auto-refresh
 const POLL_INTERVAL = 8;
-
 type KitchenStatus = KitchenOrderItem['kitchen_status'];
+
+interface AggregatedItem {
+    product_name: string;
+    product_khmer: string | null;
+    pendingItems: KitchenOrderItem[];
+    cookingItems: KitchenOrderItem[];
+    doneItems: KitchenOrderItem[];
+    tableIds: string[];
+}
 
 const STATUS_CONFIG: Record<KitchenStatus, {
     label: string; labelKm: string;
@@ -43,7 +50,8 @@ export default function KitchenPage() {
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [countdown, setCountdown] = useState(POLL_INTERVAL);
-    const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+    const [viewMode, setViewMode] = useState<'summary' | 'tables'>('summary');
 
     const refresh = useCallback(async () => {
         try {
@@ -57,11 +65,8 @@ export default function KitchenPage() {
         }
     }, []);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    useEffect(() => { refresh(); }, [refresh]);
 
-    // Auto-refresh countdown
     useEffect(() => {
         const tick = setInterval(() => {
             setCountdown(c => {
@@ -72,26 +77,71 @@ export default function KitchenPage() {
         return () => clearInterval(tick);
     }, [refresh]);
 
-    async function handleAdvance(item: KitchenOrderItem) {
+    // Aggregate items by product_name across all orders
+    const aggregated = useMemo<AggregatedItem[]>(() => {
+        const map = new Map<string, AggregatedItem>();
+        for (const order of orders) {
+            for (const item of order.items) {
+                if (!map.has(item.product_name)) {
+                    map.set(item.product_name, {
+                        product_name: item.product_name,
+                        product_khmer: item.product_khmer ?? null,
+                        pendingItems: [],
+                        cookingItems: [],
+                        doneItems: [],
+                        tableIds: [],
+                    });
+                }
+                const entry = map.get(item.product_name)!;
+                if (item.kitchen_status === 'pending') entry.pendingItems.push(item);
+                else if (item.kitchen_status === 'cooking') entry.cookingItems.push(item);
+                else entry.doneItems.push(item);
+                if (order.table_id && !entry.tableIds.includes(order.table_id)) {
+                    entry.tableIds.push(order.table_id);
+                }
+            }
+        }
+        // Sort: pending first, then cooking, then done
+        return Array.from(map.values()).sort((a, b) => {
+            const scoreA = a.pendingItems.length * 2 + a.cookingItems.length;
+            const scoreB = b.pendingItems.length * 2 + b.cookingItems.length;
+            return scoreB - scoreA;
+        });
+    }, [orders]);
+
+    async function handleAdvanceAll(items: KitchenOrderItem[], nextStatus: KitchenStatus) {
+        const ids = items.map(i => i.id);
+        setUpdatingIds(prev => new Set([...prev, ...ids]));
+        try {
+            await Promise.all(items.map(i => updateKitchenItemStatus(i.id, nextStatus)));
+            await refresh();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setUpdatingIds(prev => {
+                const next = new Set(prev);
+                ids.forEach(id => next.delete(id));
+                return next;
+            });
+        }
+    }
+
+    async function handleAdvanceSingle(item: KitchenOrderItem) {
         const cfg = STATUS_CONFIG[item.kitchen_status];
         if (!cfg.next) return;
-        setUpdatingId(item.id);
+        setUpdatingIds(prev => new Set([...prev, item.id]));
         try {
             await updateKitchenItemStatus(item.id, cfg.next);
             await refresh();
         } catch (e) {
             console.error(e);
         } finally {
-            setUpdatingId(null);
+            setUpdatingIds(prev => { const s = new Set(prev); s.delete(item.id); return s; });
         }
     }
 
-    const totalPending = orders.reduce(
-        (sum, o) => sum + o.items.filter(i => i.kitchen_status === 'pending').length, 0
-    );
-    const totalCooking = orders.reduce(
-        (sum, o) => sum + o.items.filter(i => i.kitchen_status === 'cooking').length, 0
-    );
+    const totalPending = aggregated.reduce((s, a) => s + a.pendingItems.length, 0);
+    const totalCooking = aggregated.reduce((s, a) => s + a.cookingItems.length, 0);
 
     return (
         <div className="h-full flex flex-col bg-[var(--bg-dark)]">
@@ -106,13 +156,12 @@ export default function KitchenPage() {
                             {lang === 'km' ? 'ផ្ទះបាយ' : 'Kitchen Display'}
                         </h1>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
-                            {lang === 'km' ? 'ជ្រើសសន្លឹកការងារ' : 'Tap items to advance status'}
+                            {lang === 'km' ? 'ចុចដើម្បីផ្លាស់ប្ដូរស្ថានភាព' : 'Tap items to advance status'}
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* Pending + Cooking counts */}
                     {totalPending > 0 && (
                         <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
                             <Clock size={11} className="text-yellow-400" />
@@ -126,7 +175,24 @@ export default function KitchenPage() {
                         </div>
                     )}
 
-                    {/* Manual refresh + countdown */}
+                    {/* View toggle */}
+                    <div className="flex items-center gap-0.5 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg p-0.5">
+                        <button
+                            onClick={() => setViewMode('summary')}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${viewMode === 'summary' ? 'bg-[var(--accent-blue)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                            title={lang === 'km' ? 'ព្រៀងសង្ខេប' : 'Summary'}
+                        >
+                            <Layers size={11} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('tables')}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${viewMode === 'tables' ? 'bg-[var(--accent-blue)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                            title={lang === 'km' ? 'តាមតុ' : 'By Table'}
+                        >
+                            <LayoutList size={11} />
+                        </button>
+                    </div>
+
                     <button
                         onClick={() => { setLoading(true); refresh(); }}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
@@ -138,20 +204,32 @@ export default function KitchenPage() {
                 </div>
             </div>
 
-            {/* Order cards */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
                 {loading && orders.length === 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="rounded-2xl animate-pulse bg-[var(--bg-elevated)] h-48" />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <div key={i} className="rounded-2xl animate-pulse bg-[var(--bg-elevated)] h-36" />
                         ))}
                     </div>
-                ) : orders.length === 0 ? (
+                ) : aggregated.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-3 opacity-40">
                         <UtensilsCrossed size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                            {lang === 'km' ? 'គ្មានការបញ្ជាទិញតូ' : 'No active orders'}
+                            {lang === 'km' ? 'គ្មានការបញ្ជាទិញ' : 'No active orders'}
                         </p>
+                    </div>
+                ) : viewMode === 'summary' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {aggregated.map(item => (
+                            <AggregatedCard
+                                key={item.product_name}
+                                item={item}
+                                lang={lang}
+                                updatingIds={updatingIds}
+                                onAdvanceAll={handleAdvanceAll}
+                            />
+                        ))}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -160,8 +238,8 @@ export default function KitchenPage() {
                                 key={order.order_id}
                                 order={order}
                                 lang={lang}
-                                updatingId={updatingId}
-                                onAdvance={handleAdvance}
+                                updatingIds={updatingIds}
+                                onAdvance={handleAdvanceSingle}
                             />
                         ))}
                     </div>
@@ -171,15 +249,108 @@ export default function KitchenPage() {
     );
 }
 
+// ── Aggregated item card ────────────────────────────────────────────────────
+function AggregatedCard({
+    item, lang, updatingIds, onAdvanceAll,
+}: {
+    item: AggregatedItem;
+    lang: string;
+    updatingIds: Set<string>;
+    onAdvanceAll: (items: KitchenOrderItem[], next: KitchenStatus) => void;
+}) {
+    const totalQty = item.pendingItems.length + item.cookingItems.length + item.doneItems.length;
+    const isAnyUpdating = [...item.pendingItems, ...item.cookingItems].some(i => updatingIds.has(i.id));
+
+    const displayName = lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name;
+
+    // Determine dominant state for card color
+    const cardBorder = item.pendingItems.length > 0
+        ? 'border-yellow-500/30 bg-yellow-500/5'
+        : item.cookingItems.length > 0
+            ? 'border-orange-500/40 bg-orange-500/5'
+            : 'border-green-500/30 bg-green-500/5';
+
+    return (
+        <div className={`rounded-2xl border overflow-hidden flex flex-col ${cardBorder}`}>
+            {/* Header */}
+            <div className="px-3 pt-3 pb-2">
+                <div className="flex items-start justify-between gap-1 mb-1">
+                    <p className={`text-sm font-black text-[var(--foreground)] leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
+                        {displayName}
+                    </p>
+                    <span className="text-lg font-black text-[var(--foreground)] leading-none flex-shrink-0">
+                        ×{totalQty}
+                    </span>
+                </div>
+
+                {/* Tables */}
+                {item.tableIds.length > 0 && (
+                    <p className="text-[9px] text-[var(--text-secondary)] truncate">
+                        {item.tableIds.join(', ')}
+                    </p>
+                )}
+            </div>
+
+            {/* Status breakdown */}
+            <div className="px-3 pb-2 flex items-center gap-2">
+                {item.pendingItems.length > 0 && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
+                        <Clock size={8} strokeWidth={2.5} />
+                        {item.pendingItems.length}
+                    </span>
+                )}
+                {item.cookingItems.length > 0 && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                        <Flame size={8} strokeWidth={2.5} />
+                        {item.cookingItems.length}
+                    </span>
+                )}
+                {item.doneItems.length > 0 && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-green-500/15 text-green-300 border border-green-500/30">
+                        <CheckCircle2 size={8} strokeWidth={2.5} />
+                        {item.doneItems.length}
+                    </span>
+                )}
+            </div>
+
+            {/* Action buttons */}
+            {(item.pendingItems.length > 0 || item.cookingItems.length > 0) && (
+                <div className="px-2 pb-2 flex gap-1.5 mt-auto">
+                    {item.pendingItems.length > 0 && (
+                        <button
+                            onClick={() => onAdvanceAll(item.pendingItems, 'cooking')}
+                            disabled={isAnyUpdating}
+                            className="flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wide bg-yellow-500/20 text-yellow-200 hover:bg-yellow-500/30 border border-yellow-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                            {isAnyUpdating ? <RefreshCw size={9} className="animate-spin" /> : <Flame size={9} />}
+                            {lang === 'km' ? 'ចំអិន' : 'Start'}
+                        </button>
+                    )}
+                    {item.cookingItems.length > 0 && (
+                        <button
+                            onClick={() => onAdvanceAll(item.cookingItems, 'done')}
+                            disabled={isAnyUpdating}
+                            className="flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wide bg-green-500/20 text-green-200 hover:bg-green-500/30 border border-green-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                            {isAnyUpdating ? <RefreshCw size={9} className="animate-spin" /> : <CheckCircle2 size={9} />}
+                            {lang === 'km' ? 'ដាក់ចេញ' : 'Done'}
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Per-table order card (detail view) ─────────────────────────────────────
 function KitchenOrderCard({
-    order, lang, updatingId, onAdvance,
+    order, lang, updatingIds, onAdvance,
 }: {
     order: KitchenOrder;
     lang: string;
-    updatingId: string | null;
+    updatingIds: Set<string>;
     onAdvance: (item: KitchenOrderItem) => void;
 }) {
-    // Format elapsed time
     const elapsed = (() => {
         const sec = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1000);
         if (sec < 60) return `${sec}s`;
@@ -192,7 +363,6 @@ function KitchenOrderCard({
 
     return (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden flex flex-col">
-            {/* Card header */}
             <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border)]">
                 <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
@@ -212,12 +382,11 @@ function KitchenOrderCard({
                 )}
             </div>
 
-            {/* Items */}
             <div className="flex-1 p-2 space-y-1.5">
                 {order.items.map(item => {
                     const cfg = STATUS_CONFIG[item.kitchen_status];
                     const StatusIcon = cfg.Icon;
-                    const isUpdating = updatingId === item.id;
+                    const isUpdating = updatingIds.has(item.id);
 
                     return (
                         <button
@@ -232,29 +401,22 @@ function KitchenOrderCard({
                                         <span className="text-xs font-bold text-[var(--foreground)] truncate">
                                             {lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name}
                                         </span>
-                                        <span className="text-xs font-black text-[var(--text-secondary)] flex-shrink-0">
-                                            ×{item.quantity}
-                                        </span>
+                                        <span className="text-xs font-black text-[var(--text-secondary)] flex-shrink-0">×{item.quantity}</span>
                                     </div>
                                     {item.note && (
-                                        <p className="text-[10px] text-[var(--accent-blue)] italic truncate">
-                                            {item.note}
-                                        </p>
+                                        <p className="text-[10px] text-[var(--accent-blue)] italic truncate">{item.note}</p>
                                     )}
-                                    {/* Status badge + next action hint */}
                                     <div className="flex items-center gap-1.5 mt-1">
                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${cfg.badgeCls}`}>
                                             <StatusIcon size={8} strokeWidth={2.5} />
-                                            {lang === 'km' ? cfg.label : cfg.label}
+                                            {lang === 'km' ? cfg.labelKm : cfg.label}
                                         </span>
                                         {cfg.next && !isUpdating && (
                                             <span className="text-[9px] font-semibold text-[var(--text-secondary)] group-hover:text-[var(--foreground)] transition-colors">
                                                 → {lang === 'km' ? cfg.nextLabelKm : cfg.nextLabel}
                                             </span>
                                         )}
-                                        {isUpdating && (
-                                            <RefreshCw size={9} className="text-[var(--text-secondary)] animate-spin" />
-                                        )}
+                                        {isUpdating && <RefreshCw size={9} className="text-[var(--text-secondary)] animate-spin" />}
                                     </div>
                                 </div>
                             </div>

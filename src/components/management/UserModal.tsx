@@ -14,7 +14,7 @@ interface UserModalProps {
 export default function UserModal({ isOpen, onClose, onSave, user }: UserModalProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<'admin' | 'manager' | 'cashier' | 'waiter'>('cashier');
+    const [role, setRole] = useState<'admin' | 'manager' | 'cashier' | 'waiter' | 'chef'>('cashier');
     const [fullName, setFullName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [loading, setLoading] = useState(false);
@@ -142,7 +142,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         <div className="space-y-2 col-span-2">
                             <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Role & Permissions</label>
                             <div className="grid grid-cols-2 gap-3">
-                                {['admin', 'manager', 'cashier', 'waiter'].map((r) => (
+                                {['admin', 'manager', 'cashier', 'waiter', 'chef'].map((r) => (
                                     <button
                                         key={r}
                                         type="button"

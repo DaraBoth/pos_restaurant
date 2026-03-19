@@ -6,7 +6,7 @@
 export interface UserSession {
     id: string;
     username: string;
-    role: 'admin' | 'manager' | 'cashier' | 'waiter';
+    role: 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef';
     full_name?: string;
     khmer_name?: string;
 }

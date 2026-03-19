@@ -73,7 +73,9 @@ export default function SidebarNav() {
             {/* Navigation */}
             <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
                 <NavItem label={lang === 'km' ? 'ផ្នែកលក់' : 'POS'} icon={LayoutGrid} path="/pos" pathname={pathname} />
-                <NavItem label={lang === 'km' ? 'ផ្ទះបាយ' : 'Kitchen'} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} />
+                {(user?.role === 'admin' || user?.role === 'chef') && (
+                    <NavItem label={lang === 'km' ? 'ផ្ទះបាយ' : 'Kitchen'} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} />
+                )}
                 <NavItem label={lang === 'km' ? 'ប្រវត្តិ' : 'History'} icon={History} path="/history" pathname={pathname} />
                 {(user?.role === 'admin' || user?.role === 'manager') && (
                     <NavItem label={lang === 'km' ? 'គ្រប់គ្រង' : 'Management'} icon={Settings} path="/management" pathname={pathname} />
@@ -89,7 +91,7 @@ export default function SidebarNav() {
                         title={lang === 'en' ? 'Switch to Khmer' : 'Switch to English'}
                     >
                         <Globe size={13} className="text-[var(--accent-blue)]" />
-                        {lang === 'en' ? 'EN' : 'ážáŸ’áž˜áŸ‚ážš'}
+                        {lang === 'en' ? 'EN' : 'ខ្មែរ'}
                     </button>
                     <button
                         onClick={handleLogout}

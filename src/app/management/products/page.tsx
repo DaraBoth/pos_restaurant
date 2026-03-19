@@ -84,55 +84,46 @@ export default function ProductsManagement() {
     );
 
     return (
-        <div className="max-w-7xl mx-auto animate-fade-in space-y-[var(--space-unit)] pb-10">
-            {/* Header Area */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-[var(--bg-card)] p-[var(--space-unit)] rounded-[2.5rem] border border-[var(--border)] shadow-xl overflow-hidden relative">
-                {/* Decorative background element */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-[100px] pointer-events-none" />
-                
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
-                    <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20">
-                            {activeTab === 'products' ? <Package size={32} /> : <Layers size={32} />}
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-black text-[var(--foreground)] tracking-tight leading-none mb-2">Catalog Control</h1>
-                            <div className="flex gap-4">
-                                <button 
-                                    onClick={() => setActiveTab('products')}
-                                    className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'products' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}
-                                >
-                                    Products
-                                </button>
-                                <button 
-                                    onClick={() => setActiveTab('categories')}
-                                    className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'categories' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}
-                                >
-                                    Categories
-                                </button>
-                            </div>
-                        </div>
+        <div className="animate-fade-in space-y-4 pb-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-[var(--accent)]/15 border border-[var(--accent)]/30">
+                        {activeTab === 'products' ? <Package size={16} className="text-[var(--accent)]" /> : <Layers size={16} className="text-[var(--accent)]" />}
                     </div>
                     <div>
-                        <h1 className="text-[var(--text-3xl)] font-black text-[var(--foreground)] tracking-tight leading-none mb-2">Master Roster</h1>
-                        <p className="text-[var(--text-xs)] font-bold text-[var(--text-secondary)] uppercase tracking-[0.2em] opacity-60">
-                            Asset Monitoring & Catalog Control
-                        </p>
+                        <h1 className="text-base font-black text-[var(--foreground)] leading-none">
+                            {lang === 'km' ? 'ហាងកាហ្វេ' : activeTab === 'products' ? 'Products' : 'Categories'}
+                        </h1>
+                        <div className="flex gap-3 mt-1">
+                            <button
+                                onClick={() => setActiveTab('products')}
+                                className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'products' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                            >
+                                {lang === 'km' ? 'ផលិតផល' : 'Products'}
+                                </button>
+                                <button
+                                onClick={() => setActiveTab('categories')}
+                                className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                            >
+                                {lang === 'km' ? 'ប្រភេទ' : 'Categories'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="flex items-center gap-2">
                     <div className="relative">
-                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-40" />
-                        <input 
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+                        <input
                             type="text"
-                            placeholder={activeTab === 'products' ? "Search items..." : "Search categories..."}
+                            placeholder={activeTab === 'products' ? (lang === 'km' ? 'ស្វែងរក...' : 'Search items...') : (lang === 'km' ? 'ស្វែងរក...' : 'Search categories...')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-12 pr-6 py-4 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all w-full sm:w-64 font-bold"
+                            className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all w-52"
                         />
                     </div>
-                    
+
                     <button
                         onClick={() => {
                             if (activeTab === 'products') {
@@ -143,17 +134,17 @@ export default function ProductsManagement() {
                                 setIsCategoryModalOpen(true);
                             }
                         }}
-                        className="px-6 py-3.5 rounded-[1.25rem] bg-[var(--accent)] text-white font-black text-[var(--text-sm)] flex items-center justify-center gap-2 shadow-xl shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest"
+                        className="pos-btn-primary px-4 py-2 text-xs uppercase tracking-widest flex items-center gap-1.5 flex-shrink-0"
                     >
-                        <Plus size={18} strokeWidth={3} />
-                        Register New
+                        <Plus size={14} strokeWidth={2.5} />
+                        {lang === 'km' ? 'បន្ថែម' : activeTab === 'products' ? 'New Product' : 'New Category'}
                     </button>
                 </div>
             </div>
 
             {/* Data Grid */}
             {activeTab === 'products' ? (
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden shadow-xl relative">
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden">
                     <div className="overflow-x-auto container-snap">
                         <table className="w-full text-left whitespace-nowrap border-collapse">
                             <thead className="bg-[var(--bg-elevated)]">
@@ -244,7 +235,7 @@ export default function ProductsManagement() {
                     </div>
                 </div>
             ) : (
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden shadow-xl relative">
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden">
                     <div className="overflow-x-auto container-snap">
                         <table className="w-full text-left whitespace-nowrap border-collapse">
                             <thead className="bg-[var(--bg-elevated)]">
