@@ -11,6 +11,9 @@ export const addOrderItem = (
 export const updateOrderItemQuantity = (item_id: string, quantity: number) =>
     call<void>('update_order_item_quantity', { itemId: item_id, quantity });
 
+export const updateOrderItemNote = (item_id: string, note: string | undefined) =>
+    call<void>('update_order_item_note', { itemId: item_id, note: note ?? null });
+
 export const getOrderItems = (order_id: string) =>
     call<OrderItem[]>('get_order_items', { orderId: order_id });
 

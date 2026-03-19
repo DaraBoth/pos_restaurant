@@ -211,6 +211,21 @@ pub async fn get_order_items(
 }
 
 #[tauri::command]
+pub async fn update_order_item_note(
+    item_id: String,
+    note: Option<String>,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    sqlx::query("UPDATE order_items SET note = ? WHERE id = ? AND is_deleted = 0")
+        .bind(&note)
+        .bind(&item_id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn get_orders(
     status: Option<String>,
     start_date: Option<String>,

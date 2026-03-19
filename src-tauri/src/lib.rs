@@ -55,6 +55,7 @@ pub fn run() {
             commands::orders::create_order,
             commands::orders::add_order_item,
             commands::orders::update_order_item_quantity,
+            commands::orders::update_order_item_note,
             commands::orders::get_order_items,
             commands::orders::get_orders,
             commands::orders::get_active_order_for_table,

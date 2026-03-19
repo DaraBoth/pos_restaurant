@@ -1,11 +1,11 @@
 ﻿'use client';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { updateOrderItemQuantity, voidOrder } from '@/lib/tauri-commands';
+import { updateOrderItemQuantity, updateOrderItemNote, voidOrder } from '@/lib/tauri-commands';
 import { getOrderItems } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useState } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, UtensilsCrossed, CheckCircle2, CreditCard, PauseCircle, XCircle } from 'lucide-react';
+import { Trash2, ShoppingCart, Plus, Minus, History, UtensilsCrossed, CheckCircle2, CreditCard, PauseCircle, XCircle, Pencil, StickyNote } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
 const KITCHEN_BADGE: Record<string, { label: string; labelKm: string; cls: string }> = {
@@ -19,6 +19,22 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
     const { t, lang } = useLanguage();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [orderSent, setOrderSent] = useState(false);
+    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+    const [noteInput, setNoteInput] = useState('');
+
+    async function handleNoteSave(id: string) {
+        try {
+            await updateOrderItemNote(id, noteInput.trim() || undefined);
+            if (orderId) {
+                const updated = await getOrderItems(orderId);
+                setItems(updated);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setEditingNoteId(null);
+        }
+    }
 
     async function handleQtyChange(id: string, current: number, delta: number) {
         if (!orderId) return;
@@ -131,7 +147,8 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                                                     </span>
                                                 )}
                                             </div>
-                                            {item.note && (
+                                            {/* note shown via edit button below for pending; shown static for cooking/done */}
+                                            {(isDone || isCooking) && item.note && (
                                                 <p className="text-[10px] text-[var(--accent-blue)] italic truncate">
                                                     {item.note}
                                                 </p>
@@ -161,6 +178,41 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                                             <Plus size={11} />
                                         </button>
                                     </div>
+                                    {/* Inline note editor — only for pending items */}
+                                    {!isDone && !isCooking && (
+                                        editingNoteId === item.id ? (
+                                            <div className="mt-1.5 flex items-center gap-1">
+                                                <StickyNote size={10} className="text-[var(--accent-blue)] flex-shrink-0" />
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={noteInput}
+                                                    onChange={e => setNoteInput(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleNoteSave(item.id);
+                                                        if (e.key === 'Escape') setEditingNoteId(null);
+                                                    }}
+                                                    onBlur={() => handleNoteSave(item.id)}
+                                                    placeholder={lang === 'km' ? 'កំណត់ចំណាំ...' : 'Add note...'}
+                                                    className="flex-1 text-[10px] bg-[#0d1721] border border-[var(--accent-blue)]/40 rounded-md px-1.5 py-0.5 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => {
+                                                    setEditingNoteId(item.id);
+                                                    setNoteInput(item.note ?? '');
+                                                }}
+                                                className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
+                                            >
+                                                <Pencil size={9} />
+                                                {item.note
+                                                    ? <span className="italic text-[var(--accent-blue)] truncate max-w-[120px]">{item.note}</span>
+                                                    : <span>{lang === 'km' ? 'បន្ថែមចំណាំ' : 'Add note'}</span>
+                                                }
+                                            </button>
+                                        )
+                                    )}
                                 </div>
                             );
                         })

@@ -121,6 +121,19 @@ export const translations = {
         deleteTable: 'Delete Table',
         noTables: 'No tables yet',
         inventory: 'Inventory',
+        // Kitchen
+        kitchen: 'Kitchen',
+        sendToKitchen: 'Send to Kitchen',
+        sentToKitchen: 'Sent to Kitchen!',
+        hold: 'Hold',
+        pending: 'Pending',
+        cooking: 'Cooking',
+        doneItems: 'Done items',
+        addNote: 'Add note',
+        seatCount: 'Seats',
+        tableAvailable: 'Available',
+        tableOrdering: 'Ordering',
+        tableServing: 'Serving',
     },
     km: {
         // Auth
@@ -238,6 +251,19 @@ export const translations = {
         deleteTable: 'លុបតុ',
         noTables: 'គ្មានតុ',
         inventory: 'ស្តុក',
+        // Kitchen
+        kitchen: 'ផ្ទះបាយ',
+        sendToKitchen: 'ផ្ញើទៅផ្ទះបាយ',
+        sentToKitchen: 'បានផ្ញើទៅផ្ទះបាយ!',
+        hold: 'រក្សាទុក',
+        pending: 'រង់ចាំ',
+        cooking: 'ចំអិន',
+        doneItems: 'រួចរាល់',
+        addNote: 'បន្ថែមចំណាំ',
+        seatCount: 'កៅអី',
+        tableAvailable: 'ទំនេរ',
+        tableOrdering: 'កំពុងបញ្ជាទិញ',
+        tableServing: 'កំពុងបម្រើ',
     },
 } as const;
 
