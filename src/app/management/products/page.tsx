@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { 
     getProducts, getCategories, deleteProduct, updateStock, 
     Product, Category, deleteCategory 
 } from '@/lib/tauri-commands';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { 
     Package, Plus, Trash2, Box, Minus, Edit3, 

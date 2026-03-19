@@ -1,6 +1,6 @@
 ﻿'use client';
 import Link from 'next/link';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { Package, Users, RefreshCw, ClipboardList, Building2, ArrowRight, TrendingUp } from 'lucide-react';
 
 const QUICK_LINKS = [

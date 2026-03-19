@@ -1,7 +1,7 @@
 ﻿'use client';
 import { useState, useEffect } from 'react';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
 import { LogOut, LayoutGrid, Settings, History, Globe, TableProperties, ChefHat, TrendingUp } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';

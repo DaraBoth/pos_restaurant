@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { getUsers, deleteUser, UserSession } from '@/lib/tauri-commands';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { Users as UsersIcon, Plus, ShieldCheck, Mail, CircleDot, Activity, Search, Edit3, Trash2, Shield } from 'lucide-react';
 import UserModal from '@/components/management/UserModal';
 

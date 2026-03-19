@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { getExchangeRate, setExchangeRate, ExchangeRate } from '@/lib/tauri-commands';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { formatKhr } from '@/lib/currency';
 import { RefreshCw, Save, ArrowRightLeft } from 'lucide-react';
 

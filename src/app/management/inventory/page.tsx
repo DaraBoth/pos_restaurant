@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { History, Search, ArrowUpRight, ArrowDownLeft, Package, Calendar, Filter } from 'lucide-react';
 import { call } from '@/lib/tauri-commands';
 

@@ -1,8 +1,8 @@
 ﻿'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useOrder } from '@/contexts/OrderContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrder } from '@/providers/OrderProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { getOrders, Order, getTables, FloorTable, createTable, getActiveOrderForTable, getOrderItems } from '@/lib/tauri-commands';
 import { LayoutGrid, Plus, Users2, CheckCircle2 } from 'lucide-react';
 

@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
-import { LanguageProvider } from "@/contexts/LanguageContext";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { OrderProvider } from "@/contexts/OrderContext";
+import { LanguageProvider } from "@/providers/LanguageProvider";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { OrderProvider } from "@/providers/OrderProvider";
 import RouteGuard from "@/components/auth/RouteGuard";
 
 export const metadata: Metadata = {

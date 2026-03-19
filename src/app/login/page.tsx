@@ -1,8 +1,8 @@
 ﻿'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { login, getSetupStatus } from '@/lib/tauri-commands';
 import { ArrowRight, Lock, User, Globe, ChefHat } from 'lucide-react';
 

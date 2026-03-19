@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { getRevenueSummary, getRevenueByPeriod, RevenueSummary, RevenueByDay } from '@/lib/tauri-commands';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { TrendingUp, ShoppingBag, DollarSign, Clock } from 'lucide-react';
 

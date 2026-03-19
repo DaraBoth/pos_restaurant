@@ -5,9 +5,9 @@ import {
     createOrder as apiCreateOrder, addOrderItem as apiAddOrderItem,
     getOrderItems
 } from '@/lib/tauri-commands';
-import { useOrder } from '@/contexts/OrderContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrder } from '@/providers/OrderProvider';
+import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { Search, ShoppingBag } from 'lucide-react';
 

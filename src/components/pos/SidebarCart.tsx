@@ -1,6 +1,6 @@
 ﻿'use client';
-import { useOrder } from '@/contexts/OrderContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrder } from '@/providers/OrderProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { updateOrderItemQuantity, voidOrder } from '@/lib/tauri-commands';
 import { getOrderItems } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';

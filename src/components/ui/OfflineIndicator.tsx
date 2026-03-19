@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { getDbStatus } from '@/lib/tauri-commands';
 import { Database, Cloud } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function OfflineIndicator() {
     const [isLocal, setIsLocal] = useState(true);

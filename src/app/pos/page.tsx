@@ -1,12 +1,12 @@
-'use client';
+﻿'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MonitorSmartphone, TableProperties, ShoppingCart } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
-import SidebarCart from '@/components/layout/SidebarCart';
+import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
-import { useOrder } from '@/contexts/OrderContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrder } from '@/providers/OrderProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);

@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 import { useState } from 'react';
-import { useOrder } from '@/contexts/OrderContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrder } from '@/providers/OrderProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { checkoutOrder, getRestaurant, PaymentInput } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
 import { X, CheckCircle, CreditCard, Banknote, QrCode } from 'lucide-react';
