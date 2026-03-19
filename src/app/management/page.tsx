@@ -52,9 +52,9 @@ export default function ManagementDashboard() {
         <div className="animate-fade-in">
             {/* Header */}
             <div className="mb-[var(--space-unit)]">
-                <h1 className="text-[var(--text-4xl)] font-black tracking-tight mb-2 text-[var(--foreground)]">System Dashboard</h1>
+                <h1 className="text-[var(--text-4xl)] font-black tracking-tight mb-2 text-[var(--foreground)]">Back Office</h1>
                 <p className="text-[var(--text-secondary)] font-bold uppercase tracking-[0.2em] text-[var(--text-xs)] opacity-60">
-                    Retail Operations & Datastore Control
+                    Restaurant Operations & Control Center
                 </p>
             </div>
 
@@ -64,7 +64,7 @@ export default function ManagementDashboard() {
                     <Link
                         key={href}
                         href={href}
-                        className="group flex flex-col p-[var(--space-unit)] rounded-[2rem] transition-all relative overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 hover:-translate-y-1"
+                        className="group flex flex-col p-[var(--space-unit)] rounded-[1.1rem] transition-all relative overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent-blue)]/35 hover:shadow-2xl hover:shadow-[var(--accent-blue)]/10 hover:-translate-y-1"
                     >
                         {/* Top Context */}
                         <div className="flex items-start justify-between mb-10 relative z-10">
@@ -79,7 +79,7 @@ export default function ManagementDashboard() {
                             </div>
                             
                             <div 
-                                className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-elevated)] border border-[var(--border)] transition-colors group-hover:bg-[var(--accent)] group-hover:text-white"
+                                className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-elevated)] border border-[var(--border)] transition-colors group-hover:bg-[var(--accent-blue)] group-hover:text-white"
                             >
                                 <ArrowRight size={18} className="text-[var(--text-secondary)] group-hover:text-white transition-colors" />
                             </div>
@@ -104,7 +104,7 @@ export default function ManagementDashboard() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Database Synchronized</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Services Online</span>
             </div>
         </div>
     );

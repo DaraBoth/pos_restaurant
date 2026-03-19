@@ -80,10 +80,10 @@ export default function ProductGrid() {
     });
 
     return (
-        <div className="flex flex-col min-h-0 h-full relative bg-[var(--background)]">
+        <div className="flex flex-col min-h-0 h-full relative bg-[var(--bg-dark)]">
 
             {/* Top Toolbar: Search + Categories */}
-            <div className="flex-shrink-0 px-[var(--space-unit)] pt-[calc(var(--space-unit)*4)] pb-[var(--space-unit)] border-b border-[var(--border)] bg-[var(--bg-card)]/80 backdrop-blur-xl z-20">
+            <div className="flex-shrink-0 px-[var(--space-unit)] pt-5 pb-[var(--space-unit)] border-b border-[var(--border)] bg-[var(--bg-card)]/92 backdrop-blur-xl z-20">
                 {/* Search */}
                 <div className="relative mb-5" style={{ maxWidth: '600px' }}>
                     <Search
@@ -92,10 +92,10 @@ export default function ProductGrid() {
                     />
                     <input
                         type="text"
-                        placeholder={lang === 'km' ? 'ស្វែងរកផលិតផល...' : 'Search for anything...'}
+                        placeholder={lang === 'km' ? 'ស្វែងរកមុខម្ហូប...' : 'Search menu items...'}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="w-full bg-[var(--background)] border-2 border-[var(--border)] text-[var(--foreground)] pl-14 pr-6 py-3.5 rounded-[1.5rem] text-[var(--text-lg)] font-black transition-all focus:border-[var(--accent)] focus:outline-none focus:bg-[var(--bg-elevated)] placeholder:text-[var(--text-secondary)]/40"
+                        className="w-full pos-input pl-14 pr-6 py-3.5 text-[var(--text-lg)] font-black placeholder:text-[var(--text-secondary)]/40"
                     />
                 </div>
 
@@ -104,8 +104,8 @@ export default function ProductGrid() {
                         onClick={() => setSelectedCategory(null)}
                         className={`whitespace-nowrap px-5 py-2.5 rounded-full text-[var(--text-xs)] font-black uppercase tracking-widest transition-all ${
                             selectedCategory === null
-                                ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30'
-                                : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card)] border border-[var(--border)]'
+                                ? 'bg-[var(--accent-blue)] text-white shadow-lg shadow-[var(--accent-blue)]/30'
+                                : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[#202d3b] border border-[var(--border)]'
                         }`}
                     >
                         {t('allCategories')}
@@ -119,7 +119,7 @@ export default function ProductGrid() {
                             } ${
                                 selectedCategory === cat.id
                                     ? 'bg-[var(--accent-blue)] text-white shadow-lg shadow-[var(--accent-blue)]/30'
-                                    : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-card)] border border-[var(--border)]'
+                                    : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[#202d3b] border border-[var(--border)]'
                             }`}
                         >
                             {lang === 'km' ? (cat.khmer_name || cat.name) : cat.name}
@@ -129,7 +129,7 @@ export default function ProductGrid() {
             </div>
 
             {/* Product Grid Area */}
-            <div className="flex-1 overflow-y-auto p-[var(--space-unit)] container-snap z-10 bg-[var(--background)]">
+            <div className="flex-1 overflow-y-auto p-[var(--space-unit)] container-snap z-10 bg-[var(--bg-dark)]">
                 {filteredProducts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30">
                         <Boxes size={64} className="text-[var(--text-secondary)]" />
@@ -149,15 +149,15 @@ export default function ProductGrid() {
                                     key={product.id}
                                     onClick={() => handleProductClick(product)}
                                     disabled={unavailable}
-                                    className={`group flex flex-col text-left relative overflow-hidden transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] ${
+                                    className={`group flex flex-col text-left relative overflow-hidden transition-all duration-200 hover:translate-y-[-2px] active:scale-[0.99] ${
                                         unavailable ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
                                     }`}
                                     style={{
                                         animationDelay: `${idx * 20}ms`,
                                         height: '240px',
                                         background: 'var(--bg-card)',
-                                        border: isAdding ? '2px solid var(--accent)' : '1px solid var(--border)',
-                                        borderRadius: '2rem',
+                                                border: isAdding ? '2px solid var(--accent-green)' : '1px solid var(--border)',
+                                                borderRadius: '1.2rem',
                                     }}
                                 >
                                     {/* Product Image Overlay */}
@@ -166,7 +166,7 @@ export default function ProductGrid() {
                                             <img 
                                                 src={`https://asset.localhost/${product.image_path}`}
                                                 alt={product.name}
-                                                className="w-full h-full object-cover opacity-[0.03] group-hover:opacity-10 transition-opacity duration-700"
+                                                className="w-full h-full object-cover opacity-[0.05] group-hover:opacity-12 transition-opacity duration-300"
                                             />
                                         </div>
                                     )}
@@ -176,13 +176,13 @@ export default function ProductGrid() {
                                         <div className="flex justify-between items-start mb-6">
                                             {/* Stock Badge */}
                                             <span className={`text-[var(--text-xs)] font-black uppercase tracking-[0.2em] px-2.5 py-1.5 rounded-full ${
-                                                outOfStock ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-600'
+                                                outOfStock ? 'bg-red-500/15 text-red-300' : 'bg-green-500/15 text-green-300'
                                             } border border-current/10`}>
-                                                {outOfStock ? 'SOLDOUT' : `${product.stock_quantity} IN STOCK`}
+                                                {outOfStock ? 'SOLD OUT' : `${product.stock_quantity} READY`}
                                             </span>
                                             
                                             {/* Action Pill */}
-                                            <div className="px-2 py-3 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--accent)] group-hover:text-black transition-all duration-300 shadow-xl group-hover:shadow-[var(--accent)]/20">
+                                            <div className="px-2 py-3 rounded-full bg-[#0d1721] border border-[var(--border)] flex items-center justify-center group-hover:bg-[var(--accent-green)] group-hover:text-black transition-all duration-200">
                                                 <Plus size={16} strokeWidth={3.5} className={isAdding ? 'scale-125 transition-transform' : 'group-hover:rotate-90 transition-transform duration-500'} />
                                             </div>
                                         </div>
@@ -190,17 +190,16 @@ export default function ProductGrid() {
                                         <h3 className={`font-black mt-auto mb-1 flex-1 leading-snug line-clamp-2 ${lang === 'km' ? 'khmer text-[var(--text-lg)]' : 'text-[var(--text-lg)] text-[var(--foreground)] tracking-tight'}`}>
                                             {lang === 'km' ? (product.khmer_name || product.name) : product.name}
                                         </h3>
-                                        <span className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-4 truncate opacity-60">
+                                        <span className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-4 truncate opacity-75">
                                             {lang === 'km' ? (product.category_khmer || product.category_name) : product.category_name}
                                         </span>
 
-                                        <div className="font-mono text-[var(--text-xl)] font-black text-[var(--accent)]">
+                                        <div className="font-mono text-[var(--text-xl)] font-black text-[var(--accent-green)]">
                                             {formatUsd(product.price_cents)}
                                         </div>
                                     </div>
 
-                                    {/* OLED Glow Effect */}
-                                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[var(--accent)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                                     
                                     {/* Status Overlay */}
                                     {unavailable && (

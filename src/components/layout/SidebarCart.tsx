@@ -43,20 +43,20 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
     return (
         <>
             <div
-                className="flex-shrink-0 flex flex-col min-h-0 bg-[var(--bg-card)] relative"
+                className="flex-shrink-0 flex flex-col min-h-0 bg-[#101a24] relative"
                 style={{
                     width: 'var(--sidebar-cart-width)',
                     borderLeft: '1px solid var(--border)',
-                    boxShadow: '-1px 0 20px rgba(0,0,0,0.02)',
+                    boxShadow: '-8px 0 30px rgba(2, 6, 23, 0.35)',
                 }}
             >
             {/* Header / Ticket Strip */}
-            <div className="flex-shrink-0 flex items-center justify-between px-[var(--space-unit)] py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+            <div className="flex-shrink-0 flex items-center justify-between px-[var(--space-unit)] py-4 border-b border-[var(--border)] bg-[#162230]">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--accent)]/10">
                         <Ticket size={16} className="text-[var(--accent)]" />
                     </div>
-                    <span className="font-bold text-[var(--text-base)] text-[var(--foreground)]">Order</span>
+                    <span className="font-bold text-[var(--text-base)] text-[var(--foreground)]">Current Ticket</span>
                     {items.length > 0 && (
                         <span className="text-[var(--text-xs)] font-bold px-2 py-0.5 rounded-md bg-[var(--accent)] text-white">
                             {items.reduce((s, i) => s + i.quantity, 0)}
@@ -66,7 +66,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
 
                 <div className="flex items-center gap-2">
                     {tableId && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--background)] border border-[var(--border)] text-[var(--accent)]">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0d1721] border border-[var(--border)] text-[var(--accent-blue)]">
                             <TableProperties size={12} />
                             {tableId}
                         </div>
@@ -74,7 +74,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     {tableId && (
                         <button
                             onClick={() => setIsHistoryOpen(true)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 text-[var(--text-secondary)] hover:text-white"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-blue)]/20 text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
                             title="Table order history"
                         >
                             <History size={15} />
@@ -93,7 +93,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
             </div>
 
             {/* Items List */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0 container-snap">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0 container-snap bg-[#0f1822]">
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center gap-4 opacity-40">
                         <ShoppingCart size={40} className="text-[var(--text-secondary)]" />
@@ -105,7 +105,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     items.map(item => (
                         <div
                             key={item.id}
-                            className="p-[var(--space-unit)] rounded-2xl animate-fade-in bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent)]/30 transition-colors"
+                            className="p-[var(--space-unit)] rounded-2xl animate-fade-in bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/35 transition-colors"
                         >
                             <div className="flex justify-between items-start gap-3 mb-4">
                                 <div className="flex-1 min-w-0">
@@ -116,16 +116,16 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                                         {formatUsd(item.price_at_order)}
                                     </p>
                                 </div>
-                                <span className="font-mono font-black text-[var(--text-sm)] text-[var(--accent)]">
+                                <span className="font-mono font-black text-[var(--text-sm)] text-[var(--accent-green)]">
                                     {formatUsd(item.price_at_order * item.quantity)}
                                 </span>
                             </div>
 
                             {/* Qty Controls */}
-                            <div className="flex items-center justify-between gap-1 p-1 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                            <div className="flex items-center justify-between gap-1 p-1 rounded-xl bg-[#0d1721] border border-[var(--border)]">
                                 <button
                                     onClick={() => handleQtyChange(item.id, item.quantity, -1)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-red-50 text-[var(--text-secondary)] hover:text-red-600"
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
                                 >
                                     {item.quantity <= 1 ? <Trash2 size={13} /> : <Minus size={13} />}
                                 </button>
@@ -134,7 +134,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                                 </span>
                                 <button
                                     onClick={() => handleQtyChange(item.id, item.quantity, 1)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent)]/10 text-[var(--accent)]"
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
                                 >
                                     <Plus size={13} />
                                 </button>
@@ -145,7 +145,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
             </div>
 
             {/* Checkout Footer */}
-            <div className="flex-shrink-0 p-5 bg-[var(--bg-elevated)] border-t border-[var(--border)]">
+            <div className="flex-shrink-0 p-5 bg-[#162230] border-t border-[var(--border)]">
                 <div className="space-y-2 text-[var(--text-xs)] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-6 opacity-60">
                     <div className="flex justify-between items-center">
                         <span>{t('subtotal')}</span>
@@ -168,7 +168,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                 </div>
 
                 <button
-                    className="btn-primary w-full py-4 text-sm font-black uppercase tracking-widest flex items-center justify-center shadow-lg shadow-[var(--accent)]/30"
+                    className="pos-btn-primary w-full py-4 text-sm font-black uppercase tracking-widest flex items-center justify-center"
                     disabled={isEmpty || !orderId}
                     onClick={onCheckout}
                 >

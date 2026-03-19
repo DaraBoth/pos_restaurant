@@ -46,8 +46,8 @@ interface FormFieldProps {
 function FormField({ label, value, placeholder, icon: Icon, multiline, onChange }: FormFieldProps) {
     return (
         <div className="space-y-3">
-            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#8a8a99]">
-                {Icon && <Icon size={14} className="text-[var(--accent)]" />}
+            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">
+                {Icon && <Icon size={14} className="text-[var(--accent-blue)]" />}
                 {label}
             </label>
             {multiline ? (
@@ -56,7 +56,7 @@ function FormField({ label, value, placeholder, icon: Icon, multiline, onChange 
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
                     rows={3}
-                    className="w-full bg-black border border-white/10 text-white px-5 py-4 rounded-2xl text-sm font-bold transition-all focus:border-[var(--accent)] focus:outline-none resize-none placeholder:text-white/20"
+                    className="w-full pos-input px-5 py-4 text-sm font-bold resize-none placeholder:text-[var(--text-secondary)]/55"
                 />
             ) : (
                 <input
@@ -64,7 +64,7 @@ function FormField({ label, value, placeholder, icon: Icon, multiline, onChange 
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="w-full bg-black border border-white/10 text-white px-5 py-4 rounded-2xl text-sm font-bold transition-all focus:border-[var(--accent)] focus:outline-none placeholder:text-white/20"
+                    className="w-full pos-input px-5 py-4 text-sm font-bold placeholder:text-[var(--text-secondary)]/55"
                 />
             )}
         </div>
@@ -174,16 +174,16 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
 
     return (
         <div className="max-w-6xl mx-auto animate-fade-in space-y-8 pb-12">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-[#121216] p-8 rounded-[2rem] border border-white/5">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pos-card p-8">
                 <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent)] shadow-[0_0_20px_rgba(59,130,246,0.25)]">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
                         <Building2 size={28} color="#fff" strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black tracking-tight text-white mb-1">
+                        <h1 className="text-3xl font-black tracking-tight text-[var(--foreground)] mb-1">
                             {mode === 'setup' ? 'Restaurant Setup' : 'Restaurant Settings'}
                         </h1>
-                        <p className="text-sm font-bold text-[#8a8a99] uppercase tracking-widest">
+                        <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-widest">
                             {mode === 'setup'
                                 ? 'Complete this before opening tables and orders'
                                 : 'Configuration for receipts, identity, and contact details'}
@@ -191,48 +191,51 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                     </div>
                 </div>
 
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className={`px-8 py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-3 transition-all ${
-                        saved
-                            ? 'bg-green-500/10 border border-green-500/30 text-green-400'
-                            : 'bg-[var(--accent)] text-white hover:brightness-110 shadow-[0_0_20px_rgba(59,130,246,0.25)]'
-                    }`}
-                >
-                    {saving ? <RefreshCw size={18} className="animate-spin" /> : saved ? <RefreshCw size={18} /> : <Save size={18} />}
-                    {saved ? 'Saved' : mode === 'setup' ? 'Save Information' : 'Update Settings'}
-                </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className={`px-8 py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-3 transition-all ${
+                            saved
+                                ? 'bg-green-500/15 border border-green-500/40 text-green-300'
+                                : 'pos-btn-primary'
+                        }`}
+                    >
+                        {saving ? <RefreshCw size={18} className="animate-spin" /> : saved ? <RefreshCw size={18} /> : <Save size={18} />}
+                        {saved ? 'Saved' : mode === 'setup' ? 'Save Information' : 'Update Settings'}
+                    </button>
 
-                {mode === 'setup' && (
-                    <div className="flex items-center gap-3">
+                    {mode === 'setup' && (
                         <button
                             onClick={handleFillSample}
                             type="button"
-                            className="px-5 py-3 rounded-xl border border-white/10 text-white/80 hover:text-white hover:border-white/20 transition-all font-bold text-xs uppercase tracking-widest"
+                            className="px-5 py-3 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/35 transition-all font-bold text-xs uppercase tracking-widest"
                         >
                             Fill Sample Data
                         </button>
+                    )}
+
+                    {mode === 'setup' && (
                         <button
                             onClick={onNext}
                             type="button"
                             disabled={!saved || saving}
                             className={`px-8 py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-3 transition-all ${
                                 saved && !saving
-                                    ? 'bg-green-500 text-black hover:brightness-110'
-                                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                                    ? 'bg-[var(--accent-blue)] text-white hover:brightness-110'
+                                    : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]/60 cursor-not-allowed border border-[var(--border)]'
                             }`}
                         >
                             <ArrowRight size={18} />
                             Next
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    <section className="bg-[#121216] p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group">
+                    <section className="pos-card p-8 rounded-[2rem] relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent)]/5 rounded-bl-[100px] pointer-events-none" />
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
                             Identity & Contact
@@ -240,14 +243,14 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         
                         <div className="flex flex-col md:flex-row gap-10 mb-10 pb-10 border-b border-white/5">
                             <div className="relative group/logo">
-                                <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-black border-2 border-dashed border-white/10 group-hover:border-[var(--accent)]/50 transition-all flex items-center justify-center overflow-hidden">
+                                <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-[#0d1721] border-2 border-dashed border-[var(--border)] group-hover:border-[var(--accent-blue)]/50 transition-all flex items-center justify-center overflow-hidden">
                                     {info.logo_path ? (
                                         <img src={`https://asset.localhost/${info.logo_path}`} alt="Logo" className="w-full h-full object-cover" />
                                     ) : (
-                                        <div className="text-[var(--accent)] opacity-20">LOGO</div>
+                                        <div className="text-[var(--accent-blue)] opacity-30">LOGO</div>
                                     )}
                                 </div>
-                                <label className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-[var(--accent)] text-black flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 active:scale-95 transition-all">
+                                <label className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 active:scale-95 transition-all">
                                     <ArrowRight size={18} className="-rotate-90" />
                                     <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
                                         const file = e.target.files?.[0];
@@ -271,8 +274,8 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                                 </label>
                             </div>
                             <div className="flex-1 space-y-2">
-                                <h3 className="text-xl font-black text-white">Restaurant Logo</h3>
-                                <p className="text-xs font-bold text-[#8a8a99] leading-relaxed uppercase tracking-wider">
+                                <h3 className="text-xl font-black text-[var(--foreground)]">Restaurant Logo</h3>
+                                <p className="text-xs font-bold text-[var(--text-secondary)] leading-relaxed uppercase tracking-wider">
                                     Upload a high-quality logo for receipts<br/>and the POS sidebar.
                                 </p>
                                 {info.logo_path && (
@@ -299,7 +302,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                     </section>
 
 
-                    <section className="bg-[#121216] p-8 rounded-[2rem] border border-white/5">
+                    <section className="pos-card p-8 rounded-[2rem]">
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
                             Receipt Footer
                         </h2>
@@ -315,34 +318,34 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                 </div>
 
                 <div className="lg:col-span-1">
-                    <div className="sticky top-8 bg-[#0a0a0c] p-8 rounded-[2rem] border border-white/10 shadow-2xl">
-                        <h2 className="text-[10px] font-black uppercase tracking-widest text-[#8a8a99] mb-6 flex items-center justify-between">
+                    <div className="sticky top-8 bg-[#101a24] p-8 rounded-[2rem] border border-[var(--border)] shadow-2xl">
+                        <h2 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-6 flex items-center justify-between">
                             Live Receipt Preview
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-[pulse_2s_ease-in-out_infinite]"></span>
                         </h2>
 
-                        <div className="bg-black border border-white/5 rounded-xl p-6 font-mono text-center flex flex-col items-center">
-                            <div className="w-full border-t-2 border-dashed border-white/20 mb-6" />
+                        <div className="bg-[#0d1721] border border-[var(--border)] rounded-xl p-6 font-mono text-center flex flex-col items-center">
+                            <div className="w-full border-t-2 border-dashed border-[var(--border)] mb-6" />
 
                             <div className="space-y-1.5 w-full">
-                                <p className="font-black text-lg text-white uppercase tracking-widest">{info.name || 'RESTAURANT NAME'}</p>
-                                {info.khmer_name && <p className="text-sm font-bold text-[#8a8a99] khmer">{info.khmer_name}</p>}
+                                <p className="font-black text-lg text-[var(--foreground)] uppercase tracking-widest">{info.name || 'RESTAURANT NAME'}</p>
+                                {info.khmer_name && <p className="text-sm font-bold text-[var(--text-secondary)] khmer">{info.khmer_name}</p>}
                                 <div className="mt-4 space-y-1">
-                                    {info.address && <p className="text-[10px] font-bold text-[#8a8a99] uppercase">{info.address}</p>}
-                                    {info.phone && <p className="text-[10px] font-bold text-[#8a8a99]">TEL: {info.phone}</p>}
-                                    {info.tin && <p className="text-[10px] font-bold text-[#8a8a99]">TIN: {info.tin}</p>}
+                                    {info.address && <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">{info.address}</p>}
+                                    {info.phone && <p className="text-[10px] font-bold text-[var(--text-secondary)]">TEL: {info.phone}</p>}
+                                    {info.tin && <p className="text-[10px] font-bold text-[var(--text-secondary)]">TIN: {info.tin}</p>}
                                 </div>
 
-                                <div className="w-full border-t border-dashed border-white/20 my-6" />
-                                <p className="text-[10px] font-bold text-[#8a8a99]">... ORDER LINES ...</p>
-                                <div className="w-full border-t border-dashed border-white/20 my-6" />
+                                <div className="w-full border-t border-dashed border-[var(--border)] my-6" />
+                                <p className="text-[10px] font-bold text-[var(--text-secondary)]">... ORDER LINES ...</p>
+                                <div className="w-full border-t border-dashed border-[var(--border)] my-6" />
 
                                 {(info.receipt_footer || DEFAULT.receipt_footer || '').split('\n').map((line, index) => (
                                     <p key={index} className="text-[10px] font-bold text-white/60 uppercase">{line}</p>
                                 ))}
                             </div>
 
-                            <div className="w-full border-t-2 border-dashed border-white/20 mt-6" />
+                            <div className="w-full border-t-2 border-dashed border-[var(--border)] mt-6" />
                         </div>
                     </div>
                 </div>

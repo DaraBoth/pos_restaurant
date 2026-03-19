@@ -16,30 +16,30 @@ const NAV_ITEMS = [
 
 export default function ManagementLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="h-screen w-full flex flex-row bg-[var(--background)] text-[var(--foreground)]">
+        <div className="h-screen w-full flex flex-row bg-[var(--bg-dark)] text-[var(--foreground)]">
             <SidebarNav />
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                 {/* Management Horizontal Navbar */}
-                <header className="flex-shrink-0 bg-[var(--bg-card)] border-b border-[var(--border)] relative z-20 shadow-sm overflow-x-auto container-snap">
+                <header className="flex-shrink-0 bg-[#131d27] border-b border-[var(--border)] relative z-20 shadow-sm overflow-x-auto container-snap">
                     <div className="px-[var(--space-unit)] flex items-center h-20 gap-[var(--space-unit)] min-w-max">
                         <div className="flex flex-col justify-center pr-[var(--space-unit)] border-r border-[var(--border)]">
-                            <h2 className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--accent)] leading-none mb-1.5 opacity-80">
+                            <h2 className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--accent-blue)] leading-none mb-1.5 opacity-80">
                                 Management
                             </h2>
                             <div className="flex items-center gap-2">
                                 <span className="text-[var(--text-sm)] font-black text-[var(--foreground)] whitespace-nowrap">DineOS Core</span>
-                                <span className="px-1.5 py-0.5 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] text-[8px] font-black uppercase border border-[var(--accent)]/20">V1</span>
+                                <span className="px-1.5 py-0.5 rounded-md bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-[8px] font-black uppercase border border-[var(--accent-blue)]/20">LIVE</span>
                             </div>
                         </div>
 
-                        <nav className="flex items-center gap-2 p-1 bg-[var(--background)] rounded-2xl border border-[var(--border)]">
+                        <nav className="flex items-center gap-2 p-1 bg-[#0d1721] rounded-2xl border border-[var(--border)]">
                             <SideNavItems />
                         </nav>
                     </div>
                 </header>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-[var(--space-unit)] lg:p-[calc(var(--space-unit)*1.5)] min-w-0 container-snap relative bg-[var(--background)]">
+                <main className="flex-1 overflow-y-auto p-[var(--space-unit)] lg:p-[calc(var(--space-unit)*1.5)] min-w-0 container-snap relative bg-[var(--bg-dark)]">
                     <div className="relative z-10 max-w-7xl mx-auto">
                         {children}
                     </div>
@@ -62,8 +62,8 @@ function SideNavItems() {
                         href={href}
                         className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-[var(--text-xs)] font-black uppercase tracking-[0.1em] transition-all group whitespace-nowrap active:scale-95 ${
                             active 
-                                ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30' 
-                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-dark)] hover:text-[var(--foreground)]'
+                                ? 'bg-[var(--accent-blue)] text-white shadow-lg shadow-[var(--accent-blue)]/30' 
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--foreground)]'
                         }`}
                     >
                         <Icon 

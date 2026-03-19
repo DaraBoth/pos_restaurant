@@ -94,37 +94,37 @@ export default function TablesPage() {
     const occupiedCount = tableData.filter(t => t.status === 'busy').length;
 
     return (
-        <div className="h-full overflow-y-auto bg-[var(--background)] flex flex-col items-center">
+        <div className="h-full overflow-y-auto bg-[var(--bg-dark)] flex flex-col items-center">
             <div className="w-full max-w-6xl px-[var(--space-unit)] py-10 space-y-8 animate-fade-in">
 
                 {/* Header & Stats */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-[var(--bg-card)] p-[var(--space-unit)] rounded-[2.5rem] border border-[var(--border)] shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pos-card p-[var(--space-unit)]">
                     <div>
                         <div className="flex items-center gap-4 mb-2">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent)]/10">
+                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
                                 <TableProperties size={28} className="text-[var(--accent)]" strokeWidth={2.5} />
                             </div>
-                            <h1 className="text-[var(--text-4xl)] font-black text-[var(--foreground)] tracking-tight uppercase">Floor Plan</h1>
+                            <h1 className="text-[var(--text-4xl)] font-black text-[var(--foreground)] tracking-tight uppercase">Service Floor</h1>
                         </div>
                         <p className="text-[var(--text-secondary)] font-medium md:ml-16 text-[var(--text-sm)]">
-                            Select a table to start or continue an active order.
+                            Select table to open or continue ticket.
                         </p>
                     </div>
 
                     <div className="flex gap-4">
                         <div className="px-5 py-4 rounded-2xl min-w-[120px] border border-[var(--border)] bg-[var(--bg-elevated)]">
-                            <p className="text-[var(--text-3xl)] font-black font-mono text-green-600 tracking-tighter leading-none">{freeCount}</p>
+                            <p className="text-[var(--text-3xl)] font-black font-mono text-[var(--accent-green)] tracking-tighter leading-none">{freeCount}</p>
                             <p className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1.5 opacity-60">Free</p>
                         </div>
                         <div className="px-5 py-4 rounded-2xl min-w-[120px] border border-[var(--border)] bg-[var(--bg-elevated)]">
-                            <p className="text-[var(--text-3xl)] font-black font-mono text-[var(--accent)] tracking-tighter leading-none">{occupiedCount}</p>
-                            <p className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1.5 opacity-60">Occupied</p>
+                            <p className="text-[var(--text-3xl)] font-black font-mono text-[var(--accent-blue)] tracking-tighter leading-none">{occupiedCount}</p>
+                            <p className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1.5 opacity-60">Busy</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Table Grid */}
-                <div className="bg-[var(--bg-card)] p-[var(--space-unit)] rounded-[2.5rem] border border-[var(--border)] shadow-sm">
+                <div className="pos-card p-[var(--space-unit)]">
                     {loading ? (
                         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-[calc(var(--space-unit)*0.75)]">
                             {Array.from({ length: 16 }).map((_, i) => (
@@ -138,29 +138,28 @@ export default function TablesPage() {
                                 const isFree = table.status === 'free';
 
                                 let styleProps = {
-                                    bg: 'rgba(255,255,255,0.02)',
-                                    border: 'rgba(255,255,255,0.05)',
+                                    bg: '#16212d',
+                                    border: 'rgba(148, 163, 184, 0.25)',
                                     text: 'var(--text-secondary)'
                                 };
 
                                 if (isCurrent) {
                                     styleProps = {
-                                        bg: 'var(--accent)',
-                                        border: 'transparent',
+                                        bg: 'rgba(14, 165, 233, 0.2)',
+                                        border: 'rgba(14, 165, 233, 0.65)',
                                         text: '#ffffff'
                                     };
                                 } else if (!isFree) {
                                     styleProps = {
-                                        bg: 'rgba(59, 130, 246, 0.08)', // Soft blue for occupied
-                                        border: 'rgba(59, 130, 246, 0.2)',
-                                        text: '#2563eb'
+                                        bg: 'rgba(14, 165, 233, 0.12)',
+                                        border: 'rgba(14, 165, 233, 0.45)',
+                                        text: '#7dd3fc'
                                     };
                                 } else {
-                                    // Free table
                                     styleProps = {
-                                        bg: 'rgba(16, 185, 129, 0.06)',
-                                        border: 'rgba(16, 185, 129, 0.15)',
-                                        text: '#059669' // Green-600
+                                        bg: 'rgba(34, 197, 94, 0.1)',
+                                        border: 'rgba(34, 197, 94, 0.35)',
+                                        text: '#86efac'
                                     };
                                 }
 
@@ -201,7 +200,7 @@ export default function TablesPage() {
                                 <button
                                     onClick={handleAddTable}
                                     disabled={!customTable.trim()}
-                                    className="w-full py-3 bg-[var(--bg-card)] hover:bg-[var(--accent)] hover:text-white font-black text-[var(--text-xs)] uppercase tracking-widest transition-all border-t border-[var(--border)] group-hover:border-[var(--accent)]/30"
+                                    className="w-full py-3 bg-[var(--bg-card)] hover:bg-[var(--accent-green)] hover:text-white font-black text-[var(--text-xs)] uppercase tracking-widest transition-all border-t border-[var(--border)] group-hover:border-[var(--accent-green)]/30"
                                 >
                                     CREATE
                                 </button>

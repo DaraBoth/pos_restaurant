@@ -15,24 +15,21 @@
 }
 
 :root {
-  /* Premium Solar Light Theme - Clean Slate & Vibrant Orange */
-  --background: #ffffff; 
-  --foreground: #0f172a; /* Slate-900 */
+  --background: #0c1219;
+  --foreground: #e6edf5;
 
-  /* Card / Layering */
-  --bg-card: #f8fafc; /* Slate-50 */
-  --bg-elevated: #ffffff;
-  --bg-dark: #f1f5f9; /* Slate-100 */
+  --bg-card: #131d27;
+  --bg-elevated: #192532;
+  --bg-dark: #0f1822;
 
-  /* Professional Accents */
-  --accent: #f97316; /* Orange-500 */
-  --accent-blue: #3b82f6; /* Blue-500 */
-  --accent-green: #10b981; /* Emerald-500 */
-  --accent-red: #ef4444; 
-  --accent-pink: #ec4899; 
-  
-  --text-secondary: #64748b; /* Slate-500 */
-  --border: rgba(15, 23, 42, 0.08);
+  --accent: #16a34a;
+  --accent-blue: #0ea5e9;
+  --accent-green: #22c55e;
+  --accent-red: #ef4444;
+  --accent-pink: #ec4899;
+
+  --text-secondary: #95a6ba;
+  --border: rgba(148, 163, 184, 0.18);
 
   /* Fluid Typography & Spacing */
   --text-xs: clamp(0.7rem, 0.65rem + 0.25vw, 0.75rem);
@@ -50,7 +47,10 @@
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background:
+    radial-gradient(1200px 600px at -10% -20%, rgba(14, 165, 233, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 110% -10%, rgba(34, 197, 94, 0.08), transparent 50%),
+    var(--background);
   font-family: var(--font-sans);
   font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
@@ -83,29 +83,53 @@ h6 { font-family: var(--font-sans); letter-spacing: -0.01em; }
 }
 
 /* Base Primary Button - Clean & Professional */
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
+.btn-primary,
+.pos-btn,
+.pos-btn-primary {
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  color: #f8fffb;
   font-family: var(--font-sans);
-  font-weight: 600;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-weight: 800;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  box-shadow: 0 8px 22px rgba(22, 163, 74, 0.28);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: #ea580c; /* Darker orange on hover */
+.btn-primary:hover:not(:disabled),
+.pos-btn:hover:not(:disabled),
+.pos-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
 }
 
-.btn-primary:active:not(:disabled) {
+.btn-primary:active:not(:disabled),
+.pos-btn:active:not(:disabled),
+.pos-btn-primary:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.btn-primary:disabled {
+.btn-primary:disabled,
+.pos-btn:disabled,
+.pos-btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+.pos-btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  font-weight: 800;
+  transition: all 0.15s ease;
+}
+
+.pos-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(14, 165, 233, 0.45);
+  background: #1e2c3a;
 }
 
 /* Inputs */
@@ -117,10 +141,50 @@ h6 { font-family: var(--font-sans); letter-spacing: -0.01em; }
   transition: all 0.2s ease;
 }
 
+.pos-input {
+  background: #0d1721;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  border-radius: 0.875rem;
+  transition: all 0.2s ease;
+}
+
 .input-bento:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.pos-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.pos-shell {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+}
+
+.pos-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.pos-card-elevated {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.pos-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+  font-weight: 800;
 }
 
 /* Hide scrollbars for aesthetic */
@@ -134,12 +198,12 @@ h6 { font-family: var(--font-sans); letter-spacing: -0.01em; }
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(148, 163, 184, 0.35);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(148, 163, 184, 0.55);
 }
 
 /* Khmer font specific fix */
