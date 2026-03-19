@@ -10,21 +10,19 @@ import {
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-type StatusFilter = 'all' | 'open' | 'completed' | 'void' | 'cancelled';
+type StatusFilter = 'all' | 'open' | 'completed' | 'void';
 
 const STATUS_TABS: { id: StatusFilter; label: string }[] = [
     { id: 'all', label: 'All' },
     { id: 'open', label: 'Open' },
     { id: 'completed', label: 'Completed' },
     { id: 'void', label: 'Void' },
-    { id: 'cancelled', label: 'Cancelled' },
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
     completed: { bg: 'rgba(34,197,94,0.1)', text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
     open:      { bg: 'rgba(249,115,22,0.1)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
     void:      { bg: 'rgba(239,68,68,0.1)', text: '#ef4444', border: 'rgba(239,68,68,0.25)' },
-    cancelled: { bg: 'rgba(107,114,128,0.1)', text: '#9ca3af', border: 'rgba(107,114,128,0.25)' },
 };
 
 export default function HistoryPage() {
@@ -166,7 +164,7 @@ export default function HistoryPage() {
                     { label: 'Revenue', value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
                     { label: 'Open', value: String(orders.filter(o => o.status === 'open').length), accent: '#f97316' },
                     { label: 'Completed', value: String(completed.length), accent: '#22c55e' },
-                    { label: 'Voided', value: String(orders.filter(o => o.status === 'void').length), accent: '#ef4444' },
+                    { label: 'Void', value: String(orders.filter(o => o.status === 'void').length), accent: '#ef4444' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
