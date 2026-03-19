@@ -1,10 +1,10 @@
 ﻿'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { login, getSetupStatus } from '@/lib/tauri-commands';
-import { ArrowRight, Lock, User, Globe, ChefHat } from 'lucide-react';
+import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle } from 'lucide-react';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('admin');
@@ -14,6 +14,15 @@ export default function LoginPage() {
     const { setUser } = useAuth();
     const { t, lang, setLang } = useLanguage();
     const router = useRouter();
+
+    // Pre-warm Tauri IPC bridge and SQLite pool as soon as login page mounts.
+    // This runs in the background while the user types their credentials,
+    // so subsequent pages (floor plan, kitchen) don't face the cold-start delay.
+    useEffect(() => {
+        import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('get_restaurant').catch(() => {/* ignore errors */});
+        }).catch(() => {/* not in Tauri env */});
+    }, []);
 
     async function handleLogin(e: React.FormEvent) {
         e.preventDefault();
@@ -49,7 +58,7 @@ export default function LoginPage() {
                 className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all z-10 bg-[var(--bg-card)] border border-[var(--border)] hover:bg-[var(--bg-elevated)]"
             >
                 <Globe size={14} className="text-[var(--accent-blue)]"/>
-                {lang === 'en' ? 'áž—áž¶ážŸáž¶ážáŸ’áž˜áŸ‚ážš' : 'English'}
+                {lang === 'en' ? 'ភាសាខ្មែរ' : 'English'}
             </button>
 
             {/* Main Login Container */}
@@ -64,7 +73,7 @@ export default function LoginPage() {
                     </div>
                     <h1 className="text-2xl font-bold tracking-tight text-white">DineOS</h1>
                     <p className="text-xs mt-1.5 font-medium text-[var(--text-secondary)]">
-                        {lang === 'km' ? 'áž”áŸ’ážšáž–áŸáž“áŸ’áž’áž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„áž—áŸ„áž‡áž“áž¸áž™ážŠáŸ’áž‹áž¶áž“' : 'Restaurant Management System'}
+                        {lang === 'km' ? 'ប្រព័ន្ធគ្រប់គ្រងភោជនីយដ្ឋាន' : 'Restaurant Management System'}
                     </p>
                 </div>
 
@@ -103,7 +112,7 @@ export default function LoginPage() {
                                     onChange={e => setPassword(e.target.value)}
                                     required
                                     className="pos-input w-full pl-10 pr-4 py-2.5 text-sm"
-                                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                                    placeholder="••••••••"
                                     autoComplete="current-password"
                                 />
                             </div>
@@ -111,7 +120,7 @@ export default function LoginPage() {
 
                         {error && (
                             <div className="rounded-xl px-3 py-2.5 text-xs font-medium flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400">
-                                <span>âš </span> {error}
+                                <AlertTriangle size={13} strokeWidth={2.5} /> {error}
                             </div>
                         )}
 

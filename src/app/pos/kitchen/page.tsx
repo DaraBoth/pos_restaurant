@@ -207,10 +207,16 @@ export default function KitchenPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
                 {loading && orders.length === 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <div key={i} className="rounded-2xl animate-pulse bg-[var(--bg-elevated)] h-36" />
-                        ))}
+                    <div className="flex flex-col items-center justify-center h-64 gap-4 opacity-60">
+                        <div className="w-10 h-10 border-2 border-orange-500/20 border-t-orange-400 rounded-full animate-spin" />
+                        <div className="text-center">
+                            <p className="text-sm font-bold text-[var(--text-secondary)]">
+                                {lang === 'km' ? 'ភ្ជាប់ទៅផ្ទះបាយ...' : 'Connecting to kitchen...'}
+                            </p>
+                            <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40 mt-1 uppercase tracking-widest">
+                                {lang === 'km' ? 'ត្រូវការពេលបន្តិច' : 'First load may take a moment'}
+                            </p>
+                        </div>
                     </div>
                 ) : aggregated.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-3 opacity-40">

@@ -36,7 +36,7 @@ export default function SidebarDrawer({ isOpen, onClose, title, subtitle, childr
 
       {/* Drawer */}
       <div 
-        className={`relative w-full max-w-md bg-[#181a20] border-l border-white/10 shadow-2xl transition-transform duration-300 ease-out transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`relative w-full max-w-lg bg-[#181a20] border-l border-white/10 shadow-2xl transition-transform duration-300 ease-out transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
         onTransitionEnd={handleAnimationEnd}
       >
         <div className="flex flex-col h-full">

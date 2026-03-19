@@ -112,105 +112,77 @@ export default function HistoryPage() {
     const totalRevenueCents = completed.reduce((s, o) => s + o.total_usd, 0);
 
     return (
-        <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 animate-fade-in">
-            {/* ── Header & Filters ── */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                    <div
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-[var(--accent)]/10"
-                        style={{ background: 'linear-gradient(135deg, var(--accent), #b45309)' }}
-                    >
-                        <History size={24} color="#000" strokeWidth={2.5} />
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
+            {/* ── Header ── */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--accent)]/15 border border-[var(--accent)]/30">
+                        <History size={18} className="text-[var(--accent)]" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black tracking-tight">Order History</h1>
-                        <p className="text-sm font-bold uppercase tracking-widest opacity-40 mt-0.5">
-                            Real-time Transaction Audit
-                        </p>
+                        <h1 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">Order History</h1>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">Transaction Audit</p>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2 bg-[var(--bg-card)] px-4 py-2.5 rounded-2xl border border-[var(--border)] shadow-sm">
-                        <Calendar size={16} className="text-[var(--accent)]" />
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 bg-[var(--bg-card)] px-3 py-2 rounded-xl border border-[var(--border)]">
+                        <Calendar size={14} className="text-[var(--accent)]" />
                         <input 
                             type="date" 
                             value={startDate} 
                             onChange={e => setStartDate(e.target.value)} 
-                            className="bg-transparent text-sm font-black outline-none border-none text-[var(--foreground)]"
+                            className="bg-transparent text-xs font-black outline-none border-none text-[var(--foreground)]"
                         />
-                        <span className="text-[var(--text-secondary)] font-black text-[10px] mx-1">TO</span>
+                        <span className="text-[var(--text-secondary)] font-black text-[10px] mx-0.5">—</span>
                         <input 
                             type="date" 
                             value={endDate} 
                             onChange={e => setEndDate(e.target.value)} 
-                            className="bg-transparent text-sm font-black outline-none border-none text-[var(--foreground)]"
+                            className="bg-transparent text-xs font-black outline-none border-none text-[var(--foreground)]"
                         />
                     </div>
 
                     <button
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest shadow-sm"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
                     >
-                        <Download size={16} />
-                        Export Excel
+                        <Download size={14} />
+                        Export
                     </button>
 
                     <button
                         onClick={loadOrders}
-                        className="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-black transition-all group"
-                        title="Refresh Data"
+                        className="p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-black transition-all group"
                     >
-                        <RefreshCw size={18} className={`${loading ? 'animate-spin' : 'group-active:rotate-180 transition-transform'}`} />
+                        <RefreshCw size={15} className={loading ? 'animate-spin' : 'group-active:rotate-180 transition-transform'} />
                     </button>
                 </div>
             </div>
 
-            {/* ── Summary Stats ── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ── Summary Stat Pills ── */}
+            <div className="flex flex-wrap gap-3">
                 {[
-                    {
-                        label: 'Total Revenue', value: formatUsd(totalRevenueCents),
-                        sub: `${completed.length} completed transactions`,
-                        accent: 'var(--accent)',
-                    },
-                    {
-                        label: 'Open Orders', value: orders.filter(o => o.status === 'open').length.toString(),
-                        sub: 'Awaiting completion',
-                        accent: '#f97316',
-                    },
-                    {
-                        label: 'Voided', value: orders.filter(o => o.status === 'void').length.toString(),
-                        sub: 'Not included in revenue',
-                        accent: '#ef4444',
-                    },
-                ].map(card => (
-                    <div
-                        key={card.label}
-                        className="bg-[var(--bg-card)] border border-[var(--border)] rounded-[2rem] p-8 shadow-xl relative overflow-hidden group"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/[0.02] rounded-bl-[100px] pointer-events-none transition-all group-hover:scale-110" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-3 opacity-40">
-                            {card.label}
-                        </p>
-                        <p className="text-4xl font-black font-mono tracking-tighter" style={{ color: card.accent }}>
-                            {card.value}
-                        </p>
-                        <p className="text-xs font-bold mt-2 opacity-30">
-                            {card.sub}
-                        </p>
+                    { label: 'Revenue', value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
+                    { label: 'Open', value: String(orders.filter(o => o.status === 'open').length), accent: '#f97316' },
+                    { label: 'Completed', value: String(completed.length), accent: '#22c55e' },
+                    { label: 'Voided', value: String(orders.filter(o => o.status === 'void').length), accent: '#ef4444' },
+                ].map(pill => (
+                    <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
+                        <span className="text-sm font-black font-mono" style={{ color: pill.accent }}>{pill.value}</span>
                     </div>
                 ))}
             </div>
 
             {/* ── Tabs & Content ── */}
-            <div className="space-y-4">
+            <div className="space-y-3">
                 <div className="flex gap-2 overflow-x-auto pb-2 container-snap">
                     {STATUS_TABS.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setFilter(tab.id)}
-                            className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${filter === tab.id
+                            className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${filter === tab.id
                                 ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
                                 : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
                                 }`}

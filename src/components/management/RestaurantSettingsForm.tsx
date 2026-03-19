@@ -173,20 +173,20 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
     }
 
     return (
-        <div className="max-w-6xl mx-auto animate-fade-in space-y-8 pb-12">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pos-card p-8">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
-                        <Building2 size={28} color="#fff" strokeWidth={2.5} />
+        <div className="max-w-6xl mx-auto animate-fade-in space-y-6 pb-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pos-card p-5">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
+                        <Building2 size={18} className="text-[var(--accent-blue)]" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black tracking-tight text-[var(--foreground)] mb-1">
+                        <h1 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">
                             {mode === 'setup' ? 'Restaurant Setup' : 'Restaurant Settings'}
                         </h1>
-                        <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-widest">
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">
                             {mode === 'setup'
-                                ? 'Complete this before opening tables and orders'
-                                : 'Configuration for receipts, identity, and contact details'}
+                                ? 'Complete before opening tables'
+                                : 'Receipts, identity & contact'}
                         </p>
                     </div>
                 </div>

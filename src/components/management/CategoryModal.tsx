@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { Category, createCategory, updateCategory } from '@/lib/tauri-commands';
-import { X, Save, Layers } from 'lucide-react';
-import useOverlayBehavior from '@/hooks/useOverlayBehavior';
+import { Save } from 'lucide-react';
+import SidebarDrawer from './SidebarDrawer';
 
 interface CategoryModalProps {
     isOpen: boolean;
@@ -26,8 +26,6 @@ export default function CategoryModal({ isOpen, onClose, onSave, category }: Cat
         }
     }, [category, isOpen]);
 
-    useOverlayBehavior(isOpen, onClose);
-
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
@@ -47,73 +45,59 @@ export default function CategoryModal({ isOpen, onClose, onSave, category }: Cat
         }
     }
 
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center pl-[100px] lg:pl-[280px] p-4 bg-black/60 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && onClose()}>
-            <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col border border-[var(--border)] animate-fade-in">
-                {/* Header */}
-                <div className="flex items-center justify-between px-8 py-6 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
-                            <Layers size={20} className="text-[var(--accent)]" />
-                        </div>
-                        <h2 className="text-xl font-bold text-white">
-                            {category ? 'Edit Category' : 'New Category'}
-                        </h2>
-                    </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 text-[#8a8a99] transition-colors">
-                        <X size={20} />
-                    </button>
+        <SidebarDrawer
+            isOpen={isOpen}
+            onClose={onClose}
+            title={category ? 'Edit Category' : 'New Category'}
+            subtitle={category ? `Editing: ${category.name}` : 'Create a menu category'}
+        >
+            <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Category Name (EN)</label>
+                    <input
+                        required
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium"
+                        placeholder="e.g. Beverages"
+                    />
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Category Name (EN)</label>
-                            <input
-                                required
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium"
-                                placeholder="e.g. Beverages"
-                            />
-                        </div>
+                <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Category Name (KH)</label>
+                    <input
+                        value={khmerName}
+                        onChange={e => setKhmerName(e.target.value)}
+                        className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all khmer"
+                        placeholder="áž—áŸážŸáž‡áŸ’áž‡áŸˆ"
+                    />
+                </div>
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99] ml-1">Category Name (KH)</label>
-                            <input
-                                value={khmerName}
-                                onChange={e => setKhmerName(e.target.value)}
-                                className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all khmer"
-                                placeholder="ភេសជ្ជៈ"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-4 pt-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-3 rounded-2xl text-sm font-bold text-[#8a8a99] hover:text-white transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-8 py-3 rounded-2xl bg-[var(--accent)] text-black font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-                        >
-                            {loading ? (
-                                <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                            ) : (
-                                <Save size={18} />
-                            )}
-                            {category ? 'Save Changes' : 'Create Category'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 py-3 rounded-2xl text-sm font-bold text-[#8a8a99] hover:text-white border border-white/5 hover:border-white/20 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 py-3 rounded-2xl bg-[var(--accent)] text-black font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                        {loading ? (
+                            <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                        ) : (
+                            <Save size={18} />
+                        )}
+                        {category ? 'Save Changes' : 'Create Category'}
+                    </button>
+                </div>
+            </form>
+        </SidebarDrawer>
     );
 }
+
+
