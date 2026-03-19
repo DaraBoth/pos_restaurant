@@ -1,110 +1,55 @@
-'use client';
+﻿'use client';
 import Link from 'next/link';
-import { Package, Users, RefreshCw, ClipboardList, Building2, ArrowRight } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Package, Users, RefreshCw, ClipboardList, Building2, ArrowRight, TrendingUp } from 'lucide-react';
 
 const QUICK_LINKS = [
-    { 
-        href: '/management/products', 
-        label: 'Products', 
-        desc: 'Manage menu items, prices, and stock levels.', 
-        icon: Package, 
-        color: '#f97316' // Orange
-    },
-    { 
-        href: '/management/categories', 
-        label: 'Categories', 
-        desc: 'Organize products into logical groups.', 
-        icon: Building2, 
-        color: '#fb923c' // Light Orange
-    },
-    { 
-        href: '/management/users', 
-        label: 'Staff', 
-        desc: 'Manage staff accounts, credentials, and access levels.', 
-        icon: Users, 
-        color: '#fbbf24' // Amber
-    },
-    { 
-        href: '/management/exchange-rate', 
-        label: 'Exchange', 
-        desc: 'Update the live USD ↔ KHR calculation rate.', 
-        icon: RefreshCw, 
-        color: '#84cc16' // Lime
-    },
-    { 
-        href: '/management/orders', 
-        label: 'Orders', 
-        desc: 'Audit past receipts, refunds, and revenue totals.', 
-        icon: ClipboardList, 
-        color: '#0ea5e9' // Ocean Blue
-    },
-    { 
-        href: '/management/settings', 
-        label: 'Settings', 
-        desc: 'Configure restaurant name, receipt headers, and taxes.', 
-        icon: Building2, 
-        color: '#f43f5e' // Coral/Rose
-    },
+    { href: '/management/analytics', labelEn: 'Analytics',    labelKm: 'ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ',       descEn: 'Revenue, orders, and earnings reports.', descKm: 'áž…áŸ†ážŽáž¼áž›, áž”áž‰áŸ’áž‡áž¶áž‘áž·áž‰, áž“áž·áž„ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ', icon: TrendingUp, color: '#22c55e' },
+    { href: '/management/products',  labelEn: 'Products',     labelKm: 'áž•áž›áž·ážáž•áž›',          descEn: 'Menu items, pricing, and stock.', descKm: 'áž˜áž»ážáž˜áŸ’áž áž¼áž”, ážáž˜áŸ’áž›áŸƒ, áž“áž·áž„ážŸáŸ’ážáž»áž€', icon: Package, color: '#0ea5e9' },
+    { href: '/management/users',     labelEn: 'Staff',        labelKm: 'áž–áž“áž€áŸ’áž',            descEn: 'Staff accounts and permissions.', descKm: 'áž‚ážŽáž“áž¸áž”áž»áž‚áŸ’áž‚áž›áž·áž€', icon: Users, color: '#a78bfa' },
+    { href: '/management/exchange-rate', labelEn: 'Exchange Rate', labelKm: 'áž¢ážáŸ’ážšáž¶',      descEn: 'USD â†” KHR conversion rate.', descKm: 'áž¢ážáŸ’ážšáž¶áž”áŸ’ážáž¼ážšážšáž¼áž”áž·áž™áž”áŸážŽáŸ’ážŽ', icon: RefreshCw, color: '#fbbf24' },
+    { href: '/management/orders',    labelEn: 'Order History', labelKm: 'áž”áŸ’ážšážœážáŸ’ážáž·áž€áž¶ážšáž›áž€áŸ‹', descEn: 'Past receipts and exported reports.', descKm: 'ážœáž·áž€áŸ’áž€áž™áž”ážáŸ’ážš, áž“áž·áž„ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ', icon: ClipboardList, color: '#f97316' },
+    { href: '/management/settings',  labelEn: 'Settings',     labelKm: 'áž€áž¶ážšáž€áŸ†ážŽážáŸ‹',        descEn: 'Restaurant info, receipt, taxes.', descKm: 'áž–áŸážáŸŒáž˜áž¶áž“áž—áŸ„áž‡áž“áž¸áž™ážŠáŸ’áž‹áž¶áž“', icon: Building2, color: '#f43f5e' },
 ];
 
 export default function ManagementDashboard() {
+    const { lang } = useLanguage();
+
     return (
         <div className="animate-fade-in">
-            {/* Header */}
-            <div className="mb-[var(--space-unit)]">
-                <h1 className="text-[var(--text-4xl)] font-black tracking-tight mb-2 text-[var(--foreground)]">Back Office</h1>
-                <p className="text-[var(--text-secondary)] font-bold uppercase tracking-[0.2em] text-[var(--text-xs)] opacity-60">
-                    Restaurant Operations & Control Center
+            <div className="mb-4">
+                <h1 className="text-base font-black text-[var(--foreground)] mb-0.5">
+                    {lang === 'km' ? 'áž•áŸ’áž‘áž¶áŸ†áž„áž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„' : 'Management'}
+                </h1>
+                <p className="text-xs text-[var(--text-secondary)]">
+                    {lang === 'km' ? 'áž€áž¶ážšáž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„áž”áŸ’ážšážáž·áž”ážáŸ’ážáž·áž€áž¶ážšáž—áŸ„áž‡áž“áž¸áž™ážŠáŸ’áž‹áž¶áž“' : 'Manage your restaurant operations'}
                 </p>
             </div>
 
-            {/* Bento Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[var(--space-unit)]">
-                {QUICK_LINKS.map(({ href, label, desc, icon: Icon, color }) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {QUICK_LINKS.map(({ href, labelEn, labelKm, descEn, descKm, icon: Icon, color }) => (
                     <Link
                         key={href}
                         href={href}
-                        className="group flex flex-col p-[var(--space-unit)] rounded-[1.1rem] transition-all relative overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent-blue)]/35 hover:shadow-2xl hover:shadow-[var(--accent-blue)]/10 hover:-translate-y-1"
+                        className="group flex flex-col p-3.5 rounded-xl transition-all bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent-blue)]/35 hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
                     >
-                        {/* Top Context */}
-                        <div className="flex items-start justify-between mb-10 relative z-10">
+                        <div className="flex items-start justify-between mb-3">
                             <div
-                                className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
-                                style={{ 
-                                    background: `color-mix(in srgb, ${color} 10%, #fff)`, 
-                                    border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` 
-                                }}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                                style={{ background: `${color}18`, border: `1px solid ${color}30` }}
                             >
-                                <Icon size={24} style={{ color }} strokeWidth={2.5} />
+                                <Icon size={18} style={{ color }} strokeWidth={2} />
                             </div>
-                            
-                            <div 
-                                className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-elevated)] border border-[var(--border)] transition-colors group-hover:bg-[var(--accent-blue)] group-hover:text-white"
-                            >
-                                <ArrowRight size={18} className="text-[var(--text-secondary)] group-hover:text-white transition-colors" />
-                            </div>
+                            <ArrowRight size={14} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-blue)] transition-colors mt-1" />
                         </div>
-
-                        {/* Text Content */}
-                        <div className="mt-auto relative z-10">
-                            <h2 className="text-[var(--text-xl)] font-black text-[var(--foreground)] mb-2">
-                                {label}
-                            </h2>
-                            <p className="text-[var(--text-sm)] font-medium text-[var(--text-secondary)] leading-relaxed">
-                                {desc}
-                            </p>
-                        </div>
+                        <h2 className={`text-sm font-bold text-[var(--foreground)] mb-1 ${lang === 'km' ? 'khmer' : ''}`}>
+                            {lang === 'km' ? labelKm : labelEn}
+                        </h2>
+                        <p className={`text-xs text-[var(--text-secondary)] leading-snug line-clamp-2 ${lang === 'km' ? 'khmer' : ''}`}>
+                            {lang === 'km' ? descKm : descEn}
+                        </p>
                     </Link>
                 ))}
-            </div>
-            
-            {/* System Status Pill */}
-            <div className="mt-12 inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] shadow-sm">
-                <div className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Services Online</span>
             </div>
         </div>
     );

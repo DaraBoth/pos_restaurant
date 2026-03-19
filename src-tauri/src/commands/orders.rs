@@ -1,6 +1,25 @@
 use tauri::State;
 use sqlx::SqlitePool;
 use crate::models::{Order, OrderItem, PaymentInput};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct RevenueSummary {
+    pub today_usd: i64,
+    pub today_orders: i64,
+    pub month_usd: i64,
+    pub month_orders: i64,
+    pub year_usd: i64,
+    pub year_orders: i64,
+    pub open_orders: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct RevenueByDay {
+    pub date: String,
+    pub total_usd: i64,
+    pub order_count: i64,
+}
 
 /// GDT/NBC KHR rounding: if decimal part > 0.5, round up; otherwise round down (truncate)
 fn round_khr(usd_cents: i64, rate: f64) -> i64 {
@@ -56,7 +75,7 @@ pub async fn add_order_item(
     note: Option<String>,
     pool: State<'_, SqlitePool>,
 ) -> Result<OrderItem, String> {
-    // Fetch product price
+    // Fetch product data first
     let (price_cents, p_name, p_khmer): (i64, String, Option<String>) = sqlx::query_as(
         "SELECT price_cents, name, khmer_name FROM products WHERE id = ? AND is_deleted = 0"
     )
@@ -65,6 +84,40 @@ pub async fn add_order_item(
     .await
     .map_err(|e| format!("Product not found: {}", e))?;
 
+    // Check if same product already exists in this order → increment quantity
+    let existing: Option<(String, i64)> = sqlx::query_as(
+        "SELECT id, quantity FROM order_items WHERE order_id = ? AND product_id = ? AND is_deleted = 0"
+    )
+    .bind(&order_id)
+    .bind(&product_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    if let Some((existing_id, current_qty)) = existing {
+        let new_qty = current_qty + quantity;
+        sqlx::query("UPDATE order_items SET quantity = ? WHERE id = ?")
+            .bind(new_qty)
+            .bind(&existing_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| format!("Database error: {}", e))?;
+
+        recalculate_order_totals(&order_id, pool.inner()).await?;
+
+        return Ok(OrderItem {
+            id: existing_id,
+            order_id,
+            product_id,
+            quantity: new_qty,
+            price_at_order: price_cents,
+            note,
+            product_name: Some(p_name),
+            product_khmer: p_khmer,
+        });
+    }
+
+    // Create new order item
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note) VALUES (?, ?, ?, ?, ?, ?)"
@@ -79,7 +132,6 @@ pub async fn add_order_item(
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    // Update order totals
     recalculate_order_totals(&order_id, pool.inner()).await?;
 
     Ok(OrderItem {
@@ -400,4 +452,49 @@ async fn recalculate_order_totals(order_id: &str, pool: &SqlitePool) -> Result<(
     .map_err(|e| format!("Update totals error: {}", e))?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_revenue_summary(pool: State<'_, SqlitePool>) -> Result<RevenueSummary, String> {
+    let (today_usd, today_orders): (i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND date(created_at)=date('now')"
+    ).fetch_one(pool.inner()).await.map_err(|e| format!("DB error: {}", e))?;
+
+    let (month_usd, month_orders): (i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND strftime('%Y-%m',created_at)=strftime('%Y-%m','now')"
+    ).fetch_one(pool.inner()).await.map_err(|e| format!("DB error: {}", e))?;
+
+    let (year_usd, year_orders): (i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND strftime('%Y',created_at)=strftime('%Y','now')"
+    ).fetch_one(pool.inner()).await.map_err(|e| format!("DB error: {}", e))?;
+
+    let (open_orders,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM orders WHERE status='open' AND is_deleted=0"
+    ).fetch_one(pool.inner()).await.map_err(|e| format!("DB error: {}", e))?;
+
+    Ok(RevenueSummary { today_usd, today_orders, month_usd, month_orders, year_usd, year_orders, open_orders })
+}
+
+#[tauri::command]
+pub async fn get_revenue_by_period(period: String, pool: State<'_, SqlitePool>) -> Result<Vec<RevenueByDay>, String> {
+    let date_filter = match period.as_str() {
+        "week"    => "created_at >= datetime('now','-7 days')",
+        "3months" => "created_at >= datetime('now','-3 months')",
+        "year"    => "strftime('%Y',created_at)=strftime('%Y','now')",
+        _         => "strftime('%Y-%m',created_at)=strftime('%Y-%m','now')",
+    };
+
+    let query = format!(
+        "SELECT date(created_at) as date, COALESCE(SUM(total_usd),0) as total_usd, COUNT(*) as order_count \
+         FROM orders WHERE status='completed' AND is_deleted=0 AND {} \
+         GROUP BY date(created_at) ORDER BY date ASC",
+        date_filter
+    );
+
+    let rows: Vec<RevenueByDay> = sqlx::query_as(&query)
+        .fetch_all(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(rows)
 }

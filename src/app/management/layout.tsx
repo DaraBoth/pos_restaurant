@@ -1,17 +1,17 @@
-'use client';
+﻿'use client';
 import SidebarNav from '@/components/layout/SidebarNav';
 import Link from 'next/link';
-import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Package, Users, RefreshCw, ClipboardList, Building2 } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { LayoutDashboard, Package, Users, RefreshCw, ClipboardList, Building2, TrendingUp } from 'lucide-react';
 
 const NAV_ITEMS = [
-    { href: '/management', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-    { href: '/management/products', label: 'Products & Categories', icon: Package },
-    { href: '/management/users', label: 'Users & Roles', icon: Users },
-    { href: '/management/exchange-rate', label: 'Exchange Rates', icon: RefreshCw },
-    { href: '/management/orders', label: 'Order History', icon: ClipboardList },
-    { href: '/management/settings', label: 'Restaurant Settings', icon: Building2 },
+    { href: '/management', label: 'Dashboard', labelKm: 'áž•áŸ’áž‘áž¶áŸ†áž„áž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„', icon: LayoutDashboard, exact: true },
+    { href: '/management/analytics', label: 'Analytics', labelKm: 'ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ', icon: TrendingUp },
+    { href: '/management/products', label: 'Products', labelKm: 'áž•áž›áž·ážáž•áž›', icon: Package },
+    { href: '/management/users', label: 'Users', labelKm: 'áž¢áŸ’áž“áž€áž”áŸ’ážšáž¾', icon: Users },
+    { href: '/management/exchange-rate', label: 'Exchange Rate', labelKm: 'áž¢ážáŸ’ážšáž¶áž”áŸ’ážáž¼ážšáž”áŸ’ážšáž¶áž€áŸ‹', icon: RefreshCw },
+    { href: '/management/orders', label: 'Orders', labelKm: 'áž”áž‰áŸ’áž‡áž¶áž‘áž·áž‰', icon: ClipboardList },
+    { href: '/management/settings', label: 'Settings', labelKm: 'áž€áž¶ážšáž€áŸ†ážŽážáŸ‹', icon: Building2 },
 ];
 
 export default function ManagementLayout({ children }: { children: React.ReactNode }) {
@@ -19,28 +19,14 @@ export default function ManagementLayout({ children }: { children: React.ReactNo
         <div className="h-screen w-full flex flex-row bg-[var(--bg-dark)] text-[var(--foreground)]">
             <SidebarNav />
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                {/* Management Horizontal Navbar */}
-                <header className="flex-shrink-0 bg-[#131d27] border-b border-[var(--border)] relative z-20 shadow-sm overflow-x-auto container-snap">
-                    <div className="px-[var(--space-unit)] flex items-center h-20 gap-[var(--space-unit)] min-w-max">
-                        <div className="flex flex-col justify-center pr-[var(--space-unit)] border-r border-[var(--border)]">
-                            <h2 className="text-[var(--text-xs)] font-black uppercase tracking-[0.2em] text-[var(--accent-blue)] leading-none mb-1.5 opacity-80">
-                                Management
-                            </h2>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[var(--text-sm)] font-black text-[var(--foreground)] whitespace-nowrap">DineOS Core</span>
-                                <span className="px-1.5 py-0.5 rounded-md bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-[8px] font-black uppercase border border-[var(--accent-blue)]/20">LIVE</span>
-                            </div>
-                        </div>
-
-                        <nav className="flex items-center gap-2 p-1 bg-[#0d1721] rounded-2xl border border-[var(--border)]">
-                            <SideNavItems />
-                        </nav>
-                    </div>
+                {/* Horizontal sub-nav */}
+                <header className="flex-shrink-0 bg-[var(--bg-card)] border-b border-[var(--border)] overflow-x-auto no-scrollbar">
+                    <nav className="px-3 flex items-center h-11 gap-0.5 min-w-max">
+                        <SideNavItems />
+                    </nav>
                 </header>
-
-                {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-[var(--space-unit)] lg:p-[calc(var(--space-unit)*1.5)] min-w-0 container-snap relative bg-[var(--bg-dark)]">
-                    <div className="relative z-10 max-w-7xl mx-auto">
+                <main className="flex-1 overflow-y-auto p-4 min-w-0 no-scrollbar bg-[var(--bg-dark)]">
+                    <div className="max-w-7xl mx-auto">
                         {children}
                     </div>
                 </main>
@@ -60,17 +46,13 @@ function SideNavItems() {
                     <Link
                         key={href}
                         href={href}
-                        className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-[var(--text-xs)] font-black uppercase tracking-[0.1em] transition-all group whitespace-nowrap active:scale-95 ${
-                            active 
-                                ? 'bg-[var(--accent-blue)] text-white shadow-lg shadow-[var(--accent-blue)]/30' 
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${
+                            active
+                                ? 'bg-[var(--accent-blue)] text-white'
                                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--foreground)]'
                         }`}
                     >
-                        <Icon 
-                            size={16} 
-                            strokeWidth={active ? 3 : 2} 
-                            className={`${active ? 'text-white' : 'group-hover:text-[var(--accent)] transition-colors'}`} 
-                        />
+                        <Icon size={13} strokeWidth={active ? 2.5 : 2} />
                         <span>{label}</span>
                     </Link>
                 );

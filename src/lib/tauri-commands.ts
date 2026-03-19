@@ -254,3 +254,24 @@ export const getPaymentsForOrder = (order_id: string) =>
 export const getTables = () => call<FloorTable[]>('get_tables');
 export const createTable = (name: string) => call<FloorTable>('create_table', { name });
 export const deleteTable = (id: string) => call<void>('delete_table', { id });
+
+// --------------- Analytics Commands ---------------
+export interface RevenueSummary {
+    today_usd: number;
+    today_orders: number;
+    month_usd: number;
+    month_orders: number;
+    year_usd: number;
+    year_orders: number;
+    open_orders: number;
+}
+
+export interface RevenueByDay {
+    date: string;
+    total_usd: number;
+    order_count: number;
+}
+
+export const getRevenueSummary = () => call<RevenueSummary>('get_revenue_summary');
+export const getRevenueByPeriod = (period: 'week' | 'month' | '3months' | 'year') =>
+    call<RevenueByDay[]>('get_revenue_by_period', { period });
