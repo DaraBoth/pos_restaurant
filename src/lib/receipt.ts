@@ -28,9 +28,6 @@ function escapeHtml(value: string) {
 export function printReceipt(payload: ReceiptPrintPayload) {
     if (typeof window === 'undefined') return;
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) return;
-
     const logoHtml = payload.restaurant.logo_path 
         ? `<img src="https://asset.localhost/${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />` 
         : '';
@@ -61,7 +58,16 @@ export function printReceipt(payload: ReceiptPrintPayload) {
         .map(line => `<div style="margin-top: 2px;">${escapeHtml(line)}</div>`)
         .join('');
 
-    printWindow.document.write(`
+    // Use a hidden iframe — window.open() is blocked by Tauri's WebView.
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (!doc) { document.body.removeChild(iframe); return; }
+
+    doc.open();
+    doc.write(`
         <!DOCTYPE html>
         <html>
             <head>
@@ -161,19 +167,17 @@ export function printReceipt(payload: ReceiptPrintPayload) {
                         POWERED BY DINEOS
                     </div>
                 </div>
-
-                <script>
-                    window.onload = function () {
-                        setTimeout(() => {
-                            window.print();
-                            window.onafterprint = () => window.close();
-                            // Fallback for browsers that don't support onafterprint or if cancelled
-                            setTimeout(() => window.close(), 500);
-                        }, 500);
-                    };
-                </script>
             </body>
         </html>
     `);
-    printWindow.document.close();
-}
+    doc.close();
+
+    iframe.onload = () => {
+        setTimeout(() => {
+            iframe.contentWindow?.print();
+            setTimeout(() => {
+                if (document.body.contains(iframe)) document.body.removeChild(iframe);
+            }, 1000);
+        }, 300);
+    };
+}
