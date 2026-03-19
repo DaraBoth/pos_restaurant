@@ -9,7 +9,7 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
-import { Search, ShoppingBag } from 'lucide-react';
+import { Search, ShoppingBag, UtensilsCrossed } from 'lucide-react';
 
 // Palette for products without images
 const CARD_COLORS = [
@@ -161,7 +161,7 @@ export default function ProductGrid() {
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">
-                                                <span className="text-3xl opacity-50">ðŸ½ï¸</span>
+                                                <UtensilsCrossed size={32} className="opacity-20 text-white" />
                                             </div>
                                         )}
                                         {/* Out of stock overlay */}
