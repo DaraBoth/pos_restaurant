@@ -4,9 +4,10 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { checkoutOrder, getRestaurant, PaymentInput } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
-import { X, CheckCircle, CreditCard, Banknote, QrCode } from 'lucide-react';
+import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
-import { printReceipt } from '@/lib/receipt';
+import { printReceipt, getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
+import ReceiptPreviewModal from '@/components/pos/ReceiptPreviewModal';
 
 export default function CheckoutModal({
     onClose,
@@ -21,19 +22,29 @@ export default function CheckoutModal({
     const [usdInput, setUsdInput] = useState<string>('');
     const [method, setMethod] = useState<'cash' | 'khqr' | 'card'>('cash');
     const [loading, setLoading] = useState(false);
+    const [discountPct, setDiscountPct] = useState<number>(0);
+    const [receiptPreview, setReceiptPreview] = useState<{ html: string; payload: ReceiptPrintPayload } | null>(null);
 
     useOverlayBehavior(true, onClose);
 
-    // Split payment logic
-    // If user enters $5.00 cash on a $12.50 order, the remaining $7.50 is shown in KHR (or USD)
+    // Discount + derived totals
+    const discountCents = Math.round(totals.subtotalCents * discountPct / 100);
+    const discountedTotals = {
+        ...totals,
+        subtotalCents: totals.subtotalCents - discountCents,
+        totalUsdCents: totals.totalUsdCents - discountCents,
+        totalKhr: roundKhr(totals.totalUsdCents - discountCents, exchangeRate),
+    };
+
+    // Split payment logic (applied against discounted total)
     const usdInputCents = usdInput ? parseToCents(usdInput) : 0;
 
     // Amount still owed
-    const remainingUsdCents = Math.max(0, totals.totalUsdCents - usdInputCents);
+    const remainingUsdCents = Math.max(0, discountedTotals.totalUsdCents - usdInputCents);
     const remainingKhr = roundKhr(remainingUsdCents, exchangeRate);
 
     // Change due if they overpay in USD cash
-    const changeUsdCents = Math.max(0, usdInputCents - totals.totalUsdCents);
+    const changeUsdCents = Math.max(0, usdInputCents - discountedTotals.totalUsdCents);
 
     async function handleConfirm() {
         if (!orderId) return;
@@ -47,7 +58,7 @@ export default function CheckoutModal({
                 payments.push({
                     method: 'cash',
                     currency: 'USD',
-                    amount: Math.min(usdInputCents, totals.totalUsdCents) // cap at total
+                    amount: Math.min(usdInputCents, discountedTotals.totalUsdCents) // cap at total
                 });
             }
 
@@ -70,18 +81,23 @@ export default function CheckoutModal({
                 }
             }
 
-            await checkoutOrder(orderId, payments);
+            const completedOrder = await checkoutOrder(orderId, payments, discountCents);
             const restaurant = await getRestaurant();
-            printReceipt({
+            const payload: ReceiptPrintPayload = {
                 restaurant,
                 orderId,
                 tableId,
+                customerName: completedOrder.customer_name,
+                customerPhone: completedOrder.customer_phone,
+                discountPct: discountPct > 0 ? discountPct : undefined,
+                discountCents: discountCents > 0 ? discountCents : undefined,
                 items,
                 payments,
-                totals,
-            });
+                totals: discountedTotals,
+            };
             clearOrder();
             onComplete();
+            setReceiptPreview({ html: getReceiptHtml(payload), payload });
         } catch (e) {
             console.error(e);
             alert(t('error'));
@@ -91,6 +107,7 @@ export default function CheckoutModal({
     }
 
     return (
+        <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/60 backdrop-blur-md" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-[var(--border)]">
                 {/* Header */}
@@ -108,11 +125,63 @@ export default function CheckoutModal({
                     <div className="flex-1 space-y-4">
                         <div className="bg-[var(--bg-elevated)] rounded-xl p-4 border border-[var(--border)]">
                             <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-60 text-[var(--text-secondary)]">{t('total')}</div>
+                            {discountCents > 0 && (
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-sm font-mono text-[var(--text-secondary)] line-through opacity-60">{formatUsd(totals.totalUsdCents)}</span>
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/30 text-yellow-400">-{discountPct}%</span>
+                                </div>
+                            )}
                             <div className="text-3xl font-black font-mono text-[var(--foreground)] tracking-tighter leading-none">
-                                {formatUsd(totals.totalUsdCents)}
+                                {formatUsd(discountedTotals.totalUsdCents)}
                             </div>
                             <div className="text-base font-bold font-mono text-[var(--text-secondary)] opacity-60 mt-1">
-                                {formatKhr(totals.totalKhr)}
+                                {formatKhr(discountedTotals.totalKhr)}
+                            </div>
+                            {discountCents > 0 && (
+                                <div className="mt-1.5 text-[10px] font-bold text-yellow-400">
+                                    Saving {formatUsd(discountCents)}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Discount */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-1.5 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">
+                                <Tag size={10} />
+                                Discount
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <div className="relative w-20 flex-shrink-0">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value={discountPct === 0 ? '' : discountPct}
+                                        onChange={e => {
+                                            const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                            setDiscountPct(v);
+                                        }}
+                                        placeholder="0"
+                                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-3 py-2 text-sm font-mono font-black text-white focus:border-yellow-400/60 outline-none transition-all"
+                                    />
+                                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-black text-[var(--text-secondary)]/50">%</span>
+                                </div>
+                                <div className="flex gap-1 flex-1">
+                                    {[5, 10, 15, 20, 50].map(pct => (
+                                        <button
+                                            key={pct}
+                                            onClick={() => setDiscountPct(discountPct === pct ? 0 : pct)}
+                                            className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-colors ${
+                                                discountPct === pct
+                                                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
+                                                    : 'bg-white/[0.07] border-white/10 text-[var(--text-secondary)] hover:text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/25'
+                                            }`}
+                                        >
+                                            {pct}%
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
@@ -153,7 +222,7 @@ export default function CheckoutModal({
                                         type="number"
                                         step="0.01"
                                         min="0"
-                                        placeholder={formatUsdNumeric(totals.totalUsdCents)}
+                                        placeholder={formatUsdNumeric(discountedTotals.totalUsdCents)}
                                         value={usdInput}
                                         onChange={e => setUsdInput(e.target.value)}
                                         className="w-full bg-white/[0.07] border border-white/20 rounded-xl pl-8 pr-4 py-3 text-xl font-mono font-black text-white focus:border-[var(--accent-blue)] outline-none transition-all"
@@ -202,5 +271,14 @@ export default function CheckoutModal({
                 </div>
             </div>
         </div>
+        {receiptPreview && (
+            <ReceiptPreviewModal
+                html={receiptPreview.html}
+                onClose={() => setReceiptPreview(null)}
+                onPrint={() => { printReceipt(receiptPreview.payload); setReceiptPreview(null); }}
+            />
+        )}
+        </>
     );
 }
+

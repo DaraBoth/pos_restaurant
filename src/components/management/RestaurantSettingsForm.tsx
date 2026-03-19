@@ -173,7 +173,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
     }
 
     return (
-        <div className="max-w-6xl mx-auto animate-fade-in space-y-6 pb-12">
+        <div className="animate-fade-in space-y-6 pb-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pos-card p-5">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
@@ -235,7 +235,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    <section className="pos-card p-8 rounded-[2rem] relative overflow-hidden group">
+                    <section className="pos-card p-5 rounded-2xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent)]/5 rounded-bl-[100px] pointer-events-none" />
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
                             Identity & Contact
@@ -307,7 +307,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                     </section>
 
 
-                    <section className="pos-card p-8 rounded-[2rem]">
+                    <section className="pos-card p-5 rounded-2xl">
                         <h2 className="text-sm font-black uppercase tracking-widest text-[var(--accent)] mb-8">
                             Receipt Footer
                         </h2>
@@ -323,13 +323,13 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                 </div>
 
                 <div className="lg:col-span-1">
-                    <div className="sticky top-8 bg-[#101a24] p-8 rounded-[2rem] border border-[var(--border)] shadow-2xl">
+                    <div className="sticky top-8 bg-[var(--bg-card)] p-5 rounded-2xl border border-[var(--border)] shadow-2xl">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-6 flex items-center justify-between">
                             Live Receipt Preview
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-[pulse_2s_ease-in-out_infinite]"></span>
                         </h2>
 
-                        <div className="bg-[#0d1721] border border-[var(--border)] rounded-xl p-6 font-mono text-center flex flex-col items-center">
+                        <div className="bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl p-5 font-mono text-center flex flex-col items-center">
                             <div className="w-full border-t-2 border-dashed border-[var(--border)] mb-6" />
 
                             <div className="space-y-1.5 w-full">

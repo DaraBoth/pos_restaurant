@@ -4,27 +4,21 @@ use crate::models::FloorTable;
 
 #[tauri::command]
 pub async fn get_tables(pool: State<'_, SqlitePool>) -> Result<Vec<FloorTable>, String> {
-    // Compute 3-state status from live order/item data:
-    //   available = no open order for this table
-    //   ordering  = open order exists with at least one non-done item (pending/cooking)
-    //   serving   = open order exists and all items are done (food is ready to serve)
     let tables: Vec<FloorTable> = sqlx::query_as(
         "SELECT
             ft.id,
             ft.name,
             ft.seat_count,
             CASE
-                WHEN NOT EXISTS (
+                WHEN EXISTS (
+                    SELECT 1 FROM orders o
+                    WHERE o.table_id = ft.name AND o.status = 'pending_payment' AND o.is_deleted = 0
+                ) THEN 'waiting'
+                WHEN EXISTS (
                     SELECT 1 FROM orders o
                     WHERE o.table_id = ft.name AND o.status = 'open' AND o.is_deleted = 0
-                ) THEN 'available'
-                WHEN EXISTS (
-                    SELECT 1 FROM order_items oi
-                    JOIN orders o ON oi.order_id = o.id
-                    WHERE o.table_id = ft.name AND o.status = 'open' AND o.is_deleted = 0
-                      AND oi.is_deleted = 0 AND oi.kitchen_status != 'done'
-                ) THEN 'ordering'
-                ELSE 'serving'
+                ) THEN 'busy'
+                ELSE 'available'
             END AS status
          FROM floor_tables ft
          WHERE ft.is_deleted = 0

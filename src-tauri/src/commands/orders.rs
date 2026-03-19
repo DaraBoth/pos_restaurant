@@ -234,7 +234,7 @@ pub async fn get_orders(
 ) -> Result<Vec<Order>, String> {
     let mut query = String::from(
         "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders WHERE is_deleted = 0"
     );
 
@@ -273,9 +273,9 @@ pub async fn get_active_order_for_table(
 ) -> Result<Option<Order>, String> {
     let order = sqlx::query_as::<_, Order>(
         "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
-         WHERE table_id = ? AND status = 'open' AND is_deleted = 0
+         WHERE table_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0
          ORDER BY created_at DESC
          LIMIT 1"
     )
@@ -294,7 +294,7 @@ pub async fn get_orders_for_table(
 ) -> Result<Vec<Order>, String> {
     let orders = sqlx::query_as::<_, Order>(
         "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
          WHERE table_id = ? AND is_deleted = 0
          ORDER BY created_at DESC"
@@ -311,6 +311,7 @@ pub async fn get_orders_for_table(
 pub async fn checkout_order(
     order_id: String,
     payments: Vec<PaymentInput>,
+    discount_cents: Option<i64>,
     pool: State<'_, SqlitePool>,
 ) -> Result<Order, String> {
     let table_id: Option<(Option<String>,)> = sqlx::query_as("SELECT table_id FROM orders WHERE id = ?")
@@ -330,13 +331,25 @@ pub async fn checkout_order(
     .await
     .map_err(|e| format!("Subtotal error: {}", e))?;
 
+    // Apply discount then mark completed
+    let final_total = (done_subtotal - discount_cents.unwrap_or(0)).max(0);
+    let exch_rate: f64 = sqlx::query_scalar(
+        "SELECT rate FROM exchange_rates ORDER BY effective_from DESC LIMIT 1"
+    )
+    .fetch_optional(pool.inner())
+    .await
+    .unwrap_or(None)
+    .unwrap_or(4100.0);
+    let final_khr = round_khr(final_total, exch_rate);
+
     // Update order total to reflect only done items, then mark completed
     sqlx::query(
-        "UPDATE orders SET total_usd = ?, tax_vat = 0, tax_plt = 0,
+        "UPDATE orders SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0,
                 status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
          WHERE id = ?"
     )
-    .bind(done_subtotal)
+    .bind(final_total)
+    .bind(final_khr)
     .bind(&order_id)
     .execute(pool.inner())
     .await
@@ -385,7 +398,7 @@ pub async fn checkout_order(
     // Return the completed order
     let order: Order = sqlx::query_as(
         "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders WHERE id=?"
     )
     .bind(&order_id)
@@ -394,6 +407,27 @@ pub async fn checkout_order(
     .map_err(|e| format!("Database error: {}", e))?;
 
     Ok(order)
+}
+
+#[tauri::command]
+pub async fn hold_order(
+    order_id: String,
+    customer_name: Option<String>,
+    customer_phone: Option<String>,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    sqlx::query(
+        "UPDATE orders SET status = 'pending_payment', customer_name = ?, customer_phone = ?,
+                updated_at = datetime('now') WHERE id = ?"
+    )
+    .bind(&customer_name)
+    .bind(&customer_phone)
+    .bind(&order_id)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(())
 }
 
 #[tauri::command]

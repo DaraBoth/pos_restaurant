@@ -68,8 +68,8 @@ export interface Product {
 export interface FloorTable {
     id: string;
     name: string;
-    /** available = green, ordering = yellow, serving = red */
-    status: 'available' | 'ordering' | 'serving';
+    /** available = green, busy = orange, waiting = amber */
+    status: 'available' | 'busy' | 'waiting';
     seat_count: number;
 }
 
@@ -78,13 +78,15 @@ export interface Order {
     id: string;
     user_id?: string;
     table_id?: string;
-    status: 'open' | 'completed' | 'cancelled' | 'void';
+    status: 'open' | 'pending_payment' | 'completed' | 'void';
     total_usd: number;
     total_khr: number;
     tax_vat: number;
     tax_plt: number;
     bakong_bill_number?: string;
     notes?: string;
+    customer_name?: string;
+    customer_phone?: string;
     created_at: string;
     updated_at?: string;
     completed_at?: string;

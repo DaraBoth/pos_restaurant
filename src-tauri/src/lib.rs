@@ -62,6 +62,7 @@ pub fn run() {
             commands::orders::get_active_order_for_table,
             commands::orders::get_orders_for_table,
             commands::orders::checkout_order,
+            commands::orders::hold_order,
             commands::orders::void_order,
             commands::orders::get_revenue_summary,
             commands::orders::get_revenue_by_period,

@@ -26,11 +26,15 @@ export const getActiveOrderForTable = (table_id: string) =>
 export const getOrdersForTable = (table_id: string) =>
     call<Order[]>('get_orders_for_table', { tableId: table_id });
 
-export const checkoutOrder = (order_id: string, payments: PaymentInput[]) =>
-    call<Order>('checkout_order', { orderId: order_id, payments });
+export const checkoutOrder = (order_id: string, payments: PaymentInput[], discount_cents = 0) =>
+    call<Order>('checkout_order', { orderId: order_id, payments, discountCents: discount_cents });
 
 export const voidOrder = (order_id: string) =>
     call<void>('void_order', { orderId: order_id });
+
+export const holdOrder = (order_id: string, customer_name?: string, customer_phone?: string) =>
+    call<void>('hold_order', { orderId: order_id, customerName: customer_name, customerPhone: customer_phone });
+
 
 export const getPaymentsForOrder = (order_id: string) =>
     call<Payment[]>('get_payments_for_order', { orderId: order_id });

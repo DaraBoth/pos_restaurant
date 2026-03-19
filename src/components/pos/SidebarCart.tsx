@@ -5,10 +5,10 @@ import { updateOrderItemQuantity, updateOrderItemNote, voidOrder } from '@/lib/t
 import { getOrderItems } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useState } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote } from 'lucide-react';
+import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
-export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) {
+export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => void; onHold: () => void }) {
     const { items, totals, orderId, tableId, clearOrder, setItems } = useOrder();
     const { t, lang } = useLanguage();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -58,11 +58,11 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
     return (
         <>
             <div
-                className="flex-shrink-0 flex flex-col min-h-0 bg-[#101a24]"
+                className="flex-shrink-0 flex flex-col min-h-0 bg-[var(--bg-card)]"
                 style={{ width: 'var(--sidebar-cart-width)', borderLeft: '1px solid var(--border)' }}
             >
                 {/* Header */}
-                <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)] bg-[#162230]">
+                <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
                     <div className="flex items-center gap-2">
                         <ShoppingCart size={14} className="text-[var(--accent)]" />
                         <span className="text-xs font-bold text-[var(--foreground)]">
@@ -76,7 +76,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                     </div>
                     <div className="flex items-center gap-1">
                         {tableId && (
-                            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-[#0d1721] border border-[var(--border)] text-[var(--accent-blue)]">
+                            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--accent-blue)]">
                                 {tableId}
                             </span>
                         )}
@@ -93,7 +93,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                 </div>
 
                 {/* Items List */}
-                <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-0 no-scrollbar bg-[#0f1822]">
+                <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-0 no-scrollbar bg-[var(--bg-dark)]">
                     {isEmpty ? (
                         <div className="h-full flex flex-col items-center justify-center gap-2 opacity-30">
                             <ShoppingCart size={28} className="text-[var(--text-secondary)]" />
@@ -126,7 +126,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                                             {formatUsd(item.price_at_order * item.quantity)}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[#0d1721] border border-[var(--border)]">
+                                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)]">
                                         <button
                                             onClick={() => handleQtyChange(item.id, item.quantity, -1)}
                                             className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
@@ -157,7 +157,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                                                 }}
                                                 onBlur={() => handleNoteSave(item.id)}
                                                 placeholder={t('addNote') + '...'}
-                                                className="flex-1 text-[10px] bg-[#0d1721] border border-[var(--accent-blue)]/40 rounded-md px-1.5 py-0.5 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70"
+                                                className="flex-1 text-[10px] bg-[var(--bg-dark)] border border-[var(--accent-blue)]/40 rounded-md px-1.5 py-0.5 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70"
                                             />
                                         </div>
                                     ) : (
@@ -179,7 +179,7 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                 </div>
 
                 {/* Footer */}
-                <div className="flex-shrink-0 px-3 py-3 bg-[#162230] border-t border-[var(--border)] space-y-2.5">
+                <div className="flex-shrink-0 px-3 py-3 bg-[var(--bg-elevated)] border-t border-[var(--border)] space-y-2.5">
                     <div className="space-y-0.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                         <div className="flex justify-between">
                             <span>{t('subtotal')}</span>
@@ -199,8 +199,8 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                         </p>
                     </div>
 
-                    {/* Cancel + Checkout */}
-                    <div className="grid grid-cols-2 gap-1.5">
+                    {/* Void + Hold + Checkout */}
+                    <div className="grid grid-cols-3 gap-1.5">
                         <button
                             onClick={handleVoid}
                             disabled={!orderId}
@@ -208,6 +208,14 @@ export default function SidebarCart({ onCheckout }: { onCheckout: () => void }) 
                         >
                             <XCircle size={12} strokeWidth={2.5} />
                             {t('cancel')}
+                        </button>
+                        <button
+                            onClick={onHold}
+                            disabled={isEmpty || !orderId}
+                            className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-yellow-500/8 border border-yellow-500/25 text-yellow-400/80 hover:text-yellow-400 hover:border-yellow-500/45 transition-all disabled:opacity-40 active:scale-95"
+                        >
+                            <PauseCircle size={12} strokeWidth={2.5} />
+                            Hold
                         </button>
                         <button
                             className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"

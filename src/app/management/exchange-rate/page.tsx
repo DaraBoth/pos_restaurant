@@ -44,7 +44,7 @@ export default function ExchangeRateManagement() {
     const hasChanged = rate && parseInt(newRateInput, 10) !== rate.rate;
 
     return (
-        <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+        <div className="animate-fade-in space-y-6">
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-card)] p-5 rounded-2xl border border-[var(--border)]">
                 <div className="flex items-center gap-3">

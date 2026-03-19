@@ -147,9 +147,9 @@ export default function TablesManagementPage() {
                         {tables.map(table => {
                             const isActive = table.status !== 'available';
                             const statusLabel = {
-                                available: { en: 'Free', km: 'ទំនេរ', cls: 'text-green-400' },
-                                ordering:  { en: 'Ordering', km: 'កំពុងបញ្ជាទិញ', cls: 'text-yellow-400' },
-                                serving:   { en: 'Serving', km: 'កំពុងបម្រើ', cls: 'text-red-400' },
+                                available: { en: 'Free',    km: 'ទំនេរ',          cls: 'text-green-400'  },
+                                busy:      { en: 'Busy',    km: 'មានអតិថិជន',      cls: 'text-orange-400' },
+                                waiting:   { en: 'Waiting', km: 'រង់ចាំបង់ប្រាក់', cls: 'text-yellow-400' },
                             }[table.status] ?? { en: 'Free', km: 'ទំនេរ', cls: 'text-green-400' };
                             return (
                                 <div key={table.id} className="flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-elevated)] transition-colors">

@@ -296,6 +296,8 @@ export default function HistoryPage() {
                                                                                         restaurant,
                                                                                         orderId: o.id,
                                                                                         tableId: o.table_id || undefined,
+                                                                                        customerName: o.customer_name,
+                                                                                        customerPhone: o.customer_phone,
                                                                                         items: orderDetails[o.id],
                                                                                         payments: [],
                                                                                         totals: {

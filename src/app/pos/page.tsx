@@ -5,11 +5,13 @@ import ProductGrid from '@/components/pos/ProductGrid';
 import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
 import FloorPlanView from '@/components/pos/FloorPlanView';
+import HoldPaymentModal from '@/components/pos/HoldPaymentModal';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [isHoldOpen, setIsHoldOpen] = useState(false);
     const { tableId, items, clearOrder } = useOrder();
     const { lang } = useLanguage();
 
@@ -53,7 +55,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Sidebar Cart */}
-                <SidebarCart onCheckout={() => setIsCheckoutOpen(true)} />
+                <SidebarCart onCheckout={() => setIsCheckoutOpen(true)} onHold={() => setIsHoldOpen(true)} />
                 </div>
             </div>
 
@@ -61,6 +63,12 @@ export default function POSPage() {
                 <CheckoutModal
                     onClose={() => setIsCheckoutOpen(false)}
                     onComplete={() => setIsCheckoutOpen(false)}
+                />
+            )}
+            {isHoldOpen && (
+                <HoldPaymentModal
+                    onClose={() => setIsHoldOpen(false)}
+                    onComplete={() => { setIsHoldOpen(false); clearOrder(); }}
                 />
             )}
         </>

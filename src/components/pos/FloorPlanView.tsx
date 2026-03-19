@@ -17,19 +17,19 @@ const STATUS = {
         dot: 'bg-green-500',
         label: { en: 'Free', km: 'ទំនេរ' },
     },
-    ordering: {
+    busy: {
+        bg: 'rgba(249,115,22,0.10)',
+        border: 'rgba(249,115,22,0.45)',
+        text: '#fdba74',
+        dot: 'bg-orange-400',
+        label: { en: 'Busy', km: 'មានអតិថិជន' },
+    },
+    waiting: {
         bg: 'rgba(234,179,8,0.10)',
-        border: 'rgba(234,179,8,0.45)',
+        border: 'rgba(234,179,8,0.50)',
         text: '#fde047',
         dot: 'bg-yellow-400',
-        label: { en: 'Ordering', km: 'កំពុងបញ្ជាទិញ' },
-    },
-    serving: {
-        bg: 'rgba(239,68,68,0.10)',
-        border: 'rgba(239,68,68,0.45)',
-        text: '#fca5a5',
-        dot: 'bg-red-500',
-        label: { en: 'Serving', km: 'កំពុងបម្រើ' },
+        label: { en: 'Waiting', km: 'រង់ចាំបង់ប្រាក់' },
     },
 } as const;
 
@@ -75,8 +75,8 @@ export default function FloorPlanView() {
 
     const counts = {
         available: tables.filter(t => t.status === 'available').length,
-        ordering: tables.filter(t => t.status === 'ordering').length,
-        serving: tables.filter(t => t.status === 'serving').length,
+        busy: tables.filter(t => t.status === 'busy').length,
+        waiting: tables.filter(t => t.status === 'waiting').length,
     };
     const canManage = user?.role === 'admin' || user?.role === 'manager';
 
@@ -102,8 +102,8 @@ export default function FloorPlanView() {
                     {/* Legend counts */}
                     {[
                         { key: 'available', count: counts.available, dot: 'bg-green-500' },
-                        { key: 'ordering', count: counts.ordering, dot: 'bg-yellow-400' },
-                        { key: 'serving', count: counts.serving, dot: 'bg-red-500' },
+                        { key: 'busy', count: counts.busy, dot: 'bg-orange-400' },
+                        { key: 'waiting', count: counts.waiting, dot: 'bg-yellow-400' },
                     ].map(({ key, count, dot }) => (
                         <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)]">
                             <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
@@ -168,7 +168,7 @@ export default function FloorPlanView() {
                                         <CheckCircle2 size={20} color={s.text} strokeWidth={2.5} />
                                     ) : table.status === 'available' ? (
                                         <LayoutGrid size={18} color={s.text} strokeWidth={2} />
-                                    ) : table.status === 'ordering' ? (
+                                    ) : table.status === 'waiting' ? (
                                         <Clock size={18} color={s.text} strokeWidth={2} />
                                     ) : (
                                         <UtensilsCrossed size={18} color={s.text} strokeWidth={2} />

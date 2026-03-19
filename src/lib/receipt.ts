@@ -1,10 +1,14 @@
 import { OrderItem, PaymentInput, Restaurant } from '@/lib/tauri-commands';
 import { formatKhr, formatUsd } from '@/lib/currency';
 
-interface ReceiptPrintPayload {
+export interface ReceiptPrintPayload {
     restaurant: Restaurant;
     orderId: string;
     tableId?: string;
+    customerName?: string;
+    customerPhone?: string;
+    discountPct?: number;
+    discountCents?: number;
     items: OrderItem[];
     payments: PaymentInput[];
     totals: {
@@ -25,11 +29,9 @@ function escapeHtml(value: string) {
         .replace(/'/g, '&#39;');
 }
 
-export function printReceipt(payload: ReceiptPrintPayload) {
-    if (typeof window === 'undefined') return;
-
-    const logoHtml = payload.restaurant.logo_path 
-        ? `<img src="${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />` 
+export function getReceiptHtml(payload: ReceiptPrintPayload): string {
+    const logoHtml = payload.restaurant.logo_path
+        ? `<img src="${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />`
         : '';
 
     const itemRows = payload.items.map((item, idx) => `
@@ -58,20 +60,11 @@ export function printReceipt(payload: ReceiptPrintPayload) {
         .map(line => `<div style="margin-top: 2px;">${escapeHtml(line)}</div>`)
         .join('');
 
-    // Use a hidden iframe — window.open() is blocked by Tauri's WebView.
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-    if (!doc) { document.body.removeChild(iframe); return; }
-
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    doc.open();
-    doc.write(`<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -130,6 +123,7 @@ export function printReceipt(payload: ReceiptPrintPayload) {
     .totals td { padding: 2px 0; }
     .totals td:last-child { text-align: right; }
     .totals .row-sub  { color: #444; font-size: 10px; }
+    .totals .row-disc td { font-size: 10px; font-weight: 700; color: #b06000; }
     .totals .row-grand td { font-size: 14px; font-weight: 900; padding: 4px 0 2px; }
     .totals .row-khr  td { font-size: 11px; font-weight: 700; color: #222; }
 
@@ -177,8 +171,8 @@ export function printReceipt(payload: ReceiptPrintPayload) {
     <tr>
       <td><span class="lbl">Table</span> ${escapeHtml(payload.tableId || '—')}</td>
       <td>${escapeHtml(timeStr)}</td>
-    </tr>
-  </table>
+    </tr>    ${payload.customerName ? `<tr><td colspan="2"><span class="lbl">Customer</span> ${escapeHtml(payload.customerName)}</td></tr>` : ''}
+    ${payload.customerPhone ? `<tr><td colspan="2"><span class="lbl">Tel</span> ${escapeHtml(payload.customerPhone)}</td></tr>` : ''}  </table>
 
   <hr class="d-dash">
 
@@ -204,8 +198,13 @@ export function printReceipt(payload: ReceiptPrintPayload) {
   <table class="totals">
     <tr class="row-sub">
       <td>Subtotal</td>
-      <td>${formatUsd(payload.totals.subtotalCents)}</td>
+      <td>${formatUsd(payload.totals.subtotalCents + (payload.discountCents ?? 0))}</td>
     </tr>
+    ${payload.discountCents ? `
+    <tr class="row-disc">
+      <td>Discount${payload.discountPct ? ' (' + payload.discountPct + '%)' : ''}</td>
+      <td>-${formatUsd(payload.discountCents)}</td>
+    </tr>` : ''}
     <tr class="row-grand">
       <td>TOTAL USD</td>
       <td>${formatUsd(payload.totals.totalUsdCents)}</td>
@@ -233,7 +232,24 @@ export function printReceipt(payload: ReceiptPrintPayload) {
   </div>
 
 </body>
-</html>`);
+</html>`;
+}
+
+export function printReceipt(payload: ReceiptPrintPayload) {
+    if (typeof window === 'undefined') return;
+
+    const html = getReceiptHtml(payload);
+
+    // Use a hidden iframe — window.open() is blocked by Tauri's WebView.
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (!doc) { document.body.removeChild(iframe); return; }
+
+    doc.open();
+    doc.write(html);
     doc.close();
 
     iframe.onload = () => {

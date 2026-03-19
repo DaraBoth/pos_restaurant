@@ -101,6 +101,8 @@ pub struct Order {
     pub tax_plt: i64,
     pub bakong_bill_number: Option<String>,
     pub notes: Option<String>,
+    pub customer_name: Option<String>,
+    pub customer_phone: Option<String>,
     pub created_at: String,
     pub updated_at: Option<String>,
     pub completed_at: Option<String>,
