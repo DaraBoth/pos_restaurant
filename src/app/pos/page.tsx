@@ -1,41 +1,21 @@
 ﻿'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { MonitorSmartphone, TableProperties, ShoppingCart } from 'lucide-react';
+import { TableProperties, ShoppingCart, ArrowLeft } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
 import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
+import FloorPlanView from '@/components/pos/FloorPlanView';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-    const { tableId, items, orderId } = useOrder();
+    const { tableId, items, clearOrder } = useOrder();
     const { lang } = useLanguage();
-    const router = useRouter();
 
+    // No table selected — floor plan is the POS landing view
     if (!tableId) {
-        return (
-            <div className="h-full w-full flex items-center justify-center p-6" style={{ background: 'var(--bg-dark)' }}>
-                <div className="pos-card max-w-sm w-full p-6 text-center">
-                    <div className="mx-auto mb-4 w-12 h-12 rounded-xl flex items-center justify-center bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30">
-                        <MonitorSmartphone size={22} className="text-[var(--accent-blue)]" />
-                    </div>
-                    <h1 className="text-base font-black text-[var(--foreground)] mb-2">
-                        {lang === 'km' ? 'សូមជ្រើសរើសតុ' : 'Select a Table'}
-                    </h1>
-                    <p className="text-xs text-[var(--text-secondary)] mb-5">
-                        {lang === 'km' ? 'ជ្រើសរើសតុមួយដើម្បីចាប់ផ្តើម' : 'Choose a table from the floor to start taking orders.'}
-                    </p>
-                    <button
-                        className="pos-btn-primary px-5 py-2.5 text-xs uppercase tracking-widest"
-                        onClick={() => router.push('/pos/tables')}
-                    >
-                        {lang === 'km' ? 'ចូលអ្នកបម្រើ' : 'Open Floor Plan'}
-                    </button>
-                </div>
-            </div>
-        );
+        return <FloorPlanView />;
     }
 
     return (
@@ -44,6 +24,13 @@ export default function POSPage() {
                 <header className="flex-shrink-0 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-card)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={clearOrder}
+                                className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+                                title={lang === 'km' ? 'ត្រលប់ទៅផែនការជាន់' : 'Back to floor plan'}
+                            >
+                                <ArrowLeft size={13} strokeWidth={2.5} />
+                            </button>
                             <div className="w-7 h-7 rounded-lg bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center">
                                 <TableProperties size={14} className="text-[var(--accent-blue)]" />
                             </div>
@@ -52,11 +39,9 @@ export default function POSPage() {
                                 <p className="text-sm font-black text-[var(--foreground)] leading-none">{tableId}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs">
-                            <div className="px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] flex items-center gap-1">
-                                <ShoppingCart size={11} />
-                                <span className="font-black text-[var(--foreground)]">{items.length}</span>
-                            </div>
+                        <div className="px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] flex items-center gap-1">
+                            <ShoppingCart size={11} />
+                            <span className="text-xs font-black text-[var(--foreground)]">{items.length}</span>
                         </div>
                     </div>
                 </header>

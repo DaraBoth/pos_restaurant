@@ -3,15 +3,16 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, TableProperties, ChefHat, TrendingUp } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, ChefHat } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import Link from 'next/link';
 
 const NavItem = ({
     label, icon: Icon, path, pathname
 }: { label: string; icon: React.ElementType; path: string; pathname: string }) => {
-    const active = pathname.startsWith(path);
-    const isExact = path === '/pos' ? pathname === '/pos' : active;
+    // /pos covers both the floor plan (/pos) and the ordering view (same page, context-driven)
+    const active = path === '/pos' ? pathname.startsWith('/pos') : pathname.startsWith(path);
+    const isExact = active;
 
     return (
         <Link
@@ -71,14 +72,10 @@ export default function SidebarNav() {
 
             {/* Navigation */}
             <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
-                <NavItem label={lang === 'km' ? 'áž”áŸ’ážšáž–áŸáž“áŸ’áž’áž›áž€áŸ‹' : 'POS'} icon={LayoutGrid} path="/pos" pathname={pathname} />
-                <NavItem label={lang === 'km' ? 'ážáž»' : 'Tables'} icon={TableProperties} path="/pos/tables" pathname={pathname} />
-                <NavItem label={lang === 'km' ? 'áž”áŸ’ážšážœážáŸ’ážáž·' : 'History'} icon={History} path="/history" pathname={pathname} />
+                <NavItem label={lang === 'km' ? 'ផ្នែកលក់' : 'POS'} icon={LayoutGrid} path="/pos" pathname={pathname} />
+                <NavItem label={lang === 'km' ? 'ប្រវត្តិ' : 'History'} icon={History} path="/history" pathname={pathname} />
                 {(user?.role === 'admin' || user?.role === 'manager') && (
-                    <>
-                        <NavItem label={lang === 'km' ? 'áž‚áŸ’ážšáž”áŸ‹áž‚áŸ’ážšáž„' : 'Management'} icon={Settings} path="/management" pathname={pathname} />
-                        <NavItem label={lang === 'km' ? 'ážšáž”áž¶áž™áž€áž¶ážšážŽáŸ' : 'Analytics'} icon={TrendingUp} path="/management/analytics" pathname={pathname} />
-                    </>
+                    <NavItem label={lang === 'km' ? 'គ្រប់គ្រង' : 'Management'} icon={Settings} path="/management" pathname={pathname} />
                 )}
             </nav>
 
