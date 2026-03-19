@@ -319,11 +319,11 @@ pub async fn checkout_order(
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-    // Recalculate total using only kitchen-completed ('done') items for the bill
+    // Recalculate total using all non-deleted items (kitchen-accept workflow is currently disabled)
     let (done_subtotal,): (i64,) = sqlx::query_as(
         "SELECT COALESCE(SUM(price_at_order * quantity), 0)
          FROM order_items
-         WHERE order_id = ? AND is_deleted = 0 AND kitchen_status = 'done'"
+         WHERE order_id = ? AND is_deleted = 0"
     )
     .bind(&order_id)
     .fetch_one(pool.inner())
@@ -342,9 +342,9 @@ pub async fn checkout_order(
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    // Deduct stock only for done items (items never served don't consume stock)
+    // Deduct stock for all ordered items
     let sold_items: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0 AND kitchen_status = 'done'"
+        "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0"
     )
     .bind(&order_id)
     .fetch_all(pool.inner())

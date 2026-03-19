@@ -319,31 +319,7 @@ function AggregatedCard({
                 )}
             </div>
 
-            {/* Action buttons */}
-            {(item.pendingItems.length > 0 || item.cookingItems.length > 0) && (
-                <div className="px-2 pb-2 flex gap-1.5 mt-auto">
-                    {item.pendingItems.length > 0 && (
-                        <button
-                            onClick={() => onAdvanceAll(item.pendingItems, 'cooking')}
-                            disabled={isAnyUpdating}
-                            className="flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wide bg-yellow-500/20 text-yellow-200 hover:bg-yellow-500/30 border border-yellow-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
-                        >
-                            {isAnyUpdating ? <RefreshCw size={9} className="animate-spin" /> : <Flame size={9} />}
-                            {lang === 'km' ? 'ចំអិន' : 'Start'}
-                        </button>
-                    )}
-                    {item.cookingItems.length > 0 && (
-                        <button
-                            onClick={() => onAdvanceAll(item.cookingItems, 'done')}
-                            disabled={isAnyUpdating}
-                            className="flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wide bg-green-500/20 text-green-200 hover:bg-green-500/30 border border-green-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1"
-                        >
-                            {isAnyUpdating ? <RefreshCw size={9} className="animate-spin" /> : <CheckCircle2 size={9} />}
-                            {lang === 'km' ? 'ដាក់ចេញ' : 'Done'}
-                        </button>
-                    )}
-                </div>
-            )}
+            {/* Action buttons hidden — chef-accept workflow is currently disabled */}
         </div>
     );
 }
@@ -395,11 +371,9 @@ function KitchenOrderCard({
                     const isUpdating = updatingIds.has(item.id);
 
                     return (
-                        <button
+                        <div
                             key={item.id}
-                            onClick={() => onAdvance(item)}
-                            disabled={!cfg.next || isUpdating}
-                            className={`w-full p-2.5 rounded-xl border text-left transition-all active:scale-95 hover:opacity-90 group ${cfg.cardCls} ${!cfg.next ? 'cursor-default' : 'hover:brightness-110'}`}
+                            className={`w-full p-2.5 rounded-xl border text-left ${cfg.cardCls}`}
                         >
                             <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
@@ -417,16 +391,10 @@ function KitchenOrderCard({
                                             <StatusIcon size={8} strokeWidth={2.5} />
                                             {lang === 'km' ? cfg.labelKm : cfg.label}
                                         </span>
-                                        {cfg.next && !isUpdating && (
-                                            <span className="text-[9px] font-semibold text-[var(--text-secondary)] group-hover:text-[var(--foreground)] transition-colors">
-                                                → {lang === 'km' ? cfg.nextLabelKm : cfg.nextLabel}
-                                            </span>
-                                        )}
-                                        {isUpdating && <RefreshCw size={9} className="text-[var(--text-secondary)] animate-spin" />}
                                     </div>
                                 </div>
                             </div>
-                        </button>
+                        </div>
                     );
                 })}
             </div>
