@@ -41,3 +41,6 @@ export const deleteCategory = (id: string) =>
     call<void>('delete_category', { id });
 
 export const getInventoryLogs = () => call<any[]>('get_inventory_logs');
+
+export const saveProductImage = (filename: string, content: Uint8Array) =>
+    call<string>('save_product_image', { filename, content: Array.from(content) });

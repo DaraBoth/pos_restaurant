@@ -9,6 +9,7 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
+import { getImageSrc } from '@/lib/image';
 import { Search, ShoppingBag, UtensilsCrossed } from 'lucide-react';
 
 // Palette for products without images
@@ -153,9 +154,9 @@ export default function ProductGrid() {
                                 >
                                     {/* Image area */}
                                     <div className="relative w-full aspect-square overflow-hidden rounded-xl bg-black/20">
-                                        {product.image_path ? (
+                                        {product.image_path && getImageSrc(product.image_path) ? (
                                             <img
-                                                src={`https://asset.localhost/${product.image_path}`}
+                                                src={getImageSrc(product.image_path)!}
                                                 alt={displayName}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                             />

@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+/* ── Inter ─────────────────────────────────────── */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Inter-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url('/fonts/Inter-Bold.ttf') format('truetype');
+}
+
+/* ── Noto Sans Khmer ────────────────────────────── */
+@font-face {
+  font-family: 'Noto Sans Khmer';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/NotoSansKhmer-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Noto Sans Khmer';
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url('/fonts/NotoSansKhmer-Bold.ttf') format('truetype');
+}
+
 @theme {
   --color-border: var(--border);
   --color-foreground: var(--foreground);
@@ -10,8 +42,9 @@
   --color-accent-red: var(--accent-red);
   --color-accent-pink: var(--accent-pink);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-space: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-inter: 'Inter';
+  --font-sans: 'Inter', 'Noto Sans Khmer', ui-sans-serif, system-ui, sans-serif, "Noto Color Emoji";
+  --font-space: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -205,10 +238,11 @@ h6 { font-family: var(--font-sans); letter-spacing: -0.01em; }
   background: rgba(148, 163, 184, 0.55);
 }
 
-/* Khmer font specific fix */
+/* Khmer font — Noto Sans Khmer renders correctly on all platforms */
 .khmer {
-  font-family: "Siemreap", "Suwannaphum", sans-serif;
+  font-family: 'Noto Sans Khmer', sans-serif;
   letter-spacing: 0;
+  line-height: 1.6;
 }
 
 /* Hide scrollbars (no-scrollbar utility) */

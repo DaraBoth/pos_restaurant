@@ -51,6 +51,7 @@ pub fn run() {
             commands::products::create_category,
             commands::products::update_category,
             commands::products::delete_category,
+            commands::products::save_product_image,
             // Orders
             commands::orders::create_order,
             commands::orders::add_order_item,

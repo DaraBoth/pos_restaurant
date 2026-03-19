@@ -195,16 +195,16 @@ export default function HistoryPage() {
                     ))}
                 </div>
 
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-2xl relative">
                     <div className="overflow-x-auto container-snap">
                         <table className="w-full text-left">
                             <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border)]">
                                 <tr>
-                                    <th className="px-8 py-5 w-20"></th>
+                                    <th className="px-4 py-2.5 w-12"></th>
                                     {['Order #', 'Date & Time', 'Table', 'Status', 'Total USD', 'Total KHR'].map(h => (
                                         <th
                                             key={h}
-                                            className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60"
+                                            className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60"
                                         >
                                             {h}
                                         </th>
@@ -214,13 +214,13 @@ export default function HistoryPage() {
                             <tbody className="divide-y divide-[var(--border)]">
                                 {loading && filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center">
-                                            <RefreshCw size={32} className="animate-spin mx-auto opacity-20" />
+                                        <td colSpan={7} className="px-4 py-16 text-center">
+                                            <RefreshCw size={24} className="animate-spin mx-auto opacity-20" />
                                         </td>
                                     </tr>
                                 ) : filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center opacity-30 font-black uppercase tracking-[0.2em]">
+                                        <td colSpan={7} className="px-4 py-16 text-center opacity-30 font-black uppercase tracking-[0.2em] text-xs">
                                             No matching transactions
                                         </td>
                                     </tr>
@@ -235,45 +235,45 @@ export default function HistoryPage() {
                                                     onClick={() => toggleRow(o.id)}
                                                     className={`transition-all hover:bg-white/[0.03] cursor-pointer group ${isExpanded ? 'bg-white/[0.02]' : ''}`}
                                                 >
-                                                    <td className="px-8 py-6">
-                                                        <div className={`p-2 rounded-xl transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
-                                                            {isExpanded ? <ChevronUp size={16} strokeWidth={3} /> : <ChevronDown size={16} strokeWidth={3} />}
+                                                    <td className="px-4 py-2.5">
+                                                        <div className={`w-6 h-6 flex items-center justify-center rounded-lg transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
+                                                            {isExpanded ? <ChevronUp size={13} strokeWidth={3} /> : <ChevronDown size={13} strokeWidth={3} />}
                                                         </div>
                                                     </td>
-                                                    <td className="px-8 py-6 font-mono text-sm font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
+                                                    <td className="px-4 py-2.5 font-mono text-xs font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
                                                         #{o.id.split('-')[0].toUpperCase()}
                                                     </td>
-                                                    <td className="px-8 py-6">
-                                                        <div className="text-sm font-black mb-0.5">{new Date(o.created_at + 'Z').toLocaleDateString()}</div>
-                                                        <div className="text-[10px] font-black font-mono opacity-40 flex items-center gap-1.5">
-                                                            <Clock size={12} />
+                                                    <td className="px-4 py-2.5">
+                                                        <div className="text-xs font-black mb-0.5">{new Date(o.created_at + 'Z').toLocaleDateString()}</div>
+                                                        <div className="text-[10px] font-bold font-mono opacity-40 flex items-center gap-1">
+                                                            <Clock size={10} />
                                                             {new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </div>
                                                     </td>
-                                                    <td className="px-8 py-6">
+                                                    <td className="px-4 py-2.5">
                                                         {o.table_id ? (
-                                                            <span className="flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full bg-[var(--accent)]/5 border border-[var(--accent)]/20 text-[var(--accent)] w-fit uppercase tracking-widest">
-                                                                <TableProperties size={12} />
+                                                            <span className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/20 text-[var(--accent)] w-fit uppercase tracking-widest">
+                                                                <TableProperties size={10} />
                                                                 {o.table_id}
                                                             </span>
                                                         ) : (
                                                             <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">Takeout</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-8 py-6">
+                                                    <td className="px-4 py-2.5">
                                                         <span
-                                                            className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border"
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
                                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                         >
                                                             {o.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-8 py-6 font-mono font-black text-lg" style={{ color: o.status === 'void' ? 'inherit' : 'var(--accent)' }}>
+                                                    <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: o.status === 'void' ? 'inherit' : 'var(--accent)' }}>
                                                         <div className={o.status === 'void' ? 'line-through opacity-30 font-medium' : ''}>
                                                             {formatUsd(o.total_usd)}
                                                         </div>
                                                     </td>
-                                                    <td className="px-8 py-6 font-mono text-xs opacity-60 font-black">
+                                                    <td className="px-4 py-2.5 font-mono text-xs opacity-60 font-black">
                                                         <div className={o.status === 'void' ? 'line-through opacity-20' : ''}>
                                                             {formatKhr(o.total_khr)}
                                                         </div>
@@ -281,13 +281,13 @@ export default function HistoryPage() {
                                                 </tr>
 
                                                 {isExpanded && (
-                                                    <tr className="bg-black/40 animate-fade-in border-l-4 border-[var(--accent)]">
-                                                        <td colSpan={7} className="px-12 py-10">
-                                                            <div className="space-y-8">
+                                                    <tr className="bg-black/30 animate-fade-in border-l-2 border-[var(--accent)]">
+                                                        <td colSpan={7} className="px-5 py-4">
+                                                            <div className="space-y-3">
                                                                 <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <ReceiptText size={18} className="text-[var(--accent)]" />
-                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--accent)]">Itemized Transaction Audit</h4>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <ReceiptText size={14} className="text-[var(--accent)]" />
+                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Itemized Transaction Audit</h4>
                                                                     </div>
                                                                     <div className="flex items-center gap-4">
                                                                         <button
@@ -299,7 +299,7 @@ export default function HistoryPage() {
                                                                                         orderId: o.id,
                                                                                         tableId: o.table_id || undefined,
                                                                                         items: orderDetails[o.id],
-                                                                                        payments: [], // History doesn't have partial payments view yet
+                                                                                        payments: [],
                                                                                         totals: {
                                                                                             subtotalCents: o.total_usd,
                                                                                             vatCents: 0,
@@ -310,30 +310,29 @@ export default function HistoryPage() {
                                                                                     });
                                                                                 }
                                                                             }}
-                                                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-[var(--accent)]/20"
+                                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
                                                                         >
-                                                                            <ReceiptText size={14} />
+                                                                            <ReceiptText size={12} />
                                                                             Print Receipt
                                                                         </button>
-                                                                        <div className="h-px w-20 bg-white/10" />
                                                                     </div>
                                                                 </div>
                                                                 
                                                                 {orderDetails[o.id] ? (
-                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                                                         {orderDetails[o.id].map(item => (
-                                                                            <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] p-6 rounded-[1.5rem] border border-[var(--border)] hover:border-[var(--accent)]/30 transition-all">
-                                                                                <div className="flex items-center gap-5">
-                                                                                    <div className="w-12 h-12 rounded-2xl bg-black border border-white/5 flex items-center justify-center font-black text-[var(--accent)] text-lg">
+                                                                            <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] px-3 py-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--accent)]/30 transition-all">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="w-8 h-8 rounded-lg bg-black border border-white/5 flex items-center justify-center font-black text-[var(--accent)] text-xs flex-shrink-0">
                                                                                         {item.quantity}x
                                                                                     </div>
                                                                                     <div>
-                                                                                        <p className="text-sm font-black text-white leading-tight">{item.product_name}</p>
-                                                                                        <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mt-1.5">{formatUsd(item.price_at_order)} / unit</p>
+                                                                                        <p className="text-xs font-black text-white leading-tight">{item.product_name}</p>
+                                                                                        <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{formatUsd(item.price_at_order)} / unit</p>
                                                                                     </div>
                                                                                 </div>
-                                                                                <div className="text-right">
-                                                                                    <p className="text-sm font-black text-white">{formatUsd(item.price_at_order * item.quantity)}</p>
+                                                                                <div className="text-right flex-shrink-0">
+                                                                                    <p className="text-xs font-black text-white">{formatUsd(item.price_at_order * item.quantity)}</p>
                                                                                 </div>
                                                                             </div>
                                                                         ))}

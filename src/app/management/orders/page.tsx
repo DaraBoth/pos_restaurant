@@ -77,21 +77,21 @@ export default function OrdersManagement() {
     return (
         <div className="max-w-7xl mx-auto animate-fade-in space-y-6">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-[var(--bg-card)] p-8 rounded-[2.5rem] border border-[var(--border)] shadow-xl">
-                <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent)]/10">
-                        <ClipboardList size={28} className="text-[var(--accent)]" strokeWidth={2.5} />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-card)] p-5 rounded-2xl border border-[var(--border)]">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                        <ClipboardList size={18} className="text-[var(--accent)]" strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black text-[var(--foreground)] tracking-tight mb-1">Order History</h1>
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">
-                            Transaction Audit & Revenue Analytics
+                        <h1 className="text-base font-black text-[var(--foreground)] leading-none">Order History</h1>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60 mt-0.5">
+                            Transaction Audit & Revenue
                         </p>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2 bg-[var(--background)] px-4 py-2 rounded-xl border border-[var(--border)]">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 bg-[var(--bg-elevated)] px-3 py-2 rounded-xl border border-[var(--border)]">
                         <input 
                             type="date" 
                             value={startDate} 
@@ -109,21 +109,21 @@ export default function OrdersManagement() {
 
                     <button 
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
                     >
-                        <Download size={16} />
-                        Export Excel
+                        <Download size={14} />
+                        Export
                     </button>
 
-                    <div className="hidden md:flex items-center gap-5 px-6 py-3 rounded-2xl bg-[var(--background)] border border-[var(--border)]">
+                    <div className="hidden md:flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]">
                         <div>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-1 opacity-60">Audit Count</span>
-                            <span className="block text-xl font-black font-mono text-[var(--foreground)] leading-none">{orders.length}</span>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-0.5 opacity-60">Count</span>
+                            <span className="block text-base font-black font-mono text-[var(--foreground)] leading-none">{orders.length}</span>
                         </div>
-                        <div className="w-px h-8 bg-[var(--border)]" />
+                        <div className="w-px h-6 bg-[var(--border)]" />
                         <div>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--accent)] mb-1 opacity-60">Gross Revenue</span>
-                            <span className="block text-xl font-black font-mono text-[var(--accent)] leading-none">
+                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--accent)] mb-0.5 opacity-60">Revenue</span>
+                            <span className="block text-base font-black font-mono text-[var(--accent)] leading-none">
                                 {formatUsd(totalRevenue)}
                             </span>
                         </div>
@@ -132,7 +132,7 @@ export default function OrdersManagement() {
             </div>
 
             {/* Data Grid */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden relative">
                 {loading && (
                     <div className="absolute inset-x-0 top-0 h-1 bg-[var(--accent)]/20 overflow-hidden z-30">
                         <div className="h-full bg-[var(--accent)] animate-[loading_1.5s_infinite_linear]" style={{ width: '30%' }} />
@@ -143,11 +143,11 @@ export default function OrdersManagement() {
                     <table className="w-full text-left">
                         <thead className="bg-[var(--bg-elevated)]">
                             <tr>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] w-20"></th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Receipt ID</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Timestamp</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Status</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Settlement</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] w-12"></th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Receipt ID</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Timestamp</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Status</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Settlement</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
@@ -159,13 +159,13 @@ export default function OrdersManagement() {
                                             onClick={() => toggleRow(o.id)}
                                             className={`transition-all hover:bg-white/[0.03] cursor-pointer group ${isExpanded ? 'bg-white/[0.02]' : ''}`}
                                         >
-                                            <td className="px-8 py-6">
-                                                <div className={`p-2 rounded-xl transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
-                                                    {isExpanded ? <ChevronUp size={16} strokeWidth={3} /> : <ChevronDown size={16} strokeWidth={3} />}
+                                            <td className="px-4 py-2.5">
+                                                <div className={`p-1.5 rounded-lg transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
+                                                    {isExpanded ? <ChevronUp size={14} strokeWidth={3} /> : <ChevronDown size={14} strokeWidth={3} />}
                                                 </div>
                                             </td>
                                             
-                                            <td className="px-8 py-6">
+                                            <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-3">
                                                     <span className={`font-mono font-black tracking-widest text-sm ${isExpanded ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
                                                         #{o.id.split('-')[0].toUpperCase()}
@@ -173,17 +173,17 @@ export default function OrdersManagement() {
                                                 </div>
                                             </td>
                                             
-                                            <td className="px-8 py-6">
+                                            <td className="px-4 py-2.5">
                                                 <div className="text-sm font-black text-[var(--foreground)] mb-0.5">
                                                     {new Date(o.created_at + 'Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                                 </div>
                                                 <div className="text-[10px] font-black font-mono text-[var(--text-secondary)] flex items-center gap-1.5 opacity-60">
-                                                    <Clock size={12} strokeWidth={2.5} />
+                                                    <Clock size={10} strokeWidth={2.5} />
                                                     {new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </div>
                                             </td>
                                             
-                                            <td className="px-8 py-6">
+                                            <td className="px-4 py-2.5">
                                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
                                                     ${o.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}
                                                     ${o.status === 'open' ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20' : ''}
@@ -196,7 +196,7 @@ export default function OrdersManagement() {
                                                 </span>
                                             </td>
                                             
-                                            <td className="px-8 py-6 text-right">
+                                            <td className="px-4 py-2.5 text-right">
                                                 <div className={`font-black font-mono text-base ${o.status === 'void' ? 'line-through text-[var(--text-secondary)] opacity-40' : 'text-[var(--foreground)]'}`}>
                                                     {formatUsd(o.total_usd)}
                                                 </div>
@@ -207,25 +207,25 @@ export default function OrdersManagement() {
                                         </tr>
 
                                         {isExpanded && (
-                                            <tr className="bg-black/40 animate-fade-in border-l-4 border-[var(--accent)]">
-                                                <td colSpan={5} className="px-12 py-8">
-                                                    <div className="space-y-6">
+                                            <tr className="bg-black/30 animate-fade-in border-l-4 border-[var(--accent)]">
+                                                <td colSpan={5} className="px-6 py-4">
+                                                    <div className="space-y-4">
                                                         <div className="flex items-center justify-between">
-                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--accent)]">Order Specification</h4>
-                                                            <div className="h-px flex-1 mx-8 bg-[var(--border)] opacity-20" />
+                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--accent)]">Order Items</h4>
+                                                            <div className="h-px flex-1 mx-6 bg-[var(--border)] opacity-20" />
                                                         </div>
                                                         
                                                         {orderDetails[o.id] ? (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                                                 {orderDetails[o.id].map(item => (
-                                                                    <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] p-5 rounded-2xl border border-[var(--border)]">
-                                                                        <div className="flex items-center gap-4">
-                                                                            <div className="w-10 h-10 rounded-xl bg-[var(--background)] flex items-center justify-center font-black text-[var(--accent)] border border-[var(--border)]">
+                                                                    <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] p-3 rounded-xl border border-[var(--border)]">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="w-8 h-8 rounded-lg bg-[var(--background)] flex items-center justify-center font-black text-[var(--accent)] border border-[var(--border)] text-xs">
                                                                                 {item.quantity}x
                                                                             </div>
                                                                             <div>
                                                                                 <p className="text-sm font-black text-[var(--foreground)] leading-tight">{item.product_name}</p>
-                                                                                <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest mt-1">{formatUsd(item.price_at_order)} / Unit</p>
+                                                                                <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">{formatUsd(item.price_at_order)} / unit</p>
                                                                             </div>
                                                                         </div>
                                                                         <div className="text-right">
@@ -235,8 +235,8 @@ export default function OrdersManagement() {
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <div className="flex items-center justify-center py-10 opacity-30">
-                                                                <div className="w-6 h-6 border-2 border-[var(--foreground)] border-t-transparent rounded-full animate-spin" />
+                                                            <div className="flex items-center justify-center py-6 opacity-30">
+                                                                <div className="w-5 h-5 border-2 border-[var(--foreground)] border-t-transparent rounded-full animate-spin" />
                                                             </div>
                                                         )}
                                                     </div>

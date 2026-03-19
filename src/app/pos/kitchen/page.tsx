@@ -264,7 +264,10 @@ function AggregatedCard({
     updatingIds: Set<string>;
     onAdvanceAll: (items: KitchenOrderItem[], next: KitchenStatus) => void;
 }) {
-    const totalQty = item.pendingItems.length + item.cookingItems.length + item.doneItems.length;
+    const pendingQty = item.pendingItems.reduce((s, i) => s + i.quantity, 0);
+    const cookingQty = item.cookingItems.reduce((s, i) => s + i.quantity, 0);
+    const doneQty    = item.doneItems.reduce((s, i) => s + i.quantity, 0);
+    const totalQty   = pendingQty + cookingQty + doneQty;
     const isAnyUpdating = [...item.pendingItems, ...item.cookingItems].some(i => updatingIds.has(i.id));
 
     const displayName = lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name;
@@ -299,22 +302,22 @@ function AggregatedCard({
 
             {/* Status breakdown */}
             <div className="px-3 pb-2 flex items-center gap-2">
-                {item.pendingItems.length > 0 && (
+                {pendingQty > 0 && (
                     <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
                         <Clock size={8} strokeWidth={2.5} />
-                        {item.pendingItems.length}
+                        {pendingQty}
                     </span>
                 )}
-                {item.cookingItems.length > 0 && (
+                {cookingQty > 0 && (
                     <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-300 border border-orange-500/30">
                         <Flame size={8} strokeWidth={2.5} />
-                        {item.cookingItems.length}
+                        {cookingQty}
                     </span>
                 )}
-                {item.doneItems.length > 0 && (
+                {doneQty > 0 && (
                     <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-green-500/15 text-green-300 border border-green-500/30">
                         <CheckCircle2 size={8} strokeWidth={2.5} />
-                        {item.doneItems.length}
+                        {doneQty}
                     </span>
                 )}
             </div>

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 
@@ -13,8 +14,11 @@ interface SidebarDrawerProps {
 
 export default function SidebarDrawer({ isOpen, onClose, title, subtitle, children }: SidebarDrawerProps) {
   const [shouldRender, setShouldRender] = useState(isOpen);
+  const [mounted, setMounted] = useState(false);
 
   useOverlayBehavior(shouldRender, onClose);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (isOpen) setShouldRender(true);
@@ -24,42 +28,42 @@ export default function SidebarDrawer({ isOpen, onClose, title, subtitle, childr
     if (!isOpen) setShouldRender(false);
   };
 
-  if (!shouldRender) return null;
+  if (!shouldRender || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex justify-end overflow-hidden" aria-modal="true" role="dialog">
-      {/* Backdrop */}
-      <div 
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-out ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex justify-end" aria-modal="true" role="dialog">
+      {/* Backdrop — absolute since parent is already fixed inset-0 */}
+      <div
+        className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
       />
 
-      {/* Drawer */}
-      <div 
-        className={`relative w-full max-w-lg bg-[#181a20] border-l border-white/10 shadow-2xl transition-transform duration-300 ease-out transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      {/* Drawer — flex-col + h-full fills the full viewport height */}
+      <div
+        className={`relative flex flex-col w-full max-w-lg h-full bg-[#181a20] border-l border-white/10 shadow-2xl transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
         onTransitionEnd={handleAnimationEnd}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#1e2229]/50 backdrop-blur-md">
-            <div>
-              <h2 className="text-xl font-bold text-white">{title}</h2>
-              {subtitle && <p className="text-sm text-[var(--text-secondary)] font-medium mt-0.5">{subtitle}</p>}
-            </div>
-            <button 
-              onClick={onClose}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[var(--text-secondary)] hover:text-white transition-all shadow-sm"
-            >
-              <X size={20} />
-            </button>
+        {/* Header — flex-shrink-0 keeps it fixed at top */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1e2229]/60">
+          <div>
+            <h2 className="text-lg font-bold text-white">{title}</h2>
+            {subtitle && <p className="text-sm text-[var(--text-secondary)] mt-0.5">{subtitle}</p>}
           </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--text-secondary)] hover:text-white transition-all"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto container-snap p-8">
-            {children}
-          </div>
+        {/* Content — flex-1 takes remaining space, scrolls independently */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+

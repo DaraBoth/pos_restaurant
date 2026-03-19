@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight } from 'lucide-react';
-import { getRestaurant, RestaurantInput, updateRestaurant, saveLogo } from '@/lib/tauri-commands';
+import { getRestaurant, RestaurantInput, updateRestaurant } from '@/lib/tauri-commands';
 
 const DEFAULT: RestaurantInput = {
     name: '',
@@ -245,7 +245,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                             <div className="relative group/logo">
                                 <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-[#0d1721] border-2 border-dashed border-[var(--border)] group-hover:border-[var(--accent-blue)]/50 transition-all flex items-center justify-center overflow-hidden">
                                     {info.logo_path ? (
-                                        <img src={`https://asset.localhost/${info.logo_path}`} alt="Logo" className="w-full h-full object-cover" />
+                                        <img src={info.logo_path} alt="Logo" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="text-[var(--accent-blue)] opacity-30">LOGO</div>
                                     )}
@@ -254,21 +254,26 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                                     <ArrowRight size={18} className="-rotate-90" />
                                     <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
                                         const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onload = async (event) => {
-                                                const buffer = event.target?.result as ArrayBuffer;
-                                                if (buffer) {
-                                                    try {
-                                                        const newPath = await saveLogo(file.name, new Uint8Array(buffer));
-                                                        update('logo_path', newPath);
-                                                    } catch (error) {
-                                                        console.error('Failed to save logo:', error);
-                                                        alert('Failed to save logo locally.');
-                                                    }
-                                                }
-                                            };
-                                            reader.readAsArrayBuffer(file);
+                                        if (!file) return;
+                                        try {
+                                            const dataUri = await new Promise<string>((resolve, reject) => {
+                                                const img = new Image();
+                                                img.onload = () => {
+                                                    const MAX = 512;
+                                                    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                                                    const canvas = document.createElement('canvas');
+                                                    canvas.width  = Math.round(img.width  * scale);
+                                                    canvas.height = Math.round(img.height * scale);
+                                                    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                    resolve(canvas.toDataURL('image/png'));
+                                                };
+                                                img.onerror = reject;
+                                                img.src = URL.createObjectURL(file);
+                                            });
+                                            update('logo_path', dataUri);
+                                        } catch (error) {
+                                            console.error('Failed to save logo:', error);
+                                            alert('Failed to process logo.');
                                         }
                                     }} />
                                 </label>

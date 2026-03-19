@@ -82,24 +82,24 @@ export default function UsersManagement() {
             </div>
 
             {/* Data Grid */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
                 <div className="overflow-x-auto container-snap">
                     <table className="w-full text-left whitespace-nowrap border-collapse">
                         <thead className="bg-[var(--bg-elevated)]">
                             <tr>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Identity</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Role</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Actions</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Identity</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Role</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Status</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                             {filteredUsers.map(u => (
                                 <tr key={u.id} className="transition-colors hover:bg-[var(--accent)]/5 group">
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center group-hover:border-[var(--accent-blue)]/30 transition-colors">
-                                                <UsersIcon size={16} className="text-[var(--text-secondary)]" />
+                                            <div className="w-8 h-8 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center group-hover:border-[var(--accent-blue)]/30 transition-colors">
+                                                <UsersIcon size={14} className="text-[var(--text-secondary)]" />
                                             </div>
                                             <div>
                                                 <div className="font-black text-[var(--foreground)] text-sm tracking-tight">{u.username}</div>
@@ -112,7 +112,7 @@ export default function UsersManagement() {
                                         </div>
                                     </td>
                                     
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-2.5">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border
                                             ${u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
                                             ${u.role === 'manager' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
@@ -125,28 +125,28 @@ export default function UsersManagement() {
                                         </span>
                                     </td>
                                     
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-2.5">
                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-widest">
                                             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                             Active
                                         </span>
                                     </td>
                                     
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 py-2.5 text-right">
                                         <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => { setEditingUser(u); setIsModalOpen(true); }}
-                                                className="w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-secondary)] transition-all"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-secondary)] transition-all"
                                                 title="Edit"
                                             >
-                                                <Edit3 size={14} />
+                                                <Edit3 size={13} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(u.id)}
-                                                className="w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
                                                 title="Delete"
                                             >
-                                                <Trash2 size={14} />
+                                                <Trash2 size={13} />
                                             </button>
                                         </div>
                                     </td>
@@ -154,8 +154,8 @@ export default function UsersManagement() {
                             ))}
                             {filteredUsers.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-16 text-center">
-                                        <UsersIcon size={32} className="mx-auto mb-3 text-[var(--text-secondary)] opacity-20" />
+                                    <td colSpan={4} className="px-4 py-12 text-center">
+                                        <UsersIcon size={28} className="mx-auto mb-3 text-[var(--text-secondary)] opacity-20" />
                                         <p className="text-[var(--text-secondary)] font-bold text-xs">{lang === 'km' ? 'រករាល់' : 'No staff found'}</p>
                                     </td>
                                 </tr>

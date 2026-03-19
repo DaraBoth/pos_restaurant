@@ -213,3 +213,37 @@ pub async fn delete_category(id: String, pool: State<'_, SqlitePool>) -> Result<
         .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
+
+/// Save a product image to the app data directory and return the full absolute path.
+/// The path is stored in the products.image_path column and served via the
+/// asset:// protocol configured in tauri.conf.json.
+#[tauri::command]
+pub async fn save_product_image(
+    app: tauri::AppHandle,
+    filename: String,
+    content: Vec<u8>,
+) -> Result<String, String> {
+    use tauri::Manager;
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let images_dir = app_dir.join("product-images");
+    std::fs::create_dir_all(&images_dir).map_err(|e| e.to_string())?;
+
+    let extension = std::path::Path::new(&filename)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("jpg");
+
+    // Only allow safe image extensions
+    let ext_lower = extension.to_lowercase();
+    if !["jpg", "jpeg", "png", "webp", "gif"].contains(&ext_lower.as_str()) {
+        return Err("Unsupported image format".to_string());
+    }
+
+    let name = format!("{}.{}", uuid::Uuid::new_v4(), ext_lower);
+    let path = images_dir.join(&name);
+    let full_path = path.to_string_lossy().to_string();
+
+    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+
+    Ok(full_path)
+}

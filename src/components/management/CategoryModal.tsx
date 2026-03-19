@@ -54,38 +54,38 @@ export default function CategoryModal({ isOpen, onClose, onSave, category }: Cat
         >
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Category Name (EN)</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Category Name (EN)</label>
                     <input
                         required
                         value={name}
                         onChange={e => setName(e.target.value)}
-                        className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium"
+                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-medium"
                         placeholder="e.g. Beverages"
                     />
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Category Name (KH)</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Category Name (KH)</label>
                     <input
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
-                        className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all khmer"
+                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all khmer"
                         placeholder="ភេសជ្ជៈ"
                     />
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                <div className="flex items-center gap-3 pt-2 border-t border-white/10">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-2xl text-sm font-bold text-[#8a8a99] hover:text-white border border-white/5 hover:border-white/20 transition-colors"
+                        className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-white border border-white/10 hover:border-white/25 transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="flex-1 py-3 rounded-2xl bg-[var(--accent)] text-black font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-white font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />

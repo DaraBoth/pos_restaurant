@@ -29,27 +29,27 @@ export function printReceipt(payload: ReceiptPrintPayload) {
     if (typeof window === 'undefined') return;
 
     const logoHtml = payload.restaurant.logo_path 
-        ? `<img src="https://asset.localhost/${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />` 
+        ? `<img src="${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />` 
         : '';
 
-    const itemRows = payload.items.map(item => `
-        <div style="margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px;">
-                <span>${escapeHtml(item.product_name || '')}</span>
-                <span>${formatUsd(item.price_at_order * item.quantity)}</span>
-            </div>
-            ${item.product_khmer ? `<div style="font-size: 12px; color: #444; margin-top: 1px;">${escapeHtml(item.product_khmer)}</div>` : ''}
-            <div style="font-size: 11px; color: #666; font-family: monospace;">
-                ${item.quantity} x ${formatUsd(item.price_at_order)}
-            </div>
-        </div>
+    const itemRows = payload.items.map((item, idx) => `
+        <tr class="item-row">
+            <td class="col-id">${idx + 1}</td>
+            <td class="col-name">
+                ${escapeHtml(item.product_name || '')}
+                ${item.product_khmer ? `<div class="item-km">${escapeHtml(item.product_khmer)}</div>` : ''}
+            </td>
+            <td class="col-qty">${item.quantity}</td>
+            <td class="col-price">${formatUsd(item.price_at_order)}</td>
+            <td class="col-total">${formatUsd(item.price_at_order * item.quantity)}</td>
+        </tr>
     `).join('');
 
     const paymentRows = payload.payments.map(payment => `
-        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 13px;">
-            <span style="text-transform: uppercase;">${escapeHtml(payment.method)} (${escapeHtml(payment.currency)})</span>
-            <span>${payment.currency === 'KHR' ? formatKhr(payment.amount) : formatUsd(payment.amount)}</span>
-        </div>
+        <tr>
+            <td class="pay-method">${escapeHtml(payment.method)} <span class="pay-cur">(${escapeHtml(payment.currency)})</span></td>
+            <td>${payment.currency === 'KHR' ? formatKhr(payment.amount) : formatUsd(payment.amount)}</td>
+        </tr>
     `).join('');
 
     const footerLines = (payload.restaurant.receipt_footer || 'Thank you for your visit!')
@@ -66,110 +66,191 @@ export function printReceipt(payload: ReceiptPrintPayload) {
     const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
     if (!doc) { document.body.removeChild(iframe); return; }
 
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     doc.open();
-    doc.write(`
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>Receipt ${payload.orderId}</title>
-                <style>
-                    @page { margin: 0; }
-                    body { 
-                        font-family: 'Inter', -apple-system, sans-serif; 
-                        padding: 20px; 
-                        width: 80mm; 
-                        margin: 0 auto;
-                        color: #000;
-                        line-height: 1.4;
-                    }
-                    .center { text-align: center; }
-                    .divider { border-top: 1px dashed #000; margin: 15px 0; }
-                    .header { margin-bottom: 20px; }
-                    .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
-                    .header p { margin: 2px 0; font-size: 13px; font-weight: 600; }
-                    .info { font-size: 11px; font-family: monospace; color: #333; }
-                    .totals { margin-top: 10px; }
-                    .totals-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-                    .grand-total { 
-                        font-size: 18px; 
-                        font-weight: 900; 
-                        border-top: 2px solid #000; 
-                        padding-top: 8px; 
-                        margin-top: 8px;
-                    }
-                    .khr-total { font-size: 14px; font-weight: 700; color: #444; }
-                    @media print {
-                        body { width: 100%; padding: 10mm; }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header center">
-                    ${logoHtml}
-                    <h1>${escapeHtml(payload.restaurant.name)}</h1>
-                    ${payload.restaurant.khmer_name ? `<p style="font-size: 18px; margin-top: 4px;">${escapeHtml(payload.restaurant.khmer_name)}</p>` : ''}
-                    <div style="margin-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
-                        ${payload.restaurant.address ? `<div>${escapeHtml(payload.restaurant.address)}</div>` : ''}
-                        ${payload.restaurant.address_kh ? `<div>${escapeHtml(payload.restaurant.address_kh)}</div>` : ''}
-                        ${payload.restaurant.phone ? `<div style="margin-top: 4px;">TEL: ${escapeHtml(payload.restaurant.phone)}</div>` : ''}
-                    </div>
-                </div>
+    doc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Receipt</title>
+  <style>
+    @page {
+      size: 72mm auto;
+      margin: 4mm 3mm;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      color: #000;
+      background: #fff;
+      width: 66mm;
+      margin: 0 auto;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
 
-                <div class="divider"></div>
+    /* ── Header ── */
+    .hd { text-align: center; padding-bottom: 6px; }
+    .hd img { max-width: 70px; max-height: 50px; margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto; }
+    .hd .biz-name { font-size: 15px; font-weight: 900; font-family: Arial, sans-serif; letter-spacing: 0.5px; }
+    .hd .biz-km   { font-size: 12px; font-weight: 700; font-family: Arial, sans-serif; margin-top: 1px; }
+    .hd .addr     { font-size: 10px; margin-top: 3px; line-height: 1.5; }
+    .hd .phone    { font-size: 10px; font-weight: 700; margin-top: 2px; }
 
-                <div class="info">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>ORDER: ${payload.orderId.slice(0, 8)}...</span>
-                        <span>${new Date().toLocaleDateString()}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-                        <span>TABLE: ${payload.tableId || 'N/A'}</span>
-                        <span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                </div>
+    /* ── Dividers ── */
+    .d-dash  { border: none; border-top: 1px dashed #555; margin: 5px 0; }
+    .d-solid { border: none; border-top: 1.5px solid #000; margin: 5px 0; }
+    .d-eq    { border: none; border-top: 2px solid #000; margin: 4px 0; }
 
-                <div class="divider"></div>
+    /* ── Meta ── */
+    .meta { font-size: 10px; width: 100%; border-collapse: collapse; }
+    .meta td { padding: 1px 0; vertical-align: top; }
+    .meta td:last-child { text-align: right; }
+    .meta .lbl { font-weight: 900; text-transform: uppercase; }
 
-                <div class="items">
-                    ${itemRows}
-                </div>
+    /* ── Items table ── */
+    .items-tbl { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 10px; }
+    .items-tbl thead tr { border-bottom: 1px solid #000; }
+    .items-tbl th { font-weight: 900; text-transform: uppercase; padding: 1px 2px; font-size: 9px; }
+    .items-tbl td { padding: 3px 2px; vertical-align: top; }
+    .items-tbl .item-row:not(:last-child) td { border-bottom: 1px dotted #ccc; }
+    .col-id    { width: 8%;  text-align: center; }
+    .col-name  { width: 42%; }
+    .col-qty   { width: 8%;  text-align: center; }
+    .col-price { width: 20%; text-align: right; }
+    .col-total { width: 22%; text-align: right; font-weight: 700; }
+    .item-km   { font-size: 9px; color: #555; margin-top: 1px; }
 
-                <div class="divider" style="border-top-style: solid; border-top-width: 2px;"></div>
+    /* ── Totals ── */
+    .totals { font-size: 11px; width: 100%; border-collapse: collapse; }
+    .totals td { padding: 2px 0; }
+    .totals td:last-child { text-align: right; }
+    .totals .row-sub  { color: #444; font-size: 10px; }
+    .totals .row-grand td { font-size: 14px; font-weight: 900; padding: 4px 0 2px; }
+    .totals .row-khr  td { font-size: 11px; font-weight: 700; color: #222; }
 
-                <div class="totals">
-                    <div class="totals-row">
-                        <span>SUBTOTAL </span>
-                        <span>${formatUsd(payload.totals.subtotalCents)}</span>
-                    </div>
-                    <div class="totals-row grand-total">
-                        <span>TOTAL USD</span>
-                        <span>${formatUsd(payload.totals.totalUsdCents)}</span>
-                    </div>
-                    <div class="totals-row khr-total">
-                        <span>TOTAL KHR</span>
-                        <span>${formatKhr(payload.totals.totalKhr)}</span>
-                    </div>
-                </div>
+    /* ── Payments ── */
+    .pay-hd  { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555; margin-bottom: 3px; }
+    .pay-tbl { width: 100%; border-collapse: collapse; font-size: 10px; }
+    .pay-tbl td { padding: 1px 0; }
+    .pay-tbl td:last-child { text-align: right; font-weight: 700; }
+    .pay-method { font-weight: 700; text-transform: uppercase; }
+    .pay-cur    { font-weight: 400; text-transform: none; color: #666; }
 
-                <div class="divider"></div>
+    /* ── Footer ── */
+    .footer { text-align: center; padding-top: 4px; }
+    .footer .msg   { font-size: 11px; font-weight: 700; line-height: 1.6; font-family: Arial, sans-serif; }
+    .footer .brand { font-size: 8px; color: #aaa; letter-spacing: 0.15em; text-transform: uppercase; margin-top: 6px; }
 
-                <div class="payments">
-                    <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; margin-bottom: 6px;">Payment Details</div>
-                    ${paymentRows}
-                </div>
+    @media screen {
+      body { width: 300px; padding: 12px; box-shadow: 0 2px 20px rgba(0,0,0,.15); border: 1px solid #e5e5e5; }
+    }
+  </style>
+</head>
+<body>
 
-                <div class="divider"></div>
+  <!-- HEADER -->
+  <div class="hd">
+    ${logoHtml}
+    <div class="biz-name">${escapeHtml(payload.restaurant.name)}</div>
+    ${payload.restaurant.khmer_name ? `<div class="biz-km">${escapeHtml(payload.restaurant.khmer_name)}</div>` : ''}
+    ${payload.restaurant.address || payload.restaurant.address_kh ? `
+    <div class="addr">
+      ${payload.restaurant.address ? escapeHtml(payload.restaurant.address) + '<br>' : ''}
+      ${payload.restaurant.address_kh ? escapeHtml(payload.restaurant.address_kh) : ''}
+    </div>` : ''}
+    ${payload.restaurant.phone ? `<div class="phone">TEL: ${escapeHtml(payload.restaurant.phone)}</div>` : ''}
+  </div>
 
-                <div class="center" style="font-size: 12px; font-weight: bold;">
-                    ${footerLines}
-                    <div style="margin-top: 15px; font-size: 10px; font-weight: 400; font-family: monospace;">
-                        POWERED BY DINEOS
-                    </div>
-                </div>
-            </body>
-        </html>
-    `);
+  <hr class="d-dash">
+
+  <!-- ORDER META -->
+  <table class="meta">
+    <tr>
+      <td><span class="lbl">Order</span> #${escapeHtml(payload.orderId.slice(0, 8).toUpperCase())}</td>
+      <td>${escapeHtml(dateStr)}</td>
+    </tr>
+    <tr>
+      <td><span class="lbl">Table</span> ${escapeHtml(payload.tableId || '—')}</td>
+      <td>${escapeHtml(timeStr)}</td>
+    </tr>
+  </table>
+
+  <hr class="d-dash">
+
+  <!-- ITEMS TABLE -->
+  <table class="items-tbl">
+    <thead>
+      <tr>
+        <th class="col-id">#</th>
+        <th class="col-name">Name</th>
+        <th class="col-qty">Qty</th>
+        <th class="col-price">Price</th>
+        <th class="col-total">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+    </tbody>
+  </table>
+
+  <hr class="d-eq">
+
+  <!-- TOTALS -->
+  <table class="totals">
+    <tr class="row-sub">
+      <td>Subtotal</td>
+      <td>${formatUsd(payload.totals.subtotalCents)}</td>
+    </tr>
+    <tr class="row-grand">
+      <td>TOTAL USD</td>
+      <td>${formatUsd(payload.totals.totalUsdCents)}</td>
+    </tr>
+    <tr class="row-khr">
+      <td>TOTAL KHR</td>
+      <td>${formatKhr(payload.totals.totalKhr)}</td>
+    </tr>
+  </table>
+
+  <hr class="d-dash">
+
+  <!-- PAYMENTS -->
+  <div class="pay-hd">Payment</div>
+  <table class="pay-tbl">
+    ${paymentRows}
+  </table>
+
+  <hr class="d-dash">
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="msg">${footerLines}</div>
+    <div class="brand">Powered by DineOS</div>
+  </div>
+
+</body>
+</html>`);
+
+  <hr class="d-dash">
+
+  <!-- PAYMENTS -->
+  <div class="pay-title">Payment</div>
+  ${paymentRows}
+
+  <hr class="d-dash">
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="msg">${footerLines}</div>
+    <div class="brand">Powered by DineOS</div>
+  </div>
+
+</body>
+</html>`);
     doc.close();
 
     iframe.onload = () => {

@@ -27,7 +27,7 @@ export default function ManagementLayout({ children }: { children: React.ReactNo
                     </nav>
                 </header>
                 <main className="flex-1 overflow-y-auto p-4 min-w-0 no-scrollbar bg-[var(--bg-dark)]">
-                    <div className="max-w-7xl mx-auto">
+                    <div className="max-w-7xl mx-auto h-full">
                         {children}
                     </div>
                 </main>

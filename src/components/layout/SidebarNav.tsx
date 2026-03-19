@@ -57,7 +57,7 @@ export default function SidebarNav() {
                     style={{ background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' }}
                 >
                     {restaurant?.logo_path ? (
-                        <img src={`https://asset.localhost/${restaurant.logo_path}`} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+                        <img src={restaurant.logo_path} alt="Logo" className="w-full h-full object-cover rounded-xl" />
                     ) : (
                         <ChefHat size={18} color="#fff" strokeWidth={2.5} />
                     )}
@@ -73,7 +73,7 @@ export default function SidebarNav() {
             {/* Navigation */}
             <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
                 <NavItem label={lang === 'km' ? 'ផ្នែកលក់' : 'POS'} icon={LayoutGrid} path="/pos" pathname={pathname} />
-                {(user?.role === 'admin' || user?.role === 'chef') && (
+                {false && (user?.role === 'admin' || user?.role === 'chef') && (
                     <NavItem label={lang === 'km' ? 'ផ្ទះបាយ' : 'Kitchen'} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} />
                 )}
                 <NavItem label={lang === 'km' ? 'ប្រវត្តិ' : 'History'} icon={History} path="/history" pathname={pathname} />

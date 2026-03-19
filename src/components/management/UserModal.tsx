@@ -76,58 +76,58 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
         >
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Username</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
                     <input
                         required
                         disabled={!!user}
                         value={username}
                         onChange={e => setUsername(e.target.value)}
-                        className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium disabled:opacity-50"
+                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-medium disabled:opacity-50"
                         placeholder="e.g. johndoe"
                     />
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">
+                    <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">
                         {user ? 'New Password (leave blank to keep)' : 'Password'}
                     </label>
                     <div className="relative">
-                        <Key size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8a8a99]/40" />
+                        <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
                         <input
                             type="password"
                             required={!user}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="w-full bg-[#0f1115] border border-white/5 rounded-2xl pl-12 pr-6 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-mono"
-                            placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-mono"
+                            placeholder="••••••••"
                         />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Full Name</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Full Name</label>
                         <input
                             value={fullName}
                             onChange={e => setFullName(e.target.value)}
-                            className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all font-medium"
+                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-medium"
                             placeholder="John Doe"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Khmer Name</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Khmer Name</label>
                         <input
                             value={khmerName}
                             onChange={e => setKhmerName(e.target.value)}
-                            className="w-full bg-[#0f1115] border border-white/5 rounded-2xl px-5 py-3.5 text-white focus:border-[var(--accent)] outline-none transition-all khmer"
+                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all khmer"
                             placeholder="ចន ដូ"
                         />
                     </div>
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-[#8a8a99]">Role & Permissions</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Role & Permissions</label>
                     <div className="grid grid-cols-3 gap-2">
                         {(['admin', 'manager', 'cashier', 'waiter', 'chef'] as const).map((r) => (
                             <button
@@ -137,28 +137,28 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all ${
                                     role === r 
                                         ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-white' 
-                                        : 'bg-[#0f1115] border-white/5 text-[#8a8a99] hover:border-white/20'
+                                        : 'bg-white/[0.07] border-white/10 text-[var(--text-secondary)] hover:border-white/20'
                                 }`}
                             >
-                                <Shield size={14} className={role === r ? 'text-[var(--accent)]' : 'text-[#8a8a99]'} />
+                                <Shield size={14} className={role === r ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
                                 <span className="text-xs font-bold capitalize">{r}</span>
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                <div className="flex items-center gap-3 pt-2 border-t border-white/10">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-2xl text-sm font-bold text-[#8a8a99] hover:text-white border border-white/5 hover:border-white/20 transition-colors"
+                        className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-white border border-white/10 hover:border-white/25 transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="flex-1 py-3 rounded-2xl bg-[var(--accent)] text-black font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-white font-black text-sm shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
