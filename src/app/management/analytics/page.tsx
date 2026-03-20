@@ -52,7 +52,9 @@ export default function AnalyticsPage() {
                 setPeakHours(ph);
                 setSlowMovers(sm);
             } catch (e) {
-                setError(t('analyticsUnavailable'));
+                const msg = e instanceof Error ? e.message : String(e);
+                console.error('[Analytics] Load failed:', msg);
+                setError(msg || t('analyticsUnavailable'));
             } finally {
                 setLoading(false);
             }

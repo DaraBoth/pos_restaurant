@@ -23,10 +23,12 @@ export async function call<T>(cmd: string, args?: Record<string, unknown>): Prom
     if (typeof window === 'undefined') {
         throw new Error('Tauri not available — server-side rendering.');
     }
+    let invoke: InvokeFn;
     try {
-        const invoke = await getInvoke();
-        return invoke<T>(cmd, args);
+        invoke = await getInvoke();
     } catch {
-        throw new Error('Tauri not available — running outside of desktop app.');
+        throw new Error('Analytics unavailable outside Tauri desktop app.');
     }
+    // Let the actual invoke error propagate naturally so we see the real error
+    return invoke<T>(cmd, args);
 }
