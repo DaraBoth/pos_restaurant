@@ -10,7 +10,9 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { getImageSrc } from '@/lib/image';
-import { Search, ShoppingBag, UtensilsCrossed } from 'lucide-react';
+import { getTopProducts } from '@/lib/api/analytics';
+import type { TopProduct } from '@/types';
+import { Search, ShoppingBag, UtensilsCrossed, Flame, Star, Sparkles } from 'lucide-react';
 
 // Palette for products without images
 const CARD_COLORS = [
@@ -24,6 +26,7 @@ export default function ProductGrid() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [addingId, setAddingId] = useState<string | null>(null);
+    const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
     const { orderId, tableId, setOrderId, setItems } = useOrder();
     const { user } = useAuth();
@@ -32,12 +35,14 @@ export default function ProductGrid() {
     useEffect(() => {
         async function load() {
             try {
-                const [cats, prods] = await Promise.all([
+                const [cats, prods, tops] = await Promise.all([
                     getCategories(),
-                    getProducts(selectedCategory || undefined)
+                    getProducts(selectedCategory || undefined),
+                    getTopProducts('month')
                 ]);
                 setCategories(cats);
                 setProducts(prods);
+                setTopProducts(tops);
             } catch (e) {
                 console.error(e);
             }
@@ -74,6 +79,22 @@ export default function ProductGrid() {
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
         return p.name.toLowerCase().includes(q) || (p.khmer_name && p.khmer_name.toLowerCase().includes(q));
+    });
+
+    const bestSellerId = topProducts[0]?.id;
+    const recommendedId = topProducts[1]?.id;
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const sortedFiltered = [...filteredProducts].sort((a, b) => {
+        const isNewA = a.created_at ? (now - new Date(a.created_at).getTime() < SEVEN_DAYS_MS) : false;
+        const isNewB = b.created_at ? (now - new Date(b.created_at).getTime() < SEVEN_DAYS_MS) : false;
+        
+        const rankA = a.id === bestSellerId ? 1 : a.id === recommendedId ? 2 : isNewA ? 3 : 4;
+        const rankB = b.id === bestSellerId ? 1 : b.id === recommendedId ? 2 : isNewB ? 3 : 4;
+        
+        if (rankA !== rankB) return rankA - rankB;
+        return a.name.localeCompare(b.name);
     });
 
     return (
@@ -134,7 +155,7 @@ export default function ProductGrid() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
-                        {filteredProducts.map((product, idx) => {
+                        {sortedFiltered.map((product, idx) => {
                             const isAdding = addingId === product.id;
                             const outOfStock = product.stock_quantity <= 0;
                             const unavailable = product.is_available === 0 || outOfStock;
@@ -165,6 +186,24 @@ export default function ProductGrid() {
                                                 <UtensilsCrossed size={32} className="opacity-20 text-white" />
                                             </div>
                                         )}
+
+                                        {/* Badges Overlay */}
+                                        {product.id === bestSellerId && (
+                                            <div className="absolute top-1.5 left-1.5 bg-orange-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-10 hover:bg-orange-400">
+                                                <Flame size={10} /> {t('bestSeller')}
+                                            </div>
+                                        )}
+                                        {product.id !== bestSellerId && product.id === recommendedId && (
+                                            <div className="absolute top-1.5 left-1.5 bg-yellow-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-10 hover:bg-yellow-400">
+                                                <Star size={10} /> {t('recommended')}
+                                            </div>
+                                        )}
+                                        {product.id !== bestSellerId && product.id !== recommendedId && (product.created_at && (now - new Date(product.created_at).getTime() < SEVEN_DAYS_MS)) && (
+                                            <div className="absolute top-1.5 left-1.5 bg-[var(--accent-blue)] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-10 hover:brightness-110">
+                                                <Sparkles size={10} /> {t('new')}
+                                            </div>
+                                        )}
+
                                         {/* Out of stock overlay */}
                                         {unavailable && (
                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">

@@ -1,5 +1,5 @@
 use tauri::State;
-use sqlx::{SqlitePool, Row};
+use sqlx::SqlitePool;
 use uuid::Uuid;
 use crate::models::{InventoryItem, ProductIngredient};
 

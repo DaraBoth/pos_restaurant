@@ -74,6 +74,12 @@ pub fn run() {
             commands::inventory::get_product_ingredients,
             commands::inventory::set_product_ingredient,
             commands::inventory::remove_product_ingredient,
+            
+            // Analytics
+            commands::analytics::get_top_products,
+            commands::analytics::get_revenue_by_category,
+            commands::analytics::get_peak_hours,
+            commands::analytics::get_slow_movers,
 
             commands::orders::hold_order,
             commands::orders::void_order,

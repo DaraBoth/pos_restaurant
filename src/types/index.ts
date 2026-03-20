@@ -62,6 +62,7 @@ export interface Product {
     image_path?: string;
     category_name?: string;
     category_khmer?: string;
+    created_at: string;
 }
 
 // --------------- Tables ---------------
@@ -192,4 +193,23 @@ export interface ProductIngredient {
     item_name?: string;
     item_khmer_name?: string;
     unit_label?: string;
+}
+
+// --------------- Analytics ---------------
+export interface TopProduct {
+    id: string;
+    name: string;
+    order_count: number;
+    total_revenue: number;
+}
+
+export interface CategoryRevenue {
+    id: string;
+    name: string;
+    total_revenue: number;
+}
+
+export interface PeakHour {
+    hour: string;
+    order_count: number;
 }

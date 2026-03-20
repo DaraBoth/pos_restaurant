@@ -1,6 +1,6 @@
 use tauri::State;
 use sqlx::SqlitePool;
-use crate::models::{Order, OrderItem, PaymentInput, TableSession};
+use crate::models::{Order, OrderItem, PaymentInput};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -538,7 +538,7 @@ pub async fn checkout_session(
     .await
     .unwrap_or(None)
     .unwrap_or(4100.0);
-    let final_khr = round_khr(final_total, exch_rate);
+    let _final_khr = round_khr(final_total, exch_rate);
 
     // Instead of attributing the total to all orders, attribute to the first one, zero others
     // Or just update them all status = 'completed' and let the total be their individual totals

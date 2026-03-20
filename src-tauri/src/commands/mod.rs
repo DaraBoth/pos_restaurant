@@ -5,5 +5,5 @@ pub mod orders;
 pub mod exchange;
 pub mod tables;
 pub mod kitchen;
-pub mod payments;
 pub mod inventory;
+pub mod analytics;

@@ -21,7 +21,7 @@ pub async fn get_products(
     let products = if let Some(cat_id) = category_id {
         sqlx::query_as::<_, Product>(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.category_id = ?
              ORDER BY p.name"
@@ -32,7 +32,7 @@ pub async fn get_products(
     } else {
         sqlx::query_as::<_, Product>(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.is_available = 1
              ORDER BY c.sort_order, p.name"

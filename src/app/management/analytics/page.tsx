@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { getRevenueSummary, getRevenueByPeriod, RevenueSummary, RevenueByDay } from '@/lib/tauri-commands';
+import { getTopProducts, getRevenueByCategory, getPeakHours, getSlowMovers } from '@/lib/api/analytics';
+import type { TopProduct, CategoryRevenue, PeakHour } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
-import { TrendingUp, ShoppingBag, DollarSign, Clock } from 'lucide-react';
+import { TrendingUp, ShoppingBag, DollarSign, Clock, AlertTriangle, Flame, PieChart } from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 
 type Period = 'week' | 'month' | '3months' | 'year';
@@ -19,6 +21,13 @@ export default function AnalyticsPage() {
     const { t, lang } = useLanguage();
     const [summary, setSummary] = useState<RevenueSummary | null>(null);
     const [chartData, setChartData] = useState<RevenueByDay[]>([]);
+    
+    // Advanced Analytics States
+    const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+    const [categoryRevenue, setCategoryRevenue] = useState<CategoryRevenue[]>([]);
+    const [peakHours, setPeakHours] = useState<PeakHour[]>([]);
+    const [slowMovers, setSlowMovers] = useState<TopProduct[]>([]);
+
     const [period, setPeriod] = useState<Period>('month');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -28,12 +37,20 @@ export default function AnalyticsPage() {
             setLoading(true);
             setError('');
             try {
-                const [s, d] = await Promise.all([
+                const [s, d, tp, cr, ph, sm] = await Promise.all([
                     getRevenueSummary(),
                     getRevenueByPeriod(period),
+                    getTopProducts(period),
+                    getRevenueByCategory(period),
+                    getPeakHours(period),
+                    getSlowMovers()
                 ]);
                 setSummary(s);
                 setChartData(d);
+                setTopProducts(tp);
+                setCategoryRevenue(cr);
+                setPeakHours(ph);
+                setSlowMovers(sm);
             } catch (e) {
                 setError(t('analyticsUnavailable'));
             } finally {
@@ -203,6 +220,108 @@ export default function AnalyticsPage() {
                                 </div>
                             </div>
                         )}
+                    </div>
+
+                    {/* Advanced Analytics Widgets */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        
+                        {/* Top Products Widget */}
+                        <div className="pos-card p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Flame size={18} className="text-orange-400" />
+                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                                    Top Products
+                                </h3>
+                            </div>
+                            <div className="space-y-2">
+                                {topProducts.slice(0, 5).map((p, i) => (
+                                    <div key={p.id} className="flex items-center justify-between p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 font-black text-xs flex items-center justify-center">
+                                                {i + 1}
+                                            </div>
+                                            <div className="font-bold text-sm text-[var(--foreground)]">{p.name}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-mono font-bold text-green-400">{formatUsd(p.total_revenue)}</div>
+                                            <div className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest">{p.order_count} Sold</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {topProducts.length === 0 && <div className="text-xs text-[var(--text-secondary)] text-center py-4">No data</div>}
+                            </div>
+                        </div>
+
+                        {/* Revenue by Category Widget */}
+                        <div className="pos-card p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <PieChart size={18} className="text-blue-400" />
+                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                                    Revenue By Category
+                                </h3>
+                            </div>
+                            <div className="space-y-2">
+                                {categoryRevenue.map((c) => (
+                                    <div key={c.id} className="flex items-center justify-between p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]">
+                                        <div className="font-bold text-sm text-[var(--foreground)]">{c.name}</div>
+                                        <div className="font-mono font-bold text-blue-400">{formatUsd(c.total_revenue)}</div>
+                                    </div>
+                                ))}
+                                {categoryRevenue.length === 0 && <div className="text-xs text-[var(--text-secondary)] text-center py-4">No data</div>}
+                            </div>
+                        </div>
+
+                        {/* Peak Hours Widget */}
+                        <div className="pos-card p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Clock size={18} className="text-purple-400" />
+                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                                    Peak Ordering Hours
+                                </h3>
+                            </div>
+                            <div className="flex items-end gap-1 h-32 mt-4">
+                                {peakHours.length > 0 ? (() => {
+                                    const maxOrders = Math.max(...peakHours.map(h => h.order_count));
+                                    return peakHours.map(ph => {
+                                        const height = (ph.order_count / maxOrders) * 100;
+                                        return (
+                                            <div key={ph.hour} className="flex-1 flex flex-col items-center gap-1 group" title={`${ph.hour} : ${ph.order_count} orders`}>
+                                                <div className="w-full flex flex-col justify-end h-24">
+                                                    <div 
+                                                        className="w-full rounded-t-md bg-purple-500/50 group-hover:bg-purple-400 transition-colors"
+                                                        style={{ height: `${Math.max(height, 5)}%` }} 
+                                                    />
+                                                </div>
+                                                <span className="text-[9px] text-[var(--text-secondary)] font-mono">{ph.hour.split(':')[0]}h</span>
+                                            </div>
+                                        )
+                                    });
+                                })() : <div className="text-xs text-[var(--text-secondary)] text-center w-full py-4">No data</div>}
+                            </div>
+                        </div>
+
+                        {/* Slow Movers Widget */}
+                        <div className="pos-card p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <AlertTriangle size={18} className="text-rose-400" />
+                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                                    Slow Movers (Last 30 Days)
+                                </h3>
+                            </div>
+                            <div className="space-y-2">
+                                {slowMovers.slice(0, 5).map(sm => (
+                                    <div key={sm.id} className="flex items-center justify-between p-3 bg-rose-500/5 rounded-xl border border-rose-500/10">
+                                        <div className="font-bold text-sm text-[var(--foreground)]">{sm.name}</div>
+                                        <div className="text-right">
+                                            <div className="font-mono font-bold text-rose-400">{sm.order_count} Sold</div>
+                                            <div className="text-[10px] text-rose-400/60 font-bold uppercase tracking-widest">Action Needed</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {slowMovers.length === 0 && <div className="text-xs text-green-400 font-bold text-center py-4 bg-green-500/10 rounded-xl border border-green-500/20">All products are selling well!</div>}
+                            </div>
+                        </div>
+
                     </div>
                 </>
             )}

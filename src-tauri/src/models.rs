@@ -42,6 +42,7 @@ pub struct Product {
     pub image_path: Option<String>,
     pub category_name: Option<String>,
     pub category_khmer: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
