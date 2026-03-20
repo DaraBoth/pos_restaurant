@@ -1,4 +1,4 @@
-use libsql::{Builder, Connection, Database};
+use libsql::{Builder, Connection};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};

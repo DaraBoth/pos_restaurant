@@ -112,6 +112,7 @@ pub struct Order {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct TableSession {
     pub id: String,
     pub table_id: Option<String>,
