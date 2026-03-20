@@ -1,8 +1,8 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { getUsers, deleteUser, UserSession } from '@/lib/tauri-commands';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { Users as UsersIcon, Plus, ShieldCheck, Mail, CircleDot, Activity, Search, Edit3, Trash2, Shield } from 'lucide-react';
+import { Users as UsersIcon, Plus, Search, Edit3, Trash2, Shield } from 'lucide-react';
 import UserModal from '@/components/management/UserModal';
 
 export default function UsersManagement() {
@@ -10,7 +10,7 @@ export default function UsersManagement() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<UserSession | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const { t, lang } = useLanguage();
+    const { t } = useLanguage();
 
     useEffect(() => {
         loadUsers();
@@ -26,17 +26,17 @@ export default function UsersManagement() {
     }
 
     async function handleDelete(id: string) {
-        if (!confirm('Permanently remove this staff member? This cannot be undone.')) return;
+        if (!confirm(t('confirm'))) return;
         try {
             await deleteUser(id);
             loadUsers();
         } catch (e) {
             console.error(e);
-            alert('Failed to delete user');
+            alert(t('error'));
         }
     }
 
-    const filteredUsers = users.filter(u => 
+    const filteredUsers = users.filter(u =>
         u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (u.full_name && u.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
@@ -54,7 +54,7 @@ export default function UsersManagement() {
                             {t('users')}
                         </h1>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
-                            {lang === 'km' ? 'គ្រប់គ្រងបុគ្គលិក' : 'Manage staff access & roles'}
+                            {t('manageStaff')}
                         </p>
                     </div>
                 </div>
@@ -64,7 +64,7 @@ export default function UsersManagement() {
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
                         <input
                             type="text"
-                            placeholder={lang === 'km' ? 'ស្វែងរក...' : 'Search staff...'}
+                            placeholder={t('searchStaff')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent-blue)] outline-none transition-all w-48"
@@ -76,7 +76,7 @@ export default function UsersManagement() {
                         className="pos-btn-primary px-4 py-2 text-xs uppercase tracking-widest flex items-center gap-1.5 flex-shrink-0"
                     >
                         <Plus size={14} strokeWidth={2.5} />
-                        {lang === 'km' ? 'បន្ថែម' : 'Add Staff'}
+                        {t('addStaff')}
                     </button>
                 </div>
             </div>
@@ -87,10 +87,10 @@ export default function UsersManagement() {
                     <table className="w-full text-left whitespace-nowrap border-collapse">
                         <thead className="bg-[var(--bg-elevated)]">
                             <tr>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Identity</th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Role</th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Status</th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Actions</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">{t('identityCol')}</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">{t('roleCol')}</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">{t('statusCol')}</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">{t('actionsCol')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
@@ -111,7 +111,7 @@ export default function UsersManagement() {
                                             </div>
                                         </div>
                                     </td>
-                                    
+
                                     <td className="px-4 py-2.5">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border
                                             ${u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
@@ -124,27 +124,27 @@ export default function UsersManagement() {
                                             {u.role}
                                         </span>
                                     </td>
-                                    
+
                                     <td className="px-4 py-2.5">
                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-widest">
                                             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                            Active
+                                            {t('activeStatus')}
                                         </span>
                                     </td>
-                                    
+
                                     <td className="px-4 py-2.5 text-right">
                                         <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => { setEditingUser(u); setIsModalOpen(true); }}
                                                 className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-secondary)] transition-all"
-                                                title="Edit"
+                                                title={t('editProduct')}
                                             >
                                                 <Edit3 size={13} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(u.id)}
                                                 className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
-                                                title="Delete"
+                                                title={t('delete')}
                                             >
                                                 <Trash2 size={13} />
                                             </button>
@@ -156,7 +156,7 @@ export default function UsersManagement() {
                                 <tr>
                                     <td colSpan={4} className="px-4 py-12 text-center">
                                         <UsersIcon size={28} className="mx-auto mb-3 text-[var(--text-secondary)] opacity-20" />
-                                        <p className="text-[var(--text-secondary)] font-bold text-xs">{lang === 'km' ? 'រករាល់' : 'No staff found'}</p>
+                                        <p className="text-[var(--text-secondary)] font-bold text-xs">{t('noStaffFound')}</p>
                                     </td>
                                 </tr>
                             )}
@@ -165,7 +165,7 @@ export default function UsersManagement() {
                 </div>
             </div>
 
-            <UserModal 
+            <UserModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSave={loadUsers}

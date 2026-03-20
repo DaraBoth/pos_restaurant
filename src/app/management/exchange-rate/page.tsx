@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { getExchangeRate, setExchangeRate, ExchangeRate } from '@/lib/tauri-commands';
 import { useLanguage } from '@/providers/LanguageProvider';
@@ -27,7 +27,7 @@ export default function ExchangeRateManagement() {
 
     async function handleUpdate() {
         const val = parseInt(newRateInput, 10);
-        if (isNaN(val) || val <= 0) return alert('Invalid rate');
+        if (isNaN(val) || val <= 0) return alert(t('invalidRate'));
 
         setLoading(true);
         try {
@@ -52,18 +52,17 @@ export default function ExchangeRateManagement() {
                         <ArrowRightLeft size={18} className="text-blue-400" strokeWidth={2} />
                     </div>
                     <div>
-                        <h1 className="text-base font-black text-[var(--foreground)] leading-none">Currency Exchange</h1>
+                        <h1 className="text-base font-black text-[var(--foreground)] leading-none">{t('exchangeCurrency')}</h1>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
-                            Manage the USD ↔ KHR checkout calculation
+                            {t('manageCurrencyDesc')}
                         </p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
-                    {/* Active Status Pill */}
                     <div className="px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                        <span className="text-[10px] font-black tracking-wider text-[var(--text-secondary)] uppercase">Rate Active</span>
+                        <span className="text-[10px] font-black tracking-wider text-[var(--text-secondary)] uppercase">{t('rateActive')}</span>
                     </div>
                 </div>
             </div>
@@ -72,9 +71,9 @@ export default function ExchangeRateManagement() {
                 {/* Current Rate Card */}
                 <div className="bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border)] relative overflow-hidden">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-4 relative z-10">
-                        Live Rate
+                        {t('liveRate')}
                     </p>
-                    
+
                     <div className="flex items-baseline gap-3 mb-2 relative z-10">
                         <div className="text-3xl font-black font-mono text-blue-400">
                             {rate ? formatKhr(rate.rate * 100).replace('៛', '') : '---'}
@@ -82,11 +81,11 @@ export default function ExchangeRateManagement() {
                         <span className="text-base font-black text-[var(--text-secondary)]">KHR</span>
                     </div>
                     <p className="text-xs font-medium text-[var(--text-secondary)] relative z-10">
-                        per 1.00 USD
+                        {t('perUsd')}
                     </p>
 
                     <div className="mt-6 pt-4 border-t border-[var(--border)] relative z-10">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Last Updated</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">{t('lastUpdated')}</p>
                         <p className="text-sm font-bold text-[var(--foreground)] font-mono">
                             {rate && rate.effective_from ? new Date(rate.effective_from + 'Z').toLocaleString() : 'Never'}
                         </p>
@@ -96,9 +95,9 @@ export default function ExchangeRateManagement() {
                 {/* Set New Rate Card */}
                 <div className="bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border)] flex flex-col">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-4">
-                        Adjust Rate
+                        {t('adjustRate')}
                     </p>
-                    
+
                     <div className="relative mb-4">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-black text-[var(--text-secondary)] text-lg">
                             ៛
@@ -112,20 +111,20 @@ export default function ExchangeRateManagement() {
                     </div>
 
                     <p className="text-xs font-medium text-[var(--text-secondary)] mb-auto">
-                        Note: Updating immediately alters future checkouts. Historical orders keep their locked rate.
+                        {t('rateNote')}
                     </p>
 
                     <button
                         onClick={handleUpdate}
                         disabled={loading || !newRateInput || !hasChanged}
                         className={`w-full mt-6 py-3 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 transition-all ${
-                            hasChanged 
-                                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                            hasChanged
+                                ? 'bg-blue-500 text-white hover:bg-blue-600'
                                 : 'bg-white/[0.05] text-[var(--text-secondary)] cursor-not-allowed border border-white/10'
                         }`}
                     >
                         {loading ? <RefreshCw className="animate-spin" size={16} /> : <Save size={16} />}
-                        Save New Rate
+                        {t('saveNewRate')}
                     </button>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState } from 'react';
 import { TableProperties, ShoppingCart, ArrowLeft } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
@@ -13,7 +13,7 @@ export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isHoldOpen, setIsHoldOpen] = useState(false);
     const { tableId, items, clearOrder } = useOrder();
-    const { lang } = useLanguage();
+    const { lang, t } = useLanguage();
 
     // No table selected — floor plan is the POS landing view
     if (!tableId) {
@@ -29,7 +29,7 @@ export default function POSPage() {
                             <button
                                 onClick={clearOrder}
                                 className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
-                                title={lang === 'km' ? 'ត្រលប់ទៅផែនការជាន់' : 'Back to floor plan'}
+                                title={t('backToFloorPlan')}
                             >
                                 <ArrowLeft size={13} strokeWidth={2.5} />
                             </button>
@@ -37,7 +37,7 @@ export default function POSPage() {
                                 <TableProperties size={14} className="text-[var(--accent-blue)]" />
                             </div>
                             <div>
-                                <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--text-secondary)] leading-none mb-0.5">{lang === 'km' ? 'តុ' : 'Table'}</p>
+                                <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--text-secondary)] leading-none mb-0.5">{t('tableLabel')}</p>
                                 <p className="text-sm font-black text-[var(--foreground)] leading-none">{tableId}</p>
                             </div>
                         </div>

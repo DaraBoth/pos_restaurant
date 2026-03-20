@@ -6,7 +6,7 @@ import type { FloorTable } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function TablesManagementPage() {
-    const { lang } = useLanguage();
+    const { t } = useLanguage();
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [newName, setNewName] = useState('');
     const [seatCount, setSeatCount] = useState(4);
@@ -31,7 +31,7 @@ export default function TablesManagementPage() {
         const name = newName.trim().toUpperCase();
         if (!name) return;
         if (tables.some(t => t.name === name)) {
-            setError(lang === 'km' ? 'ឈ្មោះតុនេះមានរួចហើយ' : 'A table with that name already exists.');
+            setError(t('tableNameExists'));
             return;
         }
         setCreating(true);
@@ -42,7 +42,7 @@ export default function TablesManagementPage() {
             setSeatCount(4);
             await load();
         } catch (e) {
-            setError(lang === 'km' ? 'បរាជ័យក្នុងការបន្ថែមតុ' : 'Failed to create table.');
+            setError(t('failedCreateTable'));
             console.error(e);
         } finally {
             setCreating(false);
@@ -51,16 +51,14 @@ export default function TablesManagementPage() {
 
     async function handleDelete(table: FloorTable) {
         if (table.status !== 'available') {
-            setError(lang === 'km'
-                ? `តុ ${table.name} មានការបញ្ជាទិញសកម្ម មិនអាចលុបបានទេ`
-                : `Table ${table.name} has an active order and cannot be deleted.`);
+            setError(`${t('deleteTable')}: ${table.name}`);
             return;
         }
         try {
             await deleteTable(table.id);
             await load();
         } catch (e) {
-            setError(lang === 'km' ? 'បរាជ័យក្នុងការលុបតុ' : 'Failed to delete table.');
+            setError(t('failedDeleteTable'));
             console.error(e);
         }
     }
@@ -74,10 +72,10 @@ export default function TablesManagementPage() {
                 </div>
                 <div>
                     <h1 className="text-lg font-black text-[var(--foreground)] leading-none">
-                        {lang === 'km' ? 'គ្រប់គ្រងតុ' : 'Table Management'}
+                        {t('tableManagement')}
                     </h1>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                        {lang === 'km' ? 'បន្ថែម ឬ លុបតុ' : 'Add and remove tables from the floor plan'}
+                        {t('addRemoveTables')}
                     </p>
                 </div>
             </div>
@@ -85,7 +83,7 @@ export default function TablesManagementPage() {
             {/* Add table card */}
             <div className="pos-card p-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)] mb-3">
-                    {lang === 'km' ? 'បន្ថែមតុថ្មី' : 'Add New Table'}
+                    {t('addNewTable')}
                 </p>
                 <div className="flex gap-2">
                     <input
@@ -93,7 +91,7 @@ export default function TablesManagementPage() {
                         value={newName}
                         onChange={e => { setNewName(e.target.value.toUpperCase()); setError(''); }}
                         onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                        placeholder={lang === 'km' ? 'ឈ្មោះតុ (ឧ. A1)' : 'Table name (e.g. A1)'}
+                        placeholder={t('tableName')}
                         maxLength={10}
                         className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-bold uppercase text-[var(--foreground)] placeholder-[var(--text-secondary)]/40 outline-none focus:border-[var(--accent-blue)] transition-colors"
                     />
@@ -103,7 +101,7 @@ export default function TablesManagementPage() {
                         max={20}
                         value={seatCount}
                         onChange={e => setSeatCount(Math.max(1, parseInt(e.target.value) || 4))}
-                        title={lang === 'km' ? 'ចំនួនកៅអី' : 'Seats'}
+                        title={t('seatCountTitle')}
                         className="w-16 px-2 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-bold text-center text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)] transition-colors"
                     />
                     <button
@@ -112,7 +110,7 @@ export default function TablesManagementPage() {
                         className="pos-btn-primary px-4 py-2 text-xs uppercase tracking-widest flex items-center gap-1.5 disabled:opacity-40"
                     >
                         <Plus size={14} strokeWidth={2.5} />
-                        {lang === 'km' ? 'បន្ថែម' : 'Add'}
+                        {t('addTable')}
                     </button>
                 </div>
                 {error && (
@@ -124,7 +122,7 @@ export default function TablesManagementPage() {
             <div className="pos-card overflow-hidden">
                 <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
                     <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">
-                        {lang === 'km' ? 'តុទាំងអស់' : 'All Tables'}
+                        {t('allTables')}
                     </p>
                     <span className="text-xs text-[var(--text-secondary)]">{tables.length}</span>
                 </div>
@@ -139,7 +137,7 @@ export default function TablesManagementPage() {
                     <div className="py-12 flex flex-col items-center gap-2 opacity-40">
                         <LayoutGrid size={32} className="text-[var(--text-secondary)]" />
                         <p className="text-sm text-[var(--text-secondary)]">
-                            {lang === 'km' ? 'មិនទាន់មានតុ' : 'No tables yet'}
+                            {t('noTables')}
                         </p>
                     </div>
                 ) : (
@@ -147,10 +145,10 @@ export default function TablesManagementPage() {
                         {tables.map(table => {
                             const isActive = table.status !== 'available';
                             const statusLabel = {
-                                available: { en: 'Free',    km: 'ទំនេរ',          cls: 'text-green-400'  },
-                                busy:      { en: 'Busy',    km: 'មានអតិថិជន',      cls: 'text-orange-400' },
-                                waiting:   { en: 'Waiting', km: 'រង់ចាំបង់ប្រាក់', cls: 'text-yellow-400' },
-                            }[table.status] ?? { en: 'Free', km: 'ទំនេរ', cls: 'text-green-400' };
+                                available: { label: t('tableStatusFree'),    cls: 'text-green-400'  },
+                                busy:      { label: t('tableStatusBusy'),    cls: 'text-orange-400' },
+                                waiting:   { label: t('tableStatusWaiting'), cls: 'text-yellow-400' },
+                            }[table.status] ?? { label: t('tableStatusFree'), cls: 'text-green-400' };
                             return (
                                 <div key={table.id} className="flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-elevated)] transition-colors">
                                     <div className="flex items-center gap-3">
@@ -168,11 +166,11 @@ export default function TablesManagementPage() {
                                             <p className="text-sm font-bold text-[var(--foreground)]">{table.name}</p>
                                             <div className="flex items-center gap-2">
                                                 <p className={`text-[10px] font-semibold ${statusLabel.cls}`}>
-                                                    {lang === 'km' ? statusLabel.km : statusLabel.en}
+                                                    {statusLabel.label}
                                                 </p>
                                                 <span className="text-[10px] text-[var(--text-secondary)]">·</span>
                                                 <p className="text-[10px] text-[var(--text-secondary)] flex items-center gap-0.5">
-                                                    <Users2 size={9} /> {table.seat_count} {lang === 'km' ? 'កៅអី' : 'seats'}
+                                                    <Users2 size={9} /> {table.seat_count} {t('seats')}
                                                 </p>
                                             </div>
                                         </div>
@@ -180,9 +178,7 @@ export default function TablesManagementPage() {
                                     <button
                                         onClick={() => handleDelete(table)}
                                         disabled={isActive}
-                                        title={isActive
-                                            ? (lang === 'km' ? 'មិនអាចលុបតុដែលសកម្ម' : 'Cannot delete active table')
-                                            : (lang === 'km' ? 'លុបតុ' : 'Delete table')}
+                                        title={isActive ? t('cannotDeleteActive') : t('deleteThisTable')}
                                         className="p-1.5 rounded-lg transition-all hover:bg-red-500/10 text-red-500/50 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed"
                                     >
                                         <Trash2 size={14} strokeWidth={2} />

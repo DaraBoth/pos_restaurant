@@ -1,17 +1,18 @@
-﻿'use client';
+'use client';
 import { useEffect, useState } from 'react';
 import { getRevenueSummary, getRevenueByPeriod, RevenueSummary, RevenueByDay } from '@/lib/tauri-commands';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { TrendingUp, ShoppingBag, DollarSign, Clock } from 'lucide-react';
+import type { TranslationKey } from '@/lib/i18n';
 
 type Period = 'week' | 'month' | '3months' | 'year';
 
-const PERIOD_LABELS: Record<Period, { en: string; km: string }> = {
-    week:    { en: 'Last 7 Days', km: '៧ ថ្ងៃចុងក្រោយ' },
-    month:   { en: 'This Month',  km: 'ខែនេះ' },
-    '3months': { en: 'Last 3 Months', km: '៣ ខែចុងក្រោយ' },
-    year:    { en: 'This Year',   km: 'ឆ្នាំនេះ' },
+const PERIOD_LABELS: Record<Period, TranslationKey> = {
+    week: 'last7Days',
+    month: 'thisMonth',
+    '3months': 'last3Months',
+    year: 'thisYear',
 };
 
 export default function AnalyticsPage() {
@@ -34,45 +35,45 @@ export default function AnalyticsPage() {
                 setSummary(s);
                 setChartData(d);
             } catch (e) {
-                setError(lang === 'km' ? 'មិនអាចទាញប្រព័ន្ធ Tauri បាន' : 'Analytics unavailable outside Tauri desktop app.');
+                setError(t('analyticsUnavailable'));
             } finally {
                 setLoading(false);
             }
         }
         load();
-    }, [period]);
+    }, [period, t]);
 
     const maxRevenue = chartData.length > 0 ? Math.max(...chartData.map(d => d.total_usd)) : 1;
 
     const statCards = summary ? [
         {
-            label: lang === 'km' ? t('todayRevenue') : "Today's Revenue",
+            label: t('todayRevenue'),
             value: formatUsd(summary.today_usd),
-            sub: `${summary.today_orders} ${lang === 'km' ? 'លក្ខខណ្ឌ' : 'orders'}`,
+            sub: `${summary.today_orders} ${t('orders')}`,
             icon: DollarSign,
             color: 'text-green-400',
             bg: 'bg-green-500/10 border-green-500/20',
         },
         {
-            label: lang === 'km' ? t('monthRevenue') : 'This Month',
+            label: t('monthRevenue'),
             value: formatUsd(summary.month_usd),
-            sub: `${summary.month_orders} ${lang === 'km' ? 'លក្ខខណ្ឌ' : 'orders'}`,
+            sub: `${summary.month_orders} ${t('orders')}`,
             icon: TrendingUp,
             color: 'text-blue-400',
             bg: 'bg-blue-500/10 border-blue-500/20',
         },
         {
-            label: lang === 'km' ? t('yearRevenue') : 'This Year',
+            label: t('yearRevenue'),
             value: formatUsd(summary.year_usd),
-            sub: `${summary.year_orders} ${lang === 'km' ? 'លក្ខខណ្ឌ' : 'orders'}`,
+            sub: `${summary.year_orders} ${t('orders')}`,
             icon: ShoppingBag,
             color: 'text-purple-400',
             bg: 'bg-purple-500/10 border-purple-500/20',
         },
         {
-            label: lang === 'km' ? t('openOrders') : 'Open Tables',
+            label: t('openOrders'),
             value: String(summary.open_orders),
-            sub: lang === 'km' ? 'ក្នុងពេលនេះ' : 'active now',
+            sub: t('activeNow'),
             icon: Clock,
             color: 'text-orange-400',
             bg: 'bg-orange-500/10 border-orange-500/20',
@@ -84,10 +85,10 @@ export default function AnalyticsPage() {
             {/* Page header */}
             <div>
                 <h1 className="text-base font-black text-[var(--foreground)]">
-                    {lang === 'km' ? t('revenueReport') : 'Revenue Report'}
+                    {t('revenueReport')}
                 </h1>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                    {lang === 'km' ? 'ទិន្នន័យចំណូលភោជនីយដ្ឋានអ្នក' : 'Real-time earnings overview for your restaurant'}
+                    {t('revenueOverview')}
                 </p>
             </div>
 
@@ -123,7 +124,7 @@ export default function AnalyticsPage() {
                     <div className="pos-card p-4">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-sm font-bold text-[var(--foreground)]">
-                                {lang === 'km' ? 'ក្រាហ្វចំណូល' : 'Revenue Chart'}
+                                {t('revenueChart')}
                             </h2>
                             <div className="flex items-center gap-1">
                                 {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
@@ -136,7 +137,7 @@ export default function AnalyticsPage() {
                                                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] border border-[var(--border)]'
                                         }`}
                                     >
-                                        {PERIOD_LABELS[p][lang]}
+                                        {t(PERIOD_LABELS[p])}
                                     </button>
                                 ))}
                             </div>
@@ -145,7 +146,7 @@ export default function AnalyticsPage() {
                         {chartData.length === 0 ? (
                             <div className="h-32 flex items-center justify-center">
                                 <p className="text-xs text-[var(--text-secondary)]">
-                                    {lang === 'km' ? 'គ្មានទិន្នន័យ' : 'No revenue data for this period.'}
+                                    {t('noRevenueData')}
                                 </p>
                             </div>
                         ) : (
@@ -158,7 +159,7 @@ export default function AnalyticsPage() {
                                             <div
                                                 key={day.date}
                                                 className="flex-1 flex flex-col items-center gap-1 group"
-                                                title={`${day.date}: ${formatUsd(day.total_usd)} (${day.order_count} orders)`}
+                                                title={`${day.date}: ${formatUsd(day.total_usd)} (${day.order_count} ${t('orders')})`}
                                             >
                                                 <div className="w-full flex flex-col justify-end" style={{ height: '6rem' }}>
                                                     <div
@@ -188,13 +189,13 @@ export default function AnalyticsPage() {
                                 {/* Summary row */}
                                 <div className="pt-2 border-t border-[var(--border)] flex items-center gap-6 text-xs">
                                     <div>
-                                        <span className="text-[var(--text-secondary)]">{lang === 'km' ? 'សរុប' : 'Total'}: </span>
+                                        <span className="text-[var(--text-secondary)]">{t('total')}: </span>
                                         <span className="font-bold font-mono text-green-400">
                                             {formatUsd(chartData.reduce((s, d) => s + d.total_usd, 0))}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-[var(--text-secondary)]">{lang === 'km' ? 'ការបញ្ជាទិញ' : 'Orders'}: </span>
+                                        <span className="text-[var(--text-secondary)]">{t('orders')}: </span>
                                         <span className="font-bold text-blue-400">
                                             {chartData.reduce((s, d) => s + d.order_count, 0)}
                                         </span>

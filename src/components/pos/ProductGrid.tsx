@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import {
     getProducts, getCategories, Product, Category,
@@ -86,7 +86,7 @@ export default function ProductGrid() {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
                     <input
                         type="text"
-                        placeholder={lang === 'km' ? 'ស្វែងរកម្ហូប...' : 'Search menu...'}
+                        placeholder={t('searchMenu')}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none focus:border-[var(--accent-blue)]/60 transition-colors"
@@ -129,7 +129,7 @@ export default function ProductGrid() {
                     <div className="flex flex-col items-center justify-center h-48 gap-3 opacity-30">
                         <ShoppingBag size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                            {searchQuery ? (lang === 'km' ? 'គ្មានលទ្ធផល' : 'No results') : (lang === 'km' ? 'គ្មានផលិតផល' : 'No products')}
+                            {searchQuery ? t('noResults') : t('noProducts')}
                         </p>
                     </div>
                 ) : (
@@ -146,7 +146,7 @@ export default function ProductGrid() {
                                     key={product.id}
                                     onClick={() => handleProductClick(product)}
                                     disabled={unavailable}
-                                    title={unavailable ? (outOfStock ? (lang === 'km' ? 'អស់ស្តុក' : 'Out of stock') : (lang === 'km' ? 'មិនមាន' : 'Unavailable')) : displayName}
+                                    title={unavailable ? (outOfStock ? t('outOfStock') : t('unavailable')) : displayName}
                                     className={`group flex flex-col text-left relative overflow-hidden rounded-xl transition-all duration-150 active:scale-95 ${
                                         isAdding ? 'scale-95 ring-2 ring-[var(--accent-green)]' : ''
                                     } ${unavailable ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'}`}
@@ -169,7 +169,7 @@ export default function ProductGrid() {
                                         {unavailable && (
                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                                 <span className="text-[10px] font-black text-red-400 uppercase tracking-widest bg-black/60 px-2 py-1 rounded-full">
-                                                    {outOfStock ? (lang === 'km' ? 'អស់ស្តុក' : 'Sold Out') : (lang === 'km' ? 'មិនមាន' : 'N/A')}
+                                                    {outOfStock ? t('soldOut') : t('notAvailableShort')}
                                                 </span>
                                             </div>
                                         )}

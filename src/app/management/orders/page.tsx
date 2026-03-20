@@ -2,14 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { getOrders, getOrderItems, Order, OrderItem } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
+import { useLanguage } from '@/providers/LanguageProvider';
 import {
-    Search, Calendar, Filter, Download, ChevronDown,
-    ChevronUp, ReceiptText, Clock, User, Trash2, CheckCircle, Package, ClipboardList
+    Download, ChevronDown,
+    ChevronUp, Clock, Trash2, CheckCircle, ClipboardList
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
 export default function OrdersManagement() {
+    const { t } = useLanguage();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -57,7 +59,7 @@ export default function OrdersManagement() {
     const handleExport = () => {
         const data = orders.map(o => ({
             'Order ID': o.id.split('-')[0].toUpperCase(),
-            'Table': o.table_id || 'Takeout',
+            'Table': o.table_id || t('takeout'),
             'Subtotal ($)': ((o.total_usd - o.tax_vat - o.tax_plt) / 100).toFixed(2),
             'Total ($)': (o.total_usd / 100).toFixed(2),
             'Status': o.status,
@@ -83,9 +85,9 @@ export default function OrdersManagement() {
                         <ClipboardList size={18} className="text-[var(--accent)]" strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h1 className="text-base font-black text-[var(--foreground)] leading-none">Order History</h1>
+                        <h1 className="text-base font-black text-[var(--foreground)] leading-none">{t('orderHistory')}</h1>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60 mt-0.5">
-                            Transaction Audit & Revenue
+                            {t('transactionAudit')}
                         </p>
                     </div>
                 </div>
@@ -112,17 +114,17 @@ export default function OrdersManagement() {
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
                     >
                         <Download size={14} />
-                        Export
+                        {t('exportBtn')}
                     </button>
 
                     <div className="hidden md:flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]">
                         <div>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-0.5 opacity-60">Count</span>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] mb-0.5 opacity-60">{t('orderCount')}</span>
                             <span className="block text-base font-black font-mono text-[var(--foreground)] leading-none">{orders.length}</span>
                         </div>
                         <div className="w-px h-6 bg-[var(--border)]" />
                         <div>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--accent)] mb-0.5 opacity-60">Revenue</span>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-[var(--accent)] mb-0.5 opacity-60">{t('revenue')}</span>
                             <span className="block text-base font-black font-mono text-[var(--accent)] leading-none">
                                 {formatUsd(totalRevenue)}
                             </span>
@@ -144,10 +146,10 @@ export default function OrdersManagement() {
                         <thead className="bg-[var(--bg-elevated)]">
                             <tr>
                                 <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] w-12"></th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Receipt ID</th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Timestamp</th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">Status</th>
-                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Settlement</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">{t('receiptId')}</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">{t('timestamp')}</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)]">{t('orderStatus')}</th>
+                                <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] border-b border-[var(--border)] text-right">{t('settlement')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
@@ -211,7 +213,7 @@ export default function OrdersManagement() {
                                                 <td colSpan={5} className="px-6 py-4">
                                                     <div className="space-y-4">
                                                         <div className="flex items-center justify-between">
-                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--accent)]">Order Items</h4>
+                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--accent)]">{t('orderItems')}</h4>
                                                             <div className="h-px flex-1 mx-6 bg-[var(--border)] opacity-20" />
                                                         </div>
                                                         

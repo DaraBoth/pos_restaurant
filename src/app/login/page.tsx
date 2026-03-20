@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
@@ -73,7 +73,7 @@ export default function LoginPage() {
                     </div>
                     <h1 className="text-2xl font-bold tracking-tight text-white">DineOS</h1>
                     <p className="text-xs mt-1.5 font-medium text-[var(--text-secondary)]">
-                        {lang === 'km' ? 'ប្រព័ន្ធគ្រប់គ្រងភោជនីយដ្ឋាន' : 'Restaurant Management System'}
+                        {t('restaurantManagement')}
                     </p>
                 </div>
 

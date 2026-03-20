@@ -8,34 +8,16 @@ import { LayoutGrid, Users2, CheckCircle2, Settings2, UtensilsCrossed, Clock } f
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
 
-// Status color maps
-const STATUS = {
-    available: {
-        bg: 'rgba(34,197,94,0.08)',
-        border: 'rgba(34,197,94,0.35)',
-        text: '#86efac',
-        dot: 'bg-green-500',
-        label: { en: 'Free', km: 'ទំនេរ' },
-    },
-    busy: {
-        bg: 'rgba(249,115,22,0.10)',
-        border: 'rgba(249,115,22,0.45)',
-        text: '#fdba74',
-        dot: 'bg-orange-400',
-        label: { en: 'Busy', km: 'មានអតិថិជន' },
-    },
-    waiting: {
-        bg: 'rgba(234,179,8,0.10)',
-        border: 'rgba(234,179,8,0.50)',
-        text: '#fde047',
-        dot: 'bg-yellow-400',
-        label: { en: 'Waiting', km: 'រង់ចាំបង់ប្រាក់' },
-    },
+// Status color maps - labels resolved via t() keys
+const STATUS_KEYS = {
+    available: { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.35)', text: '#86efac', dot: 'bg-green-500', labelKey: 'tableStatusFree'  as const },
+    busy:      { bg: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.45)', text: '#fdba74', dot: 'bg-orange-400', labelKey: 'tableStatusBusy'  as const },
+    waiting:   { bg: 'rgba(234,179,8,0.10)',  border: 'rgba(234,179,8,0.50)',  text: '#fde047', dot: 'bg-yellow-400', labelKey: 'tableStatusWaiting' as const },
 } as const;
 
 export default function FloorPlanView() {
     const { setTableId, clearOrder, tableId: activeTableId, setOrderId, setItems } = useOrder();
-    const { lang } = useLanguage();
+    const { t } = useLanguage();
     const { user } = useAuth();
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
@@ -79,6 +61,7 @@ export default function FloorPlanView() {
         waiting: tables.filter(t => t.status === 'waiting').length,
     };
     const canManage = user?.role === 'admin' || user?.role === 'manager';
+    const STATUS = STATUS_KEYS;
 
     return (
         <div className="h-full flex flex-col bg-[var(--bg-dark)]">
@@ -90,10 +73,10 @@ export default function FloorPlanView() {
                     </div>
                     <div>
                         <h1 className="text-sm font-black text-[var(--foreground)] leading-none">
-                            {lang === 'km' ? 'ផែនការជាន់' : 'Floor Plan'}
+                            {t('floorPlanTitle')}
                         </h1>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
-                            {lang === 'km' ? 'ជ្រើសរើសតុ' : 'Tap a table to begin ordering'}
+                            {t('floorPlanSub')}
                         </p>
                     </div>
                 </div>
@@ -115,10 +98,10 @@ export default function FloorPlanView() {
                         <Link
                             href="/management/tables"
                             className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors ml-1"
-                            title={lang === 'km' ? 'គ្រប់គ្រងតុ' : 'Manage tables'}
+                            title={t('manageTables')}
                         >
                             <Settings2 size={11} />
-                            <span>{lang === 'km' ? 'គ្រប់គ្រង' : 'Manage'}</span>
+                            <span>{t('manage')}</span>
                         </Link>
                     )}
                 </div>
@@ -136,11 +119,11 @@ export default function FloorPlanView() {
                     <div className="flex flex-col items-center justify-center h-64 gap-3 opacity-40">
                         <LayoutGrid size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                            {lang === 'km' ? 'មិនទាន់មានតុ' : 'No tables yet'}
+                            {t('noTablesYet')}
                         </p>
                         {canManage && (
                             <Link href="/management/tables" className="text-xs text-[var(--accent-blue)] hover:underline">
-                                {lang === 'km' ? 'បន្ថែមតុ' : 'Add tables in Management → Tables'}
+                                {t('addTablesHint')}
                             </Link>
                         )}
                     </div>
@@ -199,7 +182,7 @@ export default function FloorPlanView() {
                             <div key={key} className="flex items-center gap-1.5">
                                 <span className={`w-2 h-2 rounded-full ${s.dot}`} />
                                 <span className="text-[10px] font-semibold text-[var(--text-secondary)]">
-                                    {lang === 'km' ? s.label.km : s.label.en}
+                                    {t(s.labelKey)}
                                 </span>
                             </div>
                         ))}

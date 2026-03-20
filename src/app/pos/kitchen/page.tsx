@@ -17,36 +17,23 @@ interface AggregatedItem {
     tableIds: string[];
 }
 
-const STATUS_CONFIG: Record<KitchenStatus, {
-    label: string; labelKm: string;
-    next: KitchenStatus | null; nextLabel: string; nextLabelKm: string;
-    cardCls: string; badgeCls: string; Icon: React.ElementType;
-}> = {
+const STATUS_CONFIG = {
     pending: {
-        label: 'Pending', labelKm: 'រង់ចាំ',
-        next: 'cooking', nextLabel: 'Start Cooking', nextLabelKm: 'ចាប់ផ្តើមចំអិន',
-        cardCls: 'border-yellow-500/30 bg-yellow-500/5',
-        badgeCls: 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/30',
-        Icon: Clock,
+        labelKey: 'pending', next: 'cooking', nextLabelKey: 'startCooking',
+        cardCls: 'border-yellow-500/30 bg-yellow-500/5', badgeCls: 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/30', Icon: Clock,
     },
     cooking: {
-        label: 'Cooking', labelKm: 'ចំអិន',
-        next: 'done', nextLabel: 'Mark Done', nextLabelKm: 'រួចរាល់',
-        cardCls: 'border-orange-500/40 bg-orange-500/5',
-        badgeCls: 'bg-orange-500/15 text-orange-300 border border-orange-500/30',
-        Icon: Flame,
+        labelKey: 'cooking', next: 'done', nextLabelKey: 'markDone',
+        cardCls: 'border-orange-500/40 bg-orange-500/5', badgeCls: 'bg-orange-500/15 text-orange-300 border border-orange-500/30', Icon: Flame,
     },
     done: {
-        label: 'Done', labelKm: 'រួចរាល់',
-        next: null, nextLabel: '', nextLabelKm: '',
-        cardCls: 'border-green-500/30 bg-green-500/5',
-        badgeCls: 'bg-green-500/15 text-green-300 border border-green-500/30',
-        Icon: CheckCircle2,
+        labelKey: 'done', next: null, nextLabelKey: null,
+        cardCls: 'border-green-500/30 bg-green-500/5', badgeCls: 'bg-green-500/15 text-green-300 border border-green-500/30', Icon: CheckCircle2,
     },
-};
+} as const;
 
 export default function KitchenPage() {
-    const { lang } = useLanguage();
+    const { lang, t } = useLanguage();
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [countdown, setCountdown] = useState(POLL_INTERVAL);
@@ -153,10 +140,10 @@ export default function KitchenPage() {
                     </div>
                     <div>
                         <h1 className="text-sm font-black text-[var(--foreground)] leading-none">
-                            {lang === 'km' ? 'ផ្ទះបាយ' : 'Kitchen Display'}
+                            {t('kitchenDisplay')}
                         </h1>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
-                            {lang === 'km' ? 'ចុចដើម្បីផ្លាស់ប្ដូរស្ថានភាព' : 'Tap items to advance status'}
+                            {t('tapToAdvance')}
                         </p>
                     </div>
                 </div>
@@ -180,14 +167,14 @@ export default function KitchenPage() {
                         <button
                             onClick={() => setViewMode('summary')}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${viewMode === 'summary' ? 'bg-[var(--accent-blue)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                            title={lang === 'km' ? 'ព្រៀងសង្ខេប' : 'Summary'}
+                            title={t('summaryView')}
                         >
                             <Layers size={11} />
                         </button>
                         <button
                             onClick={() => setViewMode('tables')}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${viewMode === 'tables' ? 'bg-[var(--accent-blue)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                            title={lang === 'km' ? 'តាមតុ' : 'By Table'}
+                            title={t('byTable')}
                         >
                             <LayoutList size={11} />
                         </button>
@@ -196,7 +183,7 @@ export default function KitchenPage() {
                     <button
                         onClick={() => { setLoading(true); refresh(); }}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
-                        title={lang === 'km' ? 'ធ្វើបច្ចុប្បន្នភាព' : 'Refresh'}
+                        title={t('refresh')}
                     >
                         <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
                         <span>{countdown}s</span>
@@ -211,10 +198,10 @@ export default function KitchenPage() {
                         <div className="w-10 h-10 border-2 border-orange-500/20 border-t-orange-400 rounded-full animate-spin" />
                         <div className="text-center">
                             <p className="text-sm font-bold text-[var(--text-secondary)]">
-                                {lang === 'km' ? 'ភ្ជាប់ទៅផ្ទះបាយ...' : 'Connecting to kitchen...'}
+                                {t('connectingKitchen')}
                             </p>
                             <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40 mt-1 uppercase tracking-widest">
-                                {lang === 'km' ? 'ត្រូវការពេលបន្តិច' : 'First load may take a moment'}
+                                {t('firstLoadMoment')}
                             </p>
                         </div>
                     </div>
@@ -222,7 +209,7 @@ export default function KitchenPage() {
                     <div className="flex flex-col items-center justify-center h-64 gap-3 opacity-40">
                         <UtensilsCrossed size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                            {lang === 'km' ? 'គ្មានការបញ្ជាទិញ' : 'No active orders'}
+                            {t('noActiveOrders')}
                         </p>
                     </div>
                 ) : viewMode === 'summary' ? (
@@ -321,8 +308,6 @@ function AggregatedCard({
                     </span>
                 )}
             </div>
-
-            {/* Action buttons hidden — chef-accept workflow is currently disabled */}
         </div>
     );
 }
@@ -336,6 +321,7 @@ function KitchenOrderCard({
     updatingIds: Set<string>;
     onAdvance: (item: KitchenOrderItem) => void;
 }) {
+    const { t } = useLanguage();
     const elapsed = (() => {
         const sec = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1000);
         if (sec < 60) return `${sec}s`;
@@ -355,14 +341,14 @@ function KitchenOrderCard({
                     </div>
                     <div>
                         <p className="text-sm font-black text-[var(--foreground)] leading-none">
-                            {order.table_id ?? (lang === 'km' ? 'តឡុះ' : 'Takeout')}
+                            {order.table_id ?? t('takeout')}
                         </p>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">{elapsed}</p>
                     </div>
                 </div>
                 {allCooking && (
                     <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-300">
-                        {lang === 'km' ? 'ចំអិន' : 'All cooking'}
+                        {t('allCooking')}
                     </span>
                 )}
             </div>
@@ -392,7 +378,7 @@ function KitchenOrderCard({
                                     <div className="flex items-center gap-1.5 mt-1">
                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${cfg.badgeCls}`}>
                                             <StatusIcon size={8} strokeWidth={2.5} />
-                                            {lang === 'km' ? cfg.labelKm : cfg.label}
+                                            {t(cfg.labelKey as any)}
                                         </span>
                                     </div>
                                 </div>

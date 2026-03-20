@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { 
     getProducts, getCategories, deleteProduct, updateStock, 
@@ -93,20 +93,20 @@ export default function ProductsManagement() {
                     </div>
                     <div>
                         <h1 className="text-sm font-black text-[var(--foreground)] leading-none">
-                            {activeTab === 'products' ? (lang === 'km' ? 'ផលិតផល' : 'Products') : (lang === 'km' ? 'ប្រភេទ' : 'Categories')}
+                            {activeTab === 'products' ? t('products') : t('category')}
                         </h1>
                         <div className="flex gap-3 mt-1">
                             <button
                                 onClick={() => setActiveTab('products')}
                                 className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'products' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                             >
-                                {lang === 'km' ? 'ផលិតផល' : 'Products'}
+                                {t('products')}
                             </button>
                             <button
                                 onClick={() => setActiveTab('categories')}
                                 className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                             >
-                                {lang === 'km' ? 'ប្រភេទ' : 'Categories'}
+                                {t('category')}
                             </button>
                         </div>
                     </div>
@@ -117,7 +117,7 @@ export default function ProductsManagement() {
                         <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
                         <input
                             type="text"
-                            placeholder={lang === 'km' ? 'ស្វែងរក...' : 'Search items...'}
+                            placeholder={t('searchItems')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="bg-white/[0.07] border border-white/20 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[var(--accent)] outline-none transition-all w-44"
@@ -131,7 +131,7 @@ export default function ProductsManagement() {
                         className="pos-btn-primary px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
                     >
                         <Plus size={13} strokeWidth={2.5} />
-                        {lang === 'km' ? 'បន្ថែម' : activeTab === 'products' ? '+ New Product' : '+ New Category'}
+                        {activeTab === 'products' ? t('newProduct') : t('newCategory')}
                     </button>
                 </div>
             </div>
@@ -221,7 +221,7 @@ export default function ProductsManagement() {
                                 {filteredProducts.length === 0 && (
                                     <tr>
                                         <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
-                                            No products found
+                                            {t('noProducts')}
                                         </td>
                                     </tr>
                                 )}
@@ -273,7 +273,7 @@ export default function ProductsManagement() {
                                 {categories.length === 0 && (
                                     <tr>
                                         <td colSpan={3} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
-                                            No categories found
+                                            {t('noProducts')}
                                         </td>
                                     </tr>
                                 )}
