@@ -5,10 +5,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // Required for Tauri: don't use trailing slashes
-  trailingSlash: false,
-  // Skip API routes (Tauri handles backend)
-  distDir: "out",
+  // Use trailing slashes so sub-routes export as folder/index.html
+  // which Tauri's file protocol resolves more reliably
+  trailingSlash: true,
 };
 
 export default nextConfig;
