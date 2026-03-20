@@ -9,9 +9,11 @@ interface OrderContextValue {
     totals: OrderTotals;
     exchangeRate: number;
     tableId: string;
+    isTakeout: boolean;
     setOrderId: (id: string | null) => void;
     setItems: (items: OrderItem[]) => void;
     setTableId: (t: string) => void;
+    setTakeout: (v: boolean) => void;
     refreshRate: () => void;
     clearOrder: () => void;
 }
@@ -22,9 +24,9 @@ const EMPTY_TOTALS: OrderTotals = {
 
 const OrderContext = createContext<OrderContextValue>({
     orderId: null, items: [], totals: EMPTY_TOTALS,
-    exchangeRate: 4100, tableId: '',
+    exchangeRate: 4100, tableId: '', isTakeout: false,
     setOrderId: () => { }, setItems: () => { }, setTableId: () => { },
-    refreshRate: () => { }, clearOrder: () => { },
+    setTakeout: () => { }, refreshRate: () => { }, clearOrder: () => { },
 });
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
@@ -32,6 +34,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [items, setItemsState] = useState<OrderItem[]>([]);
     const [exchangeRate, setExchangeRate] = useState(4100);
     const [tableId, setTableId] = useState('');
+    const [isTakeout, setTakeout] = useState(false);
 
     const subtotalCents = items.reduce(
         (sum, item) => sum + item.price_at_order * item.quantity, 0
@@ -55,6 +58,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         setOrderId(null);
         setItemsState([]);
         setTableId('');
+        setTakeout(false);
     }, []);
 
     useEffect(() => {
@@ -63,8 +67,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <OrderContext.Provider value={{
-            orderId, items, totals, exchangeRate, tableId,
-            setOrderId, setItems, setTableId, refreshRate, clearOrder,
+            orderId, items, totals, exchangeRate, tableId, isTakeout,
+            setOrderId, setItems, setTableId, setTakeout, refreshRate, clearOrder,
         }}>
             {children}
         </OrderContext.Provider>

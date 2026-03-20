@@ -22,16 +22,16 @@ import InventoryView from './views/InventoryView';
 type Tab = 'dashboard' | 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'exchange-rate' | 'orders' | 'inventory' | 'settings';
 
 const TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
-    { id: 'dashboard',     labelKey: 'dashboard',    icon: LayoutDashboard },
-    { id: 'analytics',     labelKey: 'analytics',    icon: TrendingUp },
-    { id: 'products',      labelKey: 'products',     icon: Package },
-    { id: 'categories',    labelKey: 'categories',   icon: Layers },
-    { id: 'inventory',     labelKey: 'inventory',    icon: BoxesIcon },
-    { id: 'tables',        labelKey: 'floorPlan',    icon: LayoutGrid },
-    { id: 'users',         labelKey: 'users',        icon: Users },
-    { id: 'exchange-rate', labelKey: 'exchangeRate',  icon: RefreshCw },
-    { id: 'orders',        labelKey: 'orderHistory', icon: ClipboardList },
-    { id: 'settings',      labelKey: 'settings',     icon: Building2 },
+    { id: 'dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+    { id: 'analytics', labelKey: 'analytics', icon: TrendingUp },
+    { id: 'products', labelKey: 'products', icon: Package },
+    { id: 'categories', labelKey: 'categories', icon: Layers },
+    { id: 'inventory', labelKey: 'inventory', icon: BoxesIcon },
+    { id: 'tables', labelKey: 'floorPlan', icon: LayoutGrid },
+    { id: 'users', labelKey: 'users', icon: Users },
+    { id: 'exchange-rate', labelKey: 'exchangeRate', icon: RefreshCw },
+    { id: 'orders', labelKey: 'orderHistory', icon: ClipboardList },
+    { id: 'settings', labelKey: 'settings', icon: Building2 },
 ];
 
 const TAB_COMPONENTS: Record<Tab, React.FC> = {
@@ -64,11 +64,10 @@ export default function ManagementPage() {
                             <button
                                 key={id}
                                 onClick={() => setActiveTab(id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${
-                                    active
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${active
                                         ? 'bg-[var(--accent-blue)] text-white'
                                         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--foreground)]'
-                                }`}
+                                    }`}
                             >
                                 <Icon size={13} strokeWidth={active ? 2.5 : 2} />
                                 <span>{t(labelKey)}</span>

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { TableProperties, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { TableProperties, ShoppingCart, ArrowLeft, ShoppingBag } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
 import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
@@ -12,11 +12,11 @@ import { useLanguage } from '@/providers/LanguageProvider';
 export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isHoldOpen, setIsHoldOpen] = useState(false);
-    const { tableId, items, clearOrder } = useOrder();
+    const { tableId, isTakeout, items, clearOrder } = useOrder();
     const { lang, t } = useLanguage();
 
-    // No table selected — floor plan is the POS landing view
-    if (!tableId) {
+    // No table and not takeout → show floor plan
+    if (!tableId && !isTakeout) {
         return <FloorPlanView />;
     }
 
@@ -33,13 +33,28 @@ export default function POSPage() {
                             >
                                 <ArrowLeft size={13} strokeWidth={2.5} />
                             </button>
-                            <div className="w-7 h-7 rounded-lg bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center">
-                                <TableProperties size={14} className="text-[var(--accent-blue)]" />
-                            </div>
-                            <div>
-                                <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--text-secondary)] leading-none mb-0.5">{t('tableLabel')}</p>
-                                <p className="text-sm font-black text-[var(--foreground)] leading-none">{tableId}</p>
-                            </div>
+
+                            {isTakeout ? (
+                                <>
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                                        <ShoppingBag size={14} className="text-emerald-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-400 leading-none mb-0.5">{t('takeout')}</p>
+                                        <p className="text-sm font-black text-[var(--foreground)] leading-none">{t('newOrder')}</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="w-7 h-7 rounded-lg bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center">
+                                        <TableProperties size={14} className="text-[var(--accent-blue)]" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--text-secondary)] leading-none mb-0.5">{t('tableLabel')}</p>
+                                        <p className="text-sm font-black text-[var(--foreground)] leading-none">{tableId}</p>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div className="px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] flex items-center gap-1">
                             <ShoppingCart size={11} />

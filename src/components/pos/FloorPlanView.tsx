@@ -4,7 +4,7 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { getTables, getActiveOrderForTable, getOrderItems } from '@/lib/tauri-commands';
 import type { FloorTable } from '@/types';
-import { LayoutGrid, Users2, CheckCircle2, Settings2, UtensilsCrossed, Clock } from 'lucide-react';
+import { LayoutGrid, Users2, CheckCircle2, Settings2, UtensilsCrossed, Clock, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -16,7 +16,7 @@ const STATUS_KEYS = {
 } as const;
 
 export default function FloorPlanView() {
-    const { setTableId, clearOrder, tableId: activeTableId, setOrderId, setItems } = useOrder();
+    const { setTableId, clearOrder, tableId: activeTableId, setOrderId, setItems, setTakeout } = useOrder();
     const { t } = useLanguage();
     const { user } = useAuth();
     const [tables, setTables] = useState<FloorTable[]>([]);
@@ -55,6 +55,12 @@ export default function FloorPlanView() {
         // POSPage re-renders because tableId changed
     }
 
+    function handleTakeout() {
+        clearOrder();
+        setTakeout(true);
+        // POSPage re-renders because isTakeout changed → shows product grid
+    }
+
     const counts = {
         available: tables.filter(t => t.status === 'available').length,
         busy: tables.filter(t => t.status === 'busy').length,
@@ -82,6 +88,15 @@ export default function FloorPlanView() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                    {/* Takeout button */}
+                    <button
+                        onClick={handleTakeout}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all active:scale-95"
+                    >
+                        <ShoppingBag size={13} strokeWidth={2.5} />
+                        <span>{t('takeout')}</span>
+                    </button>
+
                     {/* Legend counts */}
                     {[
                         { key: 'available', count: counts.available, dot: 'bg-green-500' },
@@ -116,11 +131,21 @@ export default function FloorPlanView() {
                         ))}
                     </div>
                 ) : tables.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 gap-3 opacity-40">
-                        <LayoutGrid size={40} className="text-[var(--text-secondary)]" />
-                        <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                            {t('noTablesYet')}
-                        </p>
+                    <div className="flex flex-col items-center justify-center h-64 gap-4">
+                        {/* No tables — show takeout prominently */}
+                        <div className="flex flex-col items-center gap-3 opacity-40">
+                            <LayoutGrid size={40} className="text-[var(--text-secondary)]" />
+                            <p className="text-sm font-semibold text-[var(--text-secondary)]">
+                                {t('noTablesYet')}
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleTakeout}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-bold text-sm hover:bg-emerald-500/25 transition-all active:scale-95"
+                        >
+                            <ShoppingBag size={16} strokeWidth={2.5} />
+                            <span>{t('takeout')}</span>
+                        </button>
                         {canManage && (
                             <Link href="/management/tables" className="text-xs text-[var(--accent-blue)] hover:underline">
                                 {t('addTablesHint')}
