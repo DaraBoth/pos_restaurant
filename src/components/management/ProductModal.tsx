@@ -1,10 +1,12 @@
-﻿'use client';
+'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Product, Category, createProduct, updateProduct } from '@/lib/tauri-commands';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { Save, ImagePlus, X } from 'lucide-react';
+import { Save, ImagePlus, X, Box, Plus, Trash2 } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 import { getImageSrc } from '@/lib/image';
+import { InventoryItem, ProductIngredient } from '@/types';
+import { getInventoryItems, getProductIngredients, setProductIngredient, removeProductIngredient } from '@/lib/api/inventory';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -27,6 +29,14 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Ingredients Tab State
+    const [activeTab, setActiveTab] = useState<'general' | 'ingredients'>('general');
+    const [materials, setMaterials] = useState<InventoryItem[]>([]);
+    const [ingredients, setIngredients] = useState<ProductIngredient[]>([]);
+    const [newIngredientId, setNewIngredientId] = useState('');
+    const [newIngredientUsage, setNewIngredientUsage] = useState(1);
+    const [ingredientsLoading, setIngredientsLoading] = useState(false);
+
     useEffect(() => {
         if (product) {
             setName(product.name);
@@ -44,10 +54,60 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setCategoryId(categories[0]?.id || '');
             setIsAvailable(true);
             setImagePath('');
+            setActiveTab('general');
         }
+        // Load materials always
+        getInventoryItems().then(setMaterials).catch(console.error);
+        
+        if (product && isOpen) {
+            loadIngredients(product.id);
+        } else {
+            setIngredients([]);
+        }
+        
         // Reset file input whenever modal opens/closes
         if (fileInputRef.current) fileInputRef.current.value = '';
-    }, [product, categories, isOpen]);    async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    }, [product, categories, isOpen]);
+
+    async function loadIngredients(productId: string) {
+        setIngredientsLoading(true);
+        try {
+            const data = await getProductIngredients(productId);
+            setIngredients(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIngredientsLoading(false);
+        }
+    }
+
+    async function handleAddIngredient() {
+        if (!product || !newIngredientId) return;
+        setIngredientsLoading(true);
+        try {
+            await setProductIngredient(product.id, newIngredientId, newIngredientUsage);
+            await loadIngredients(product.id);
+            setNewIngredientId('');
+            setNewIngredientUsage(1);
+        } catch (e) {
+            console.error(e);
+            alert("Failed to add ingredient.");
+        } finally {
+            setIngredientsLoading(false);
+        }
+    }
+
+    async function handleRemoveIngredient(invId: string) {
+        if (!product) return;
+        try {
+            await removeProductIngredient(product.id, invId);
+            await loadIngredients(product.id);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
         setUploadingImage(true);
@@ -109,7 +169,32 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             title={product ? t('editProduct') : t('addProduct')}
             subtitle={product ? product.name : t('addProductSub')}
         >
+            <div className="flex gap-2 mb-6 p-1 bg-white/[0.02] border border-white/5 rounded-2xl w-max">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('general')}
+                    className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        activeTab === 'general' ? 'bg-[#2a2d36] text-white shadow-md' : 'text-[#8a8a99] hover:text-white'
+                    }`}
+                >
+                    General
+                </button>
+                {product && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('ingredients')}
+                        className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                            activeTab === 'ingredients' ? 'bg-[#2a2d36] text-white shadow-md' : 'text-[#8a8a99] hover:text-white'
+                        }`}
+                    >
+                        Ingredients
+                    </button>
+                )}
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
+                {activeTab === 'general' && (
+                <>
                 {/* Image upload */}
                 <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
@@ -269,6 +354,81 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         </span>
                     </label>
                 </div>
+                </>)}
+
+                {/* INGREDIENTS TAB */}
+                {activeTab === 'ingredients' && product && (
+                    <div className="space-y-6 pt-2 h-[500px] overflow-y-auto container-snap">
+                        <div className="bg-[#0f1115] rounded-2xl border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)] p-5">
+                            <h3 className="text-sm font-black text-white tracking-widest uppercase mb-4 flex items-center gap-2">
+                                <Box size={16} className="text-emerald-400" />
+                                Add Ingredient
+                            </h3>
+                            <div className="flex gap-3 items-end">
+                                <div className="flex-1 space-y-1.5">
+                                    <label className="block text-[10px] font-bold text-[#8a8a99] uppercase tracking-widest">Material</label>
+                                    <select
+                                        value={newIngredientId}
+                                        onChange={e => setNewIngredientId(e.target.value)}
+                                        className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none"
+                                    >
+                                        <option value="" disabled>Select material...</option>
+                                        {materials.map(m => (
+                                            <option key={m.id} value={m.id} className="bg-[#1e2229]">{m.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="w-24 space-y-1.5">
+                                    <label className="block text-[10px] font-bold text-[#8a8a99] uppercase tracking-widest">Usage %</label>
+                                    <input
+                                        type="number" step="0.1" min="0.01" max="100"
+                                        value={newIngredientUsage}
+                                        onChange={e => setNewIngredientUsage(parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none font-mono"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddIngredient}
+                                    disabled={!newIngredientId || ingredientsLoading}
+                                    className="h-[46px] px-6 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 font-bold uppercase tracking-widest text-xs rounded-xl flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <Plus size={16} /> Add
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {ingredients.length === 0 && !ingredientsLoading ? (
+                                <div className="text-center py-10 opacity-50">
+                                    <Box size={32} className="mx-auto mb-3" />
+                                    <p className="text-xs uppercase tracking-widest font-bold">No ingredients mapped</p>
+                                </div>
+                            ) : (
+                                ingredients.map(ing => (
+                                    <div key={ing.id} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-colors">
+                                        <div>
+                                            <div className="font-bold text-white tracking-tight">{ing.item_name}</div>
+                                            <div className="text-[10px] text-[#8a8a99] uppercase font-bold tracking-widest">Stock Unit: {ing.unit_label}</div>
+                                        </div>
+                                        <div className="flex items-center gap-6">
+                                            <div className="font-mono text-emerald-400 font-bold text-lg">
+                                                {ing.usage_percentage}%
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleRemoveIngredient(ing.inventory_item_id)}
+                                                className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">

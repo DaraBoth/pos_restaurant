@@ -26,6 +26,15 @@ export const getActiveOrderForTable = (table_id: string) =>
 export const getOrdersForTable = (table_id: string) =>
     call<Order[]>('get_orders_for_table', { tableId: table_id });
 
+export const getSessionRounds = (session_id: string) =>
+    call<Order[]>('get_session_rounds', { sessionId: session_id });
+
+export const addRound = (user_id: string, session_id: string) =>
+    call<string>('add_round', { userId: user_id, sessionId: session_id });
+
+export const checkoutSession = (session_id: string, payments: PaymentInput[], discount_cents = 0) =>
+    call<void>('checkout_session', { sessionId: session_id, payments, discountCents: discount_cents });
+
 export const checkoutOrder = (order_id: string, payments: PaymentInput[], discount_cents = 0) =>
     call<Order>('checkout_order', { orderId: order_id, payments, discountCents: discount_cents });
 

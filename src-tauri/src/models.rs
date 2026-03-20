@@ -94,6 +94,8 @@ pub struct Order {
     pub id: String,
     pub user_id: Option<String>,
     pub table_id: Option<String>,
+    pub session_id: Option<String>,
+    pub round_number: i64,
     pub status: String,
     pub total_usd: i64,
     pub total_khr: i64,
@@ -105,6 +107,15 @@ pub struct Order {
     pub customer_phone: Option<String>,
     pub created_at: String,
     pub updated_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct TableSession {
+    pub id: String,
+    pub table_id: Option<String>,
+    pub status: String,
+    pub created_at: String,
     pub completed_at: Option<String>,
 }
 
@@ -171,4 +182,28 @@ pub struct DbStatus {
     pub connected: bool,
     pub path: String,
     pub mode: String, // "local" or "synced"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct InventoryItem {
+    pub id: String,
+    pub name: String,
+    pub khmer_name: Option<String>,
+    pub unit_label: String,
+    pub stock_qty: i64,
+    pub stock_pct: f64,
+    pub min_stock_qty: i64,
+    pub cost_per_unit: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ProductIngredient {
+    pub id: String,
+    pub product_id: String,
+    pub inventory_item_id: String,
+    pub usage_percentage: f64,
+    pub item_name: Option<String>,
+    pub item_khmer_name: Option<String>,
+    pub unit_label: Option<String>,
 }

@@ -16,7 +16,7 @@ const STATUS_KEYS = {
 } as const;
 
 export default function FloorPlanView() {
-    const { setTableId, clearOrder, tableId: activeTableId, setOrderId, setItems, setTakeout } = useOrder();
+    const { setTableId, clearOrder, tableId: activeTableId, setTakeout, loadTableSession } = useOrder();
     const { t } = useLanguage();
     const { user } = useAuth();
     const [tables, setTables] = useState<FloorTable[]>([]);
@@ -37,22 +37,12 @@ export default function FloorPlanView() {
 
     async function handleTableClick(table: FloorTable) {
         if (table.status !== 'available') {
-            // Table has an active order — resume it
-            try {
-                const order = await getActiveOrderForTable(table.name);
-                if (order) {
-                    const existing = await getOrderItems(order.id);
-                    setOrderId(order.id);
-                    setItems(existing);
-                }
-            } catch (e) {
-                console.error(e);
-            }
+            // Table has an active order/session — resume it
+            await loadTableSession(table.name);
         } else {
             clearOrder();
+            setTableId(table.name);
         }
-        setTableId(table.name);
-        // POSPage re-renders because tableId changed
     }
 
     function handleTakeout() {

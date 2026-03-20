@@ -1,16 +1,17 @@
-﻿'use client';
+'use client';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { updateOrderItemQuantity, updateOrderItemNote, voidOrder } from '@/lib/tauri-commands';
-import { getOrderItems } from '@/lib/tauri-commands';
+import { useAuth } from '@/providers/AuthProvider';
+import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useState } from 'react';
 import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
 export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => void; onHold: () => void }) {
-    const { items, totals, orderId, tableId, clearOrder, setItems } = useOrder();
+    const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds } = useOrder();
     const { t, lang } = useLanguage();
+    const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
@@ -49,6 +50,18 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
             clearOrder();
         } catch (e) {
             console.error(e);
+        }
+    }
+
+    async function handleAddRound() {
+        if (!user || !sessionId) return;
+        try {
+            const newOrderId = await addRound(user.id, sessionId);
+            const newRounds = await getSessionRounds(sessionId);
+            setRounds(newRounds);
+            await switchRound(newOrderId);
+        } catch (e) {
+            console.error('Failed to add round', e);
         }
     }
 
@@ -91,6 +104,36 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                         )}
                     </div>
                 </div>
+
+                {/* Rounds Scroller (only for table sessions) */}
+                {tableId && sessionId && rounds.length > 0 && (
+                    <div className="flex-shrink-0 px-2 py-1.5 bg-[var(--bg-elevated)] border-b border-[var(--border)] overflow-x-auto no-scrollbar flex items-center gap-1.5 snap-x">
+                        {rounds.map(round => {
+                            const isActive = round.id === orderId;
+                            return (
+                                <button
+                                    key={round.id}
+                                    onClick={() => switchRound(round.id)}
+                                    className={`snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide transition-all ${
+                                        isActive
+                                            ? 'bg-[var(--accent-blue)] text-white shadow-sm'
+                                            : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
+                                    }`}
+                                >
+                                    Round {round.round_number}
+                                    {isActive && <span className="ml-1.5 opacity-80">(View)</span>}
+                                </button>
+                            );
+                        })}
+                        <button
+                            onClick={handleAddRound}
+                            className="snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center gap-1"
+                        >
+                            <Plus size={11} strokeWidth={3} />
+                            New Round
+                        </button>
+                    </div>
+                )}
 
                 {/* Items List */}
                 <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-0 no-scrollbar bg-[var(--bg-dark)]">

@@ -1,6 +1,6 @@
 use tauri::State;
 use sqlx::SqlitePool;
-use crate::models::{Order, OrderItem, PaymentInput};
+use crate::models::{Order, OrderItem, PaymentInput, TableSession};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -35,7 +35,11 @@ pub async fn create_order(
     table_id: Option<String>,
     pool: State<'_, SqlitePool>,
 ) -> Result<String, String> {
+    let mut session_id = None;
+    let mut round_number = 1;
+
     if let Some(table_name) = &table_id {
+        // First check if there is an open order for this table
         let existing: Option<(String,)> = sqlx::query_as(
             "SELECT id FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1"
         )
@@ -47,15 +51,52 @@ pub async fn create_order(
         if let Some((existing_id,)) = existing {
             return Ok(existing_id);
         }
+
+        // Check if there is an active session for this table
+        let session_opt: Option<(String,)> = sqlx::query_as(
+            "SELECT id FROM table_sessions WHERE table_id = ? AND status = 'active'"
+        )
+        .bind(table_name)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if let Some((sid,)) = session_opt {
+            session_id = Some(sid.clone());
+            // Get the highest round number
+            let max_round: Option<(i64,)> = sqlx::query_as(
+                "SELECT MAX(round_number) FROM orders WHERE session_id = ? AND is_deleted = 0"
+            )
+            .bind(&sid)
+            .fetch_optional(pool.inner())
+            .await
+            .map_err(|e| format!("Database error: {}", e))?;
+            
+            if let Some((val,)) = max_round {
+                round_number = val + 1;
+            }
+        } else {
+            // Create a new session
+            let sid = uuid::Uuid::new_v4().to_string();
+            sqlx::query("INSERT INTO table_sessions (id, table_id, status) VALUES (?, ?, 'active')")
+                .bind(&sid)
+                .bind(table_name)
+                .execute(pool.inner())
+                .await
+                .map_err(|e| format!("Database error: {}", e))?;
+            session_id = Some(sid);
+        }
     }
 
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO orders (id, user_id, table_id, status) VALUES (?, ?, ?, 'open')"
+        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, ?, ?, ?, 'open')"
     )
     .bind(&id)
     .bind(&user_id)
     .bind(&table_id)
+    .bind(&session_id)
+    .bind(round_number)
     .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -233,7 +274,7 @@ pub async fn get_orders(
     pool: State<'_, SqlitePool>,
 ) -> Result<Vec<Order>, String> {
     let mut query = String::from(
-        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders WHERE is_deleted = 0"
     );
@@ -267,12 +308,32 @@ pub async fn get_orders(
 }
 
 #[tauri::command]
+pub async fn get_session_rounds(
+    session_id: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<Vec<Order>, String> {
+    let orders = sqlx::query_as::<_, Order>(
+        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
+         FROM orders
+         WHERE session_id = ? AND is_deleted = 0
+         ORDER BY round_number ASC"
+    )
+    .bind(&session_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(orders)
+}
+
+#[tauri::command]
 pub async fn get_active_order_for_table(
     table_id: String,
     pool: State<'_, SqlitePool>,
 ) -> Result<Option<Order>, String> {
     let order = sqlx::query_as::<_, Order>(
-        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
          WHERE table_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0
@@ -293,7 +354,7 @@ pub async fn get_orders_for_table(
     pool: State<'_, SqlitePool>,
 ) -> Result<Vec<Order>, String> {
     let orders = sqlx::query_as::<_, Order>(
-        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
          WHERE table_id = ? AND is_deleted = 0
@@ -365,12 +426,7 @@ pub async fn checkout_order(
     .map_err(|e| format!("Database error: {}", e))?;
 
     for (p_id, qty) in sold_items {
-        sqlx::query("UPDATE products SET stock_quantity = stock_quantity - ?, updated_at=datetime('now') WHERE id = ?")
-            .bind(qty)
-            .bind(&p_id)
-            .execute(pool.inner())
-            .await
-            .map_err(|e| format!("Stock deduction error: {}", e))?;
+        deduct_inventory(&p_id, qty, pool.inner()).await?;
     }
 
     // Record payments
@@ -397,7 +453,7 @@ pub async fn checkout_order(
 
     // Return the completed order
     let order: Order = sqlx::query_as(
-        "SELECT id, user_id, table_id, status, total_usd, total_khr, tax_vat, tax_plt,
+        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders WHERE id=?"
     )
@@ -407,6 +463,156 @@ pub async fn checkout_order(
     .map_err(|e| format!("Database error: {}", e))?;
 
     Ok(order)
+}
+
+#[tauri::command]
+pub async fn add_round(
+    user_id: String,
+    session_id: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<String, String> {
+    let (table_id, max_round): (Option<String>, i64) = sqlx::query_as(
+        "SELECT table_id, COALESCE(MAX(round_number), 0) FROM orders WHERE session_id = ? AND is_deleted = 0"
+    )
+    .bind(&session_id)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    let id = uuid::Uuid::new_v4().to_string();
+    sqlx::query(
+        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, ?, ?, ?, 'open')"
+    )
+    .bind(&id)
+    .bind(&user_id)
+    .bind(&table_id)
+    .bind(&session_id)
+    .bind(max_round + 1)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(id)
+}
+
+#[tauri::command]
+pub async fn checkout_session(
+    session_id: String,
+    payments: Vec<PaymentInput>,
+    discount_cents: Option<i64>,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    let (table_id,): (Option<String>,) = sqlx::query_as("SELECT table_id FROM table_sessions WHERE id = ?")
+        .bind(&session_id)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .unwrap_or((None,));
+
+    // Get all orders for this session
+    let session_orders: Vec<(String,)> = sqlx::query_as(
+        "SELECT id FROM orders WHERE session_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0"
+    )
+    .bind(&session_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    // Sum subtotal across all orders in session
+    let (done_subtotal,): (i64,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(price_at_order * quantity), 0)
+         FROM order_items oi
+         JOIN orders o ON oi.order_id = o.id
+         WHERE o.session_id = ? AND oi.is_deleted = 0 AND o.is_deleted = 0 AND o.status IN ('open', 'pending_payment')"
+    )
+    .bind(&session_id)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| format!("Subtotal error: {}", e))?;
+
+    let final_total = (done_subtotal - discount_cents.unwrap_or(0)).max(0);
+    let exch_rate: f64 = sqlx::query_scalar(
+        "SELECT rate FROM exchange_rates ORDER BY effective_from DESC LIMIT 1"
+    )
+    .fetch_optional(pool.inner())
+    .await
+    .unwrap_or(None)
+    .unwrap_or(4100.0);
+    let final_khr = round_khr(final_total, exch_rate);
+
+    // Instead of attributing the total to all orders, attribute to the first one, zero others
+    // Or just update them all status = 'completed' and let the total be their individual totals
+    // Wait, the POS expects individual orders to have their own totals. Let's recalculate each order separately and apply discount to text total via first order?
+    // Actually, simplest is just to mark all orders in the session 'completed' 
+    for (o_id,) in &session_orders {
+        // Recalculate just in case
+        recalculate_order_totals(o_id, pool.inner()).await?;
+        
+        sqlx::query(
+            "UPDATE orders SET status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
+             WHERE id = ?"
+        )
+        .bind(o_id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        // Deduct stock for all ordered items in this order
+        let sold_items: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0"
+        )
+        .bind(o_id)
+        .fetch_all(pool.inner())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        for (p_id, qty) in sold_items {
+            deduct_inventory(&p_id, qty, pool.inner()).await?;
+        }
+    }
+
+    // Record payments on the first order of the session
+    if let Some((first_order_id,)) = session_orders.first() {
+        if discount_cents.unwrap_or(0) > 0 {
+            // Apply discount to first order's total_usd since it's the anchor
+            sqlx::query("UPDATE orders SET total_usd = MAX(0, total_usd - ?) WHERE id = ?")
+                .bind(discount_cents.unwrap_or(0))
+                .bind(first_order_id)
+                .execute(pool.inner())
+                .await
+                .map_err(|e| format!("DB error: {}", e))?;
+        }
+
+        for p in &payments {
+            let pid = uuid::Uuid::new_v4().to_string();
+            sqlx::query(
+                "INSERT INTO payments (id, order_id, method, currency, amount, bakong_transaction_hash)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            )
+            .bind(&pid)
+            .bind(first_order_id)
+            .bind(&p.method)
+            .bind(&p.currency)
+            .bind(p.amount)
+            .bind(&p.bakong_transaction_hash)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| format!("Payment insert error: {}", e))?;
+        }
+    }
+
+    // Close session
+    sqlx::query("UPDATE table_sessions SET status = 'completed', completed_at = datetime('now') WHERE id = ?")
+        .bind(&session_id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| format!("Session close error: {}", e))?;
+
+    if let Some(table_name) = table_id {
+        release_table_if_no_open_orders(&table_name, pool.inner()).await?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -473,6 +679,54 @@ async fn release_table_if_no_open_orders(table_name: &str, pool: &SqlitePool) ->
 
     if open_count == 0 {
         set_table_status(table_name, "free", pool).await?;
+    }
+
+    Ok(())
+}
+
+async fn deduct_inventory(product_id: &str, qty: i64, pool: &SqlitePool) -> Result<(), String> {
+    // 1. Deduct from main product stock_quantity
+    sqlx::query("UPDATE products SET stock_quantity = stock_quantity - ?, updated_at=datetime('now') WHERE id = ?")
+        .bind(qty)
+        .bind(product_id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Stock deduction error: {}", e))?;
+
+    // 2. Deduct ingredient inventory
+    let ingredients: Vec<(String, f64)> = sqlx::query_as(
+        "SELECT inventory_item_id, usage_percentage FROM product_ingredients WHERE product_id = ?"
+    )
+    .bind(product_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Recipe fetch error: {}", e))?;
+
+    for (inv_id, usage_pct) in ingredients {
+        let total_usage = qty as f64 * usage_pct;
+        
+        let inv_record: Option<(i64, f64)> = sqlx::query_as(
+            "SELECT stock_qty, stock_pct FROM inventory_items WHERE id = ?"
+        )
+        .bind(&inv_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("Inv fetch error: {}", e))?;
+
+        if let Some((mut sqty, mut spct)) = inv_record {
+            spct -= total_usage;
+            while spct < 0.0 {
+                sqty -= 1;
+                spct += 100.0;
+            }
+            sqlx::query("UPDATE inventory_items SET stock_qty = ?, stock_pct = ? WHERE id = ?")
+                .bind(sqty)
+                .bind(spct)
+                .bind(&inv_id)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Inv update error: {}", e))?;
+        }
     }
 
     Ok(())

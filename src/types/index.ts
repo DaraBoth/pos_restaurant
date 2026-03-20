@@ -78,6 +78,8 @@ export interface Order {
     id: string;
     user_id?: string;
     table_id?: string;
+    session_id?: string;
+    round_number?: number;
     status: 'open' | 'pending_payment' | 'completed' | 'void';
     total_usd: number;
     total_khr: number;
@@ -167,4 +169,27 @@ export interface RevenueByDay {
     date: string;
     total_usd: number;
     order_count: number;
+}
+
+// --------------- Inventory ---------------
+export interface InventoryItem {
+    id: string;
+    name: string;
+    khmer_name?: string;
+    unit_label: string;
+    stock_qty: number;
+    stock_pct: number;
+    min_stock_qty: number;
+    cost_per_unit: number;
+    created_at: string;
+}
+
+export interface ProductIngredient {
+    id: string;
+    product_id: string;
+    inventory_item_id: string;
+    usage_percentage: number;
+    item_name?: string;
+    item_khmer_name?: string;
+    unit_label?: string;
 }

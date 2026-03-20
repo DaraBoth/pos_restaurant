@@ -1,8 +1,8 @@
-﻿'use client';
-import { useState } from 'react';
+'use client';
+import { useState, useEffect } from 'react';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { checkoutOrder, getRestaurant, PaymentInput } from '@/lib/tauri-commands';
+import { checkoutOrder, checkoutSession, getOrderItems, getRestaurant, PaymentInput, OrderItem } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
 import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
@@ -16,7 +16,7 @@ export default function CheckoutModal({
     onClose: () => void;
     onComplete: () => void;
 }) {
-    const { orderId, totals, exchangeRate, clearOrder, items, tableId } = useOrder();
+    const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds } = useOrder();
     const { t } = useLanguage();
 
     const [usdInput, setUsdInput] = useState<string>('');
@@ -25,15 +25,48 @@ export default function CheckoutModal({
     const [discountPct, setDiscountPct] = useState<number>(0);
     const [receiptPreview, setReceiptPreview] = useState<{ html: string; payload: ReceiptPrintPayload } | null>(null);
 
+    const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
+    const [combinedTotals, setCombinedTotals] = useState(totals);
+
+    // Combine all rounds for receipt view
+    useEffect(() => {
+        if (sessionId && rounds.length > 0) {
+            Promise.all(rounds.map(r => getOrderItems(r.id))).then(results => {
+                const allItems = results.flat();
+                const combined: Record<string, OrderItem> = {};
+                let sumCents = 0;
+                allItems.forEach(item => {
+                    const key = `${item.product_id}_${item.price_at_order}`;
+                    if (combined[key]) {
+                        combined[key].quantity += item.quantity;
+                    } else {
+                        combined[key] = { ...item };
+                    }
+                    sumCents += item.price_at_order * item.quantity;
+                });
+                setCombinedItems(Object.values(combined));
+                setCombinedTotals({
+                    subtotalCents: sumCents,
+                    vatCents: 0, pltCents: 0,
+                    totalUsdCents: sumCents,
+                    totalKhr: roundKhr(sumCents, exchangeRate)
+                });
+            });
+        } else {
+            setCombinedItems(items);
+            setCombinedTotals(totals);
+        }
+    }, [sessionId, rounds, items, exchangeRate, totals]);
+
     useOverlayBehavior(true, onClose);
 
     // Discount + derived totals
-    const discountCents = Math.round(totals.subtotalCents * discountPct / 100);
+    const discountCents = Math.round(combinedTotals.subtotalCents * discountPct / 100);
     const discountedTotals = {
-        ...totals,
-        subtotalCents: totals.subtotalCents - discountCents,
-        totalUsdCents: totals.totalUsdCents - discountCents,
-        totalKhr: roundKhr(totals.totalUsdCents - discountCents, exchangeRate),
+        ...combinedTotals,
+        subtotalCents: combinedTotals.subtotalCents - discountCents,
+        totalUsdCents: combinedTotals.totalUsdCents - discountCents,
+        totalKhr: roundKhr(combinedTotals.totalUsdCents - discountCents, exchangeRate),
     };
 
     // Split payment logic (applied against discounted total)
@@ -81,17 +114,29 @@ export default function CheckoutModal({
                 }
             }
 
-            const completedOrder = await checkoutOrder(orderId, payments, discountCents);
+            let customerName, customerPhone;
+            if (sessionId) {
+                await checkoutSession(sessionId, payments, discountCents);
+                // get details from arbitrary round, usually the active order has customer details
+                const currentOrder = rounds.find(r => r.id === orderId);
+                customerName = currentOrder?.customer_name;
+                customerPhone = currentOrder?.customer_phone;
+            } else {
+                const completedOrder = await checkoutOrder(orderId, payments, discountCents);
+                customerName = completedOrder.customer_name;
+                customerPhone = completedOrder.customer_phone;
+            }
+
             const restaurant = await getRestaurant();
             const payload: ReceiptPrintPayload = {
                 restaurant,
                 orderId,
                 tableId,
-                customerName: completedOrder.customer_name,
-                customerPhone: completedOrder.customer_phone,
+                customerName: customerName,
+                customerPhone: customerPhone,
                 discountPct: discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
-                items,
+                items: combinedItems,
                 payments,
                 totals: discountedTotals,
             };
@@ -127,7 +172,7 @@ export default function CheckoutModal({
                             <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-1.5 opacity-60 text-[var(--text-secondary)]">{t('total')}</div>
                             {discountCents > 0 && (
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-sm font-mono text-[var(--text-secondary)] line-through opacity-60">{formatUsd(totals.totalUsdCents)}</span>
+                                    <span className="text-sm font-mono text-[var(--text-secondary)] line-through opacity-60">{formatUsd(combinedTotals.totalUsdCents)}</span>
                                     <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/30 text-yellow-400">-{discountPct}%</span>
                                 </div>
                             )}

@@ -61,7 +61,20 @@ pub fn run() {
             commands::orders::get_orders,
             commands::orders::get_active_order_for_table,
             commands::orders::get_orders_for_table,
+            commands::orders::get_session_rounds,
+            commands::orders::add_round,
             commands::orders::checkout_order,
+            commands::orders::checkout_session,
+            
+            // Inventory
+            commands::inventory::get_inventory_items,
+            commands::inventory::create_inventory_item,
+            commands::inventory::update_inventory_item,
+            commands::inventory::delete_inventory_item,
+            commands::inventory::get_product_ingredients,
+            commands::inventory::set_product_ingredient,
+            commands::inventory::remove_product_ingredient,
+
             commands::orders::hold_order,
             commands::orders::void_order,
             commands::orders::get_revenue_summary,
