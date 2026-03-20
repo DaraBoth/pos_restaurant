@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { getSetupStatus } from '@/lib/tauri-commands';
@@ -12,7 +12,11 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     const { user, isAuthenticated } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
+
+    // `checking` is only true during the very first auth check (login → session).
+    // Once initialised, subsequent tab/route changes never block rendering.
     const [checking, setChecking] = useState(true);
+    const initialCheckDone = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -24,15 +28,21 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                 }
                 if (!cancelled) {
                     setChecking(false);
+                    initialCheckDone.current = true;
                 }
+                return;
+            }
+
+            // Only call the Tauri setup-status IPC once per auth session.
+            // After the first check, navigating between tabs skips the spinner
+            // and goes straight to rendering children.
+            if (initialCheckDone.current) {
                 return;
             }
 
             try {
                 const status = await getSetupStatus();
-                if (cancelled) {
-                    return;
-                }
+                if (cancelled) return;
 
                 if (status.needs_restaurant_setup && pathname !== SETUP_PATH) {
                     router.replace(SETUP_PATH);
@@ -57,10 +67,14 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
             if (!cancelled) {
                 setChecking(false);
+                initialCheckDone.current = true;
             }
         }
 
-        setChecking(true);
+        // Only show the spinner if we haven't completed the first check yet.
+        if (!initialCheckDone.current) {
+            setChecking(true);
+        }
         checkAccess();
 
         return () => {
