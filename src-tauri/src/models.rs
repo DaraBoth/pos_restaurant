@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
     pub restaurant_id: Option<String>,
@@ -22,7 +22,7 @@ pub struct UserSession {
     pub khmer_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Category {
     pub id: String,
     pub name: String,
@@ -30,7 +30,7 @@ pub struct Category {
     pub sort_order: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
     pub id: String,
     pub category_id: Option<String>,
@@ -45,7 +45,7 @@ pub struct Product {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FloorTable {
     pub id: String,
     pub name: String,
@@ -53,7 +53,7 @@ pub struct FloorTable {
     pub seat_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Restaurant {
     pub id: String,
     pub name: String,
@@ -90,7 +90,7 @@ pub struct SetupStatus {
     pub needs_restaurant_setup: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: String,
     pub user_id: Option<String>,
@@ -111,7 +111,7 @@ pub struct Order {
     pub completed_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableSession {
     pub id: String,
     pub table_id: Option<String>,
@@ -120,7 +120,7 @@ pub struct TableSession {
     pub completed_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderItem {
     pub id: String,
     pub order_id: String,
@@ -133,7 +133,7 @@ pub struct OrderItem {
     pub product_khmer: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KitchenOrderItem {
     pub id: String,
     pub product_name: String,
@@ -152,7 +152,7 @@ pub struct KitchenOrder {
     pub items: Vec<KitchenOrderItem>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payment {
     pub id: String,
     pub order_id: String,
@@ -163,7 +163,7 @@ pub struct Payment {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExchangeRate {
     pub id: String,
     pub rate: f64,
@@ -185,7 +185,7 @@ pub struct DbStatus {
     pub mode: String, // "local" or "synced"
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InventoryItem {
     pub id: String,
     pub name: String,
@@ -198,7 +198,7 @@ pub struct InventoryItem {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductIngredient {
     pub id: String,
     pub product_id: String,

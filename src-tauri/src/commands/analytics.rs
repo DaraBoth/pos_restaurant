@@ -1,8 +1,9 @@
 use tauri::State;
-use sqlx::SqlitePool;
+use libsql::{Connection, params};
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TopProduct {
     pub id: String,
     pub name: String,
@@ -10,14 +11,14 @@ pub struct TopProduct {
     pub total_revenue: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryRevenue {
     pub id: String,
     pub name: String,
     pub total_revenue: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeakHour {
     pub hour: String,
     pub order_count: i64,
@@ -25,7 +26,7 @@ pub struct PeakHour {
 
 fn get_modifier(period: &str) -> &'static str {
     match period {
-        "today" => "-1 days", // actually for today we just need start of day, but 24 hours is fine
+        "today" => "-1 days",
         "week" => "-7 days",
         "month" => "-1 month",
         "year" => "-1 year",
@@ -34,11 +35,9 @@ fn get_modifier(period: &str) -> &'static str {
 }
 
 #[tauri::command]
-pub async fn get_top_products(period: String, db: State<'_, SqlitePool>) -> Result<Vec<TopProduct>, String> {
+pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
     let modifier = get_modifier(&period);
     
-    // For today, we might want exact calendar day matching: `date(o.created_at, 'localtime') = date('now', 'localtime')`
-    // but a relative `-1 days` etc works nicely for "last 24 hours". Let's use strict calendar matching for 'today'.
     let query = if period == "today" {
         r#"
         SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
@@ -61,22 +60,27 @@ pub async fn get_top_products(period: String, db: State<'_, SqlitePool>) -> Resu
         "#
     };
 
-    let result = if period == "today" {
-        sqlx::query_as::<_, TopProduct>(query)
-            .fetch_all(db.inner())
-            .await
+    let mut rows = if period == "today" {
+        db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?
     } else {
-        sqlx::query_as::<_, TopProduct>(query)
-            .bind(modifier)
-            .fetch_all(db.inner())
-            .await
+        db.query(query, params![modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
     };
 
-    result.map_err(|e| format!("Database error: {}", e))
+    let mut results = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        results.push(TopProduct {
+            id: row.get::<String>(0).unwrap_or_default(),
+            name: row.get::<String>(1).unwrap_or_default(),
+            order_count: row.get::<i64>(2).unwrap_or(0),
+            total_revenue: row.get::<i64>(3).unwrap_or(0),
+        });
+    }
+
+    Ok(results)
 }
 
 #[tauri::command]
-pub async fn get_revenue_by_category(period: String, db: State<'_, SqlitePool>) -> Result<Vec<CategoryRevenue>, String> {
+pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connection>>) -> Result<Vec<CategoryRevenue>, String> {
     let modifier = get_modifier(&period);
     
     let query = if period == "today" {
@@ -103,22 +107,26 @@ pub async fn get_revenue_by_category(period: String, db: State<'_, SqlitePool>) 
         "#
     };
 
-    let result = if period == "today" {
-        sqlx::query_as::<_, CategoryRevenue>(query)
-            .fetch_all(db.inner())
-            .await
+    let mut rows = if period == "today" {
+        db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?
     } else {
-        sqlx::query_as::<_, CategoryRevenue>(query)
-            .bind(modifier)
-            .fetch_all(db.inner())
-            .await
+        db.query(query, params![modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
     };
 
-    result.map_err(|e| format!("Database error: {}", e))
+    let mut results = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        results.push(CategoryRevenue {
+            id: row.get::<String>(0).unwrap_or_default(),
+            name: row.get::<String>(1).unwrap_or_default(),
+            total_revenue: row.get::<i64>(2).unwrap_or(0),
+        });
+    }
+
+    Ok(results)
 }
 
 #[tauri::command]
-pub async fn get_peak_hours(period: String, db: State<'_, SqlitePool>) -> Result<Vec<PeakHour>, String> {
+pub async fn get_peak_hours(period: String, db: State<'_, Arc<Connection>>) -> Result<Vec<PeakHour>, String> {
     let modifier = get_modifier(&period);
     
     let query = if period == "today" {
@@ -139,23 +147,25 @@ pub async fn get_peak_hours(period: String, db: State<'_, SqlitePool>) -> Result
         "#
     };
 
-    let result = if period == "today" {
-        sqlx::query_as::<_, PeakHour>(query)
-            .fetch_all(db.inner())
-            .await
+    let mut rows = if period == "today" {
+        db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?
     } else {
-        sqlx::query_as::<_, PeakHour>(query)
-            .bind(modifier)
-            .fetch_all(db.inner())
-            .await
+        db.query(query, params![modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
     };
 
-    result.map_err(|e| format!("Database error: {}", e))
+    let mut results = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        results.push(PeakHour {
+            hour: row.get::<String>(0).unwrap_or_default(),
+            order_count: row.get::<i64>(1).unwrap_or(0),
+        });
+    }
+
+    Ok(results)
 }
 
 #[tauri::command]
-pub async fn get_slow_movers(db: State<'_, SqlitePool>) -> Result<Vec<TopProduct>, String> {
-    // Products with < 3 orders in the last 30 days
+pub async fn get_slow_movers(db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
     let query = r#"
         SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
         FROM products p
@@ -167,8 +177,17 @@ pub async fn get_slow_movers(db: State<'_, SqlitePool>) -> Result<Vec<TopProduct
         ORDER BY order_count ASC
     "#;
 
-    sqlx::query_as::<_, TopProduct>(query)
-        .fetch_all(db.inner())
-        .await
-        .map_err(|e| format!("Database error: {}", e))
+    let mut rows = db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut results = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        results.push(TopProduct {
+            id: row.get::<String>(0).unwrap_or_default(),
+            name: row.get::<String>(1).unwrap_or_default(),
+            order_count: row.get::<i64>(2).unwrap_or(0),
+            total_revenue: row.get::<i64>(3).unwrap_or(0),
+        });
+    }
+
+    Ok(results)
 }

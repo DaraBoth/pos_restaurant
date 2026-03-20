@@ -1,26 +1,44 @@
 use tauri::State;
-use sqlx::SqlitePool;
+use libsql::{Connection, params};
+use std::sync::Arc;
 use crate::models::{Restaurant, RestaurantUpsertInput, SetupStatus};
 
 const DEFAULT_RESTAURANT_ID: &str = "rest-00000000-0000-0000-0000-000000000001";
 
 #[tauri::command]
-pub async fn get_restaurant(pool: State<'_, SqlitePool>) -> Result<Restaurant, String> {
-    let restaurant = sqlx::query_as::<_, Restaurant>(
+pub async fn get_restaurant(pool: State<'_, Arc<Connection>>) -> Result<Restaurant, String> {
+    let mut rows = pool.query(
         "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, is_deleted, created_at, updated_at
          FROM restaurants
-         WHERE id = ? AND is_deleted = 0"
+         WHERE id = ? AND is_deleted = 0",
+         params![DEFAULT_RESTAURANT_ID]
     )
-    .bind(DEFAULT_RESTAURANT_ID)
-    .fetch_one(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    Ok(restaurant)
+    let row = rows.next().await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "Restaurant not found".to_string())?;
+
+    Ok(Restaurant {
+        id: row.get::<String>(0).unwrap_or_default(),
+        name: row.get::<String>(1).unwrap_or_default(),
+        khmer_name: row.get::<String>(2).ok(),
+        tin: row.get::<String>(3).ok(),
+        address: row.get::<String>(4).ok(),
+        address_kh: row.get::<String>(5).ok(),
+        phone: row.get::<String>(6).ok(),
+        website: row.get::<String>(7).ok(),
+        vat_number: row.get::<String>(8).ok(),
+        receipt_footer: row.get::<String>(9).ok(),
+        logo_path: row.get::<String>(10).ok(),
+        is_deleted: row.get::<i64>(11).unwrap_or(0),
+        created_at: row.get::<String>(12).unwrap_or_default(),
+        updated_at: row.get::<String>(13).ok(),
+    })
 }
 
 #[tauri::command]
-pub async fn get_setup_status(pool: State<'_, SqlitePool>) -> Result<SetupStatus, String> {
+pub async fn get_setup_status(pool: State<'_, Arc<Connection>>) -> Result<SetupStatus, String> {
     let restaurant = get_restaurant(pool).await?;
 
     Ok(SetupStatus {
@@ -33,9 +51,9 @@ pub async fn get_setup_status(pool: State<'_, SqlitePool>) -> Result<SetupStatus
 #[tauri::command]
 pub async fn update_restaurant(
     input: RestaurantUpsertInput,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<Restaurant, String> {
-    sqlx::query(
+    pool.execute(
         "UPDATE restaurants
          SET name = ?,
              khmer_name = ?,
@@ -48,20 +66,21 @@ pub async fn update_restaurant(
              receipt_footer = ?,
              logo_path = ?,
              updated_at = datetime('now')
-         WHERE id = ?"
+         WHERE id = ?",
+         params![
+             input.name,
+             input.khmer_name.unwrap_or_default(),
+             input.tin.unwrap_or_default(),
+             input.address.unwrap_or_default(),
+             input.address_kh.unwrap_or_default(),
+             input.phone.unwrap_or_default(),
+             input.website.unwrap_or_default(),
+             input.vat_number.unwrap_or_default(),
+             input.receipt_footer.unwrap_or_default(),
+             input.logo_path.unwrap_or_default(),
+             DEFAULT_RESTAURANT_ID
+         ]
     )
-    .bind(&input.name)
-    .bind(&input.khmer_name)
-    .bind(&input.tin)
-    .bind(&input.address)
-    .bind(&input.address_kh)
-    .bind(&input.phone)
-    .bind(&input.website)
-    .bind(&input.vat_number)
-    .bind(&input.receipt_footer)
-    .bind(&input.logo_path)
-    .bind(DEFAULT_RESTAURANT_ID)
-    .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 

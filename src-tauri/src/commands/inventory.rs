@@ -1,23 +1,41 @@
 use tauri::State;
-use sqlx::SqlitePool;
+use libsql::{Connection, params};
+use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{InventoryItem, ProductIngredient};
 
 #[tauri::command]
-pub async fn get_inventory_items(db: State<'_, SqlitePool>) -> Result<Vec<InventoryItem>, String> {
-    sqlx::query_as::<_, InventoryItem>(
+pub async fn get_inventory_items(db: State<'_, Arc<Connection>>) -> Result<Vec<InventoryItem>, String> {
+    let mut rows = db.query(
         "SELECT id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at 
          FROM inventory_items 
-         ORDER BY name ASC"
+         ORDER BY name ASC",
+         ()
     )
-    .fetch_all(&*db)
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    let mut items = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        items.push(InventoryItem {
+            id: row.get::<String>(0).unwrap_or_default(),
+            name: row.get::<String>(1).unwrap_or_default(),
+            khmer_name: row.get::<String>(2).ok(),
+            unit_label: row.get::<String>(3).unwrap_or_default(),
+            stock_qty: row.get::<i64>(4).unwrap_or(0),
+            stock_pct: row.get::<f64>(5).unwrap_or(0.0),
+            min_stock_qty: row.get::<i64>(6).unwrap_or(0),
+            cost_per_unit: row.get::<i64>(7).unwrap_or(0),
+            created_at: row.get::<String>(8).unwrap_or_default(),
+        });
+    }
+    
+    Ok(items)
 }
 
 #[tauri::command]
 pub async fn create_inventory_item(
-    db: State<'_, SqlitePool>,
+    db: State<'_, Arc<Connection>>,
     name: String,
     khmer_name: Option<String>,
     unit_label: String,
@@ -33,23 +51,35 @@ pub async fn create_inventory_item(
         RETURNING id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at
     ";
 
-    sqlx::query_as::<_, InventoryItem>(query)
-        .bind(&id)
-        .bind(&name)
-        .bind(&khmer_name)
-        .bind(&unit_label)
-        .bind(stock_qty)
-        .bind(stock_pct)
-        .bind(min_stock_qty)
-        .bind(cost_per_unit)
-        .fetch_one(&*db)
-        .await
-        .map_err(|e| e.to_string())
+    let mut rows = db.query(query, params![
+        id.clone(),
+        name,
+        khmer_name.unwrap_or_default(),
+        unit_label,
+        stock_qty,
+        stock_pct,
+        min_stock_qty,
+        cost_per_unit
+    ]).await.map_err(|e| e.to_string())?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Insert failed".to_string())?;
+
+    Ok(InventoryItem {
+        id: row.get::<String>(0).unwrap_or_default(),
+        name: row.get::<String>(1).unwrap_or_default(),
+        khmer_name: row.get::<String>(2).ok(),
+        unit_label: row.get::<String>(3).unwrap_or_default(),
+        stock_qty: row.get::<i64>(4).unwrap_or(0),
+        stock_pct: row.get::<f64>(5).unwrap_or(0.0),
+        min_stock_qty: row.get::<i64>(6).unwrap_or(0),
+        cost_per_unit: row.get::<i64>(7).unwrap_or(0),
+        created_at: row.get::<String>(8).unwrap_or_default(),
+    })
 }
 
 #[tauri::command]
 pub async fn update_inventory_item(
-    db: State<'_, SqlitePool>,
+    db: State<'_, Arc<Connection>>,
     id: String,
     name: String,
     khmer_name: Option<String>,
@@ -66,25 +96,35 @@ pub async fn update_inventory_item(
         RETURNING id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at
     ";
 
-    sqlx::query_as::<_, InventoryItem>(query)
-        .bind(&id)
-        .bind(&name)
-        .bind(&khmer_name)
-        .bind(&unit_label)
-        .bind(stock_qty)
-        .bind(stock_pct)
-        .bind(min_stock_qty)
-        .bind(cost_per_unit)
-        .fetch_one(&*db)
-        .await
-        .map_err(|e| e.to_string())
+    let mut rows = db.query(query, params![
+        id.clone(),
+        name,
+        khmer_name.unwrap_or_default(),
+        unit_label,
+        stock_qty,
+        stock_pct,
+        min_stock_qty,
+        cost_per_unit
+    ]).await.map_err(|e| e.to_string())?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Update failed".to_string())?;
+
+    Ok(InventoryItem {
+        id: row.get::<String>(0).unwrap_or_default(),
+        name: row.get::<String>(1).unwrap_or_default(),
+        khmer_name: row.get::<String>(2).ok(),
+        unit_label: row.get::<String>(3).unwrap_or_default(),
+        stock_qty: row.get::<i64>(4).unwrap_or(0),
+        stock_pct: row.get::<f64>(5).unwrap_or(0.0),
+        min_stock_qty: row.get::<i64>(6).unwrap_or(0),
+        cost_per_unit: row.get::<i64>(7).unwrap_or(0),
+        created_at: row.get::<String>(8).unwrap_or_default(),
+    })
 }
 
 #[tauri::command]
-pub async fn delete_inventory_item(db: State<'_, SqlitePool>, id: String) -> Result<(), String> {
-    sqlx::query("DELETE FROM inventory_items WHERE id = ?1")
-        .bind(&id)
-        .execute(&*db)
+pub async fn delete_inventory_item(db: State<'_, Arc<Connection>>, id: String) -> Result<(), String> {
+    db.execute("DELETE FROM inventory_items WHERE id = ?1", params![id])
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -92,7 +132,7 @@ pub async fn delete_inventory_item(db: State<'_, SqlitePool>, id: String) -> Res
 
 #[tauri::command]
 pub async fn get_product_ingredients(
-    db: State<'_, SqlitePool>,
+    db: State<'_, Arc<Connection>>,
     product_id: String,
 ) -> Result<Vec<ProductIngredient>, String> {
     let query = "
@@ -104,41 +144,45 @@ pub async fn get_product_ingredients(
         WHERE pi.product_id = ?1
     ";
 
-    sqlx::query_as::<_, ProductIngredient>(query)
-        .bind(&product_id)
-        .fetch_all(&*db)
+    let mut rows = db.query(query, params![product_id])
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    let mut ingredients = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        ingredients.push(ProductIngredient {
+            id: row.get::<String>(0).unwrap_or_default(),
+            product_id: row.get::<String>(1).unwrap_or_default(),
+            inventory_item_id: row.get::<String>(2).unwrap_or_default(),
+            usage_percentage: row.get::<f64>(3).unwrap_or(0.0),
+            item_name: row.get::<String>(4).ok(),
+            item_khmer_name: row.get::<String>(5).ok(),
+            unit_label: row.get::<String>(6).ok(),
+        });
+    }
+
+    Ok(ingredients)
 }
 
 #[tauri::command]
 pub async fn set_product_ingredient(
-    db: State<'_, SqlitePool>,
+    db: State<'_, Arc<Connection>>,
     product_id: String,
     inventory_item_id: String,
     usage_percentage: f64,
 ) -> Result<ProductIngredient, String> {
     let id = Uuid::new_v4().to_string();
     
-    // UPSERT logc based on unique pair (product_id, inventory_item_id) if we had one,
-    // but without one we can just delete previous entry for this product and item, then insert.
-    sqlx::query("DELETE FROM product_ingredients WHERE product_id = ?1 AND inventory_item_id = ?2")
-        .bind(&product_id)
-        .bind(&inventory_item_id)
-        .execute(&*db)
+    db.execute("DELETE FROM product_ingredients WHERE product_id = ?1 AND inventory_item_id = ?2", 
+        params![product_id.clone(), inventory_item_id.clone()])
         .await
         .map_err(|e| e.to_string())?;
 
-    sqlx::query("INSERT INTO product_ingredients (id, product_id, inventory_item_id, usage_percentage) VALUES (?1, ?2, ?3, ?4)")
-        .bind(&id)
-        .bind(&product_id)
-        .bind(&inventory_item_id)
-        .bind(usage_percentage)
-        .execute(&*db)
+    db.execute("INSERT INTO product_ingredients (id, product_id, inventory_item_id, usage_percentage) VALUES (?1, ?2, ?3, ?4)", 
+        params![id.clone(), product_id.clone(), inventory_item_id.clone(), usage_percentage])
         .await
         .map_err(|e| e.to_string())?;
 
-    // Return the inserted row
     let query = "
         SELECT 
             pi.id, pi.product_id, pi.inventory_item_id, pi.usage_percentage,
@@ -148,23 +192,31 @@ pub async fn set_product_ingredient(
         WHERE pi.id = ?1
     ";
 
-    sqlx::query_as::<_, ProductIngredient>(query)
-        .bind(&id)
-        .fetch_one(&*db)
+    let mut rows = db.query(query, params![id])
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Failed to fetch inserted ingredient".to_string())?;
+
+    Ok(ProductIngredient {
+        id: row.get::<String>(0).unwrap_or_default(),
+        product_id: row.get::<String>(1).unwrap_or_default(),
+        inventory_item_id: row.get::<String>(2).unwrap_or_default(),
+        usage_percentage: row.get::<f64>(3).unwrap_or(0.0),
+        item_name: row.get::<String>(4).ok(),
+        item_khmer_name: row.get::<String>(5).ok(),
+        unit_label: row.get::<String>(6).ok(),
+    })
 }
 
 #[tauri::command]
 pub async fn remove_product_ingredient(
-    db: State<'_, SqlitePool>,
+    db: State<'_, Arc<Connection>>,
     product_id: String,
     inventory_item_id: String,
 ) -> Result<(), String> {
-    sqlx::query("DELETE FROM product_ingredients WHERE product_id = ?1 AND inventory_item_id = ?2")
-        .bind(&product_id)
-        .bind(&inventory_item_id)
-        .execute(&*db)
+    db.execute("DELETE FROM product_ingredients WHERE product_id = ?1 AND inventory_item_id = ?2", 
+        params![product_id, inventory_item_id])
         .await
         .map_err(|e| e.to_string())?;
     Ok(())

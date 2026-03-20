@@ -1,5 +1,6 @@
 use tauri::State;
-use sqlx::SqlitePool;
+use libsql::{Connection, params};
+use std::sync::Arc;
 use crate::models::{User, UserSession};
 use argon2::{Argon2, PasswordHash, PasswordVerifier, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
@@ -8,20 +9,27 @@ use argon2::password_hash::{SaltString, rand_core::OsRng};
 pub async fn login(
     username: String,
     password: String,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<UserSession, String> {
-    let user: Option<User> = sqlx::query_as(
+    let mut rows = pool.query(
         "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at
-         FROM users WHERE username = ? AND is_deleted = 0"
+         FROM users WHERE username = ? AND is_deleted = 0",
+        params![username]
     )
-    .bind(&username)
-    .fetch_optional(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    let user = user.ok_or_else(|| "Invalid username or password".to_string())?;
+    let row = rows.next().await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "Invalid username or password".to_string())?;
 
-    let parsed_hash = PasswordHash::new(&user.password_hash)
+    let user_id = row.get::<String>(0).unwrap_or_default();
+    let user_name = row.get::<String>(2).unwrap_or_default();
+    let password_hash = row.get::<String>(3).unwrap_or_default();
+    let role = row.get::<String>(4).unwrap_or_default();
+    let full_name = row.get::<String>(5).ok();
+    let khmer_name = row.get::<String>(6).ok();
+
+    let parsed_hash = PasswordHash::new(&password_hash)
         .map_err(|_| "Invalid password hash".to_string())?;
 
     Argon2::default()
@@ -29,11 +37,11 @@ pub async fn login(
         .map_err(|_| "Invalid username or password".to_string())?;
 
     Ok(UserSession {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        full_name: user.full_name,
-        khmer_name: user.khmer_name,
+        id: user_id,
+        username: user_name,
+        role,
+        full_name,
+        khmer_name,
     })
 }
 
@@ -44,7 +52,7 @@ pub async fn create_user(
     role: String,
     full_name: Option<String>,
     khmer_name: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
@@ -53,17 +61,18 @@ pub async fn create_user(
         .to_string();
 
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query(
+    pool.execute(
         "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name)
-         VALUES (?, 'rest-00000000-0000-0000-0000-000000000001', ?, ?, ?, ?, ?)"
+         VALUES (?, 'rest-00000000-0000-0000-0000-000000000001', ?, ?, ?, ?, ?)",
+        params![
+            id.clone(),
+            username,
+            hash,
+            role,
+            full_name.unwrap_or_default(),
+            khmer_name.unwrap_or_default()
+        ]
     )
-    .bind(&id)
-    .bind(&username)
-    .bind(&hash)
-    .bind(&role)
-    .bind(&full_name)
-    .bind(&khmer_name)
-    .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
@@ -71,25 +80,41 @@ pub async fn create_user(
 }
 
 #[tauri::command]
-pub async fn get_users(pool: State<'_, SqlitePool>) -> Result<Vec<crate::models::User>, String> {
-    let users: Vec<User> = sqlx::query_as(
+pub async fn get_users(pool: State<'_, Arc<Connection>>) -> Result<Vec<User>, String> {
+    let mut rows = pool.query(
         "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at
-         FROM users WHERE is_deleted = 0 ORDER BY role, username"
+         FROM users WHERE is_deleted = 0 ORDER BY role, username",
+        ()
     )
-    .fetch_all(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    let mut users = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        users.push(User {
+            id: row.get::<String>(0).unwrap_or_default(),
+            restaurant_id: row.get::<String>(1).ok(),
+            username: row.get::<String>(2).unwrap_or_default(),
+            password_hash: row.get::<String>(3).unwrap_or_default(),
+            role: row.get::<String>(4).unwrap_or_default(),
+            full_name: row.get::<String>(5).ok(),
+            khmer_name: row.get::<String>(6).ok(),
+            is_deleted: row.get::<i64>(7).unwrap_or(0),
+            created_at: row.get::<String>(8).unwrap_or_default(),
+        });
+    }
 
     Ok(users)
 }
 
 #[tauri::command]
-pub async fn delete_user(id: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    sqlx::query("UPDATE users SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?")
-        .bind(&id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
+pub async fn delete_user(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+    pool.execute(
+        "UPDATE users SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?",
+        params![id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
 
@@ -100,7 +125,7 @@ pub async fn update_user(
     role: String,
     full_name: Option<String>,
     khmer_name: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     if let Some(pwd) = password {
         let salt = SaltString::generate(&mut OsRng);
@@ -109,26 +134,28 @@ pub async fn update_user(
             .map_err(|e| format!("Hash error: {}", e))?
             .to_string();
 
-        sqlx::query(
-            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?"
+        pool.execute(
+            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?",
+            params![
+                hash,
+                role,
+                full_name.unwrap_or_default(),
+                khmer_name.unwrap_or_default(),
+                id
+            ]
         )
-        .bind(&hash)
-        .bind(&role)
-        .bind(&full_name)
-        .bind(&khmer_name)
-        .bind(&id)
-        .execute(pool.inner())
         .await
         .map_err(|e| format!("Database error: {}", e))?;
     } else {
-        sqlx::query(
-            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?"
+        pool.execute(
+            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?",
+            params![
+                role,
+                full_name.unwrap_or_default(),
+                khmer_name.unwrap_or_default(),
+                id
+            ]
         )
-        .bind(&role)
-        .bind(&full_name)
-        .bind(&khmer_name)
-        .bind(&id)
-        .execute(pool.inner())
         .await
         .map_err(|e| format!("Database error: {}", e))?;
     }

@@ -1,52 +1,78 @@
 use tauri::State;
-use sqlx::{SqlitePool, Row};
+use libsql::{Connection, params};
+use std::sync::Arc;
 use crate::models::{Category, Product};
 
 #[tauri::command]
-pub async fn get_categories(pool: State<'_, SqlitePool>) -> Result<Vec<Category>, String> {
-    let cats: Vec<Category> = sqlx::query_as(
-        "SELECT id, name, khmer_name, sort_order FROM categories WHERE is_deleted = 0 ORDER BY sort_order"
+pub async fn get_categories(pool: State<'_, Arc<Connection>>) -> Result<Vec<Category>, String> {
+    let mut rows = pool.query(
+        "SELECT id, name, khmer_name, sort_order FROM categories WHERE is_deleted = 0 ORDER BY sort_order",
+        ()
     )
-    .fetch_all(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    let mut cats = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        cats.push(Category {
+            id: row.get::<String>(0).unwrap_or_default(),
+            name: row.get::<String>(1).unwrap_or_default(),
+            khmer_name: row.get::<String>(2).ok(),
+            sort_order: row.get::<i64>(3).unwrap_or(0),
+        });
+    }
+    
     Ok(cats)
 }
 
 #[tauri::command]
 pub async fn get_products(
     category_id: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Product>, String> {
-    let products = if let Some(cat_id) = category_id {
-        sqlx::query_as::<_, Product>(
+    let mut rows = if let Some(cat_id) = category_id {
+        pool.query(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
                     c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.category_id = ?
-             ORDER BY p.name"
-        )
-        .bind(&cat_id)
-        .fetch_all(pool.inner())
-        .await
+             ORDER BY p.name",
+             params![cat_id]
+        ).await
     } else {
-        sqlx::query_as::<_, Product>(
+        pool.query(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
                     c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.is_available = 1
-             ORDER BY c.sort_order, p.name"
-        )
-        .fetch_all(pool.inner())
-        .await
-    };
+             ORDER BY c.sort_order, p.name",
+             ()
+        ).await
+    }.map_err(|e| format!("Database error: {}", e))?;
 
-    products.map_err(|e| format!("Database error: {}", e))
+    let mut products = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        products.push(Product {
+            id: row.get::<String>(0).unwrap_or_default(),
+            category_id: row.get::<String>(1).ok(),
+            name: row.get::<String>(2).unwrap_or_default(),
+            khmer_name: row.get::<String>(3).ok(),
+            price_cents: row.get::<i64>(4).unwrap_or(0),
+            stock_quantity: row.get::<i64>(5).unwrap_or(0),
+            is_available: row.get::<i64>(6).unwrap_or(1),
+            image_path: row.get::<String>(7).ok(),
+            category_name: row.get::<String>(8).ok(),
+            category_khmer: row.get::<String>(9).ok(),
+            created_at: row.get::<String>(10).unwrap_or_default(),
+        });
+    }
+
+    Ok(products)
 }
 
 #[tauri::command]
-pub async fn get_inventory_logs(pool: State<'_, SqlitePool>) -> Result<Vec<serde_json::Value>, String> {
-    let logs = sqlx::query(
+pub async fn get_inventory_logs(pool: State<'_, Arc<Connection>>) -> Result<Vec<serde_json::Value>, String> {
+    let mut rows = pool.query(
         r#"
         SELECT 
             il.id, 
@@ -59,22 +85,23 @@ pub async fn get_inventory_logs(pool: State<'_, SqlitePool>) -> Result<Vec<serde
         JOIN products p ON il.product_id = p.id
         ORDER BY il.created_at DESC
         LIMIT 100
-        "#
+        "#,
+        ()
     )
-    .fetch_all(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    let result = logs.into_iter().map(|row| {
-        serde_json::json!({
-            "id": row.get::<String, _>("id"),
-            "product_id": row.get::<String, _>("product_id"),
-            "product_name": row.get::<String, _>("product_name"),
-            "change_amount": row.get::<i64, _>("change_amount"),
-            "reason": row.get::<String, _>("reason"),
-            "created_at": row.get::<String, _>("created_at")
-        })
-    }).collect();
+    let mut result = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        result.push(serde_json::json!({
+            "id": row.get::<String>(0).unwrap_or_default(),
+            "product_id": row.get::<String>(1).unwrap_or_default(),
+            "product_name": row.get::<String>(2).unwrap_or_default(),
+            "change_amount": row.get::<i64>(3).unwrap_or(0),
+            "reason": row.get::<String>(4).unwrap_or_default(),
+            "created_at": row.get::<String>(5).unwrap_or_default()
+        }));
+    }
 
     Ok(result)
 }
@@ -87,20 +114,21 @@ pub async fn create_product(
     price_cents: i64,
     stock_quantity: i64,
     image_path: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    pool.execute(
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        params![
+            id.clone(),
+            category_id,
+            name,
+            khmer_name.unwrap_or_default(),
+            price_cents,
+            stock_quantity,
+            image_path.unwrap_or_default()
+        ]
     )
-    .bind(&id)
-    .bind(&category_id)
-    .bind(&name)
-    .bind(&khmer_name)
-    .bind(price_cents)
-    .bind(stock_quantity)
-    .bind(&image_path)
-    .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
     Ok(id)
@@ -116,21 +144,22 @@ pub async fn update_product(
     category_id: String,
     is_available: bool,
     image_path: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    sqlx::query(
+    pool.execute(
         "UPDATE products SET name=?, khmer_name=?, price_cents=?, stock_quantity=?, category_id=?, is_available=?, image_path=?, updated_at=datetime('now')
-         WHERE id=?"
+         WHERE id=?",
+         params![
+             name,
+             khmer_name.unwrap_or_default(),
+             price_cents,
+             stock_quantity,
+             category_id,
+             is_available as i64,
+             image_path.unwrap_or_default(),
+             id
+         ]
     )
-    .bind(&name)
-    .bind(&khmer_name)
-    .bind(price_cents)
-    .bind(stock_quantity)
-    .bind(&category_id)
-    .bind(is_available as i64)
-    .bind(&image_path)
-    .bind(&id)
-    .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
@@ -140,26 +169,25 @@ pub async fn update_product(
 pub async fn update_stock(
     id: String,
     delta: i64,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    sqlx::query(
-        "UPDATE products SET stock_quantity = stock_quantity + ?, updated_at=datetime('now') WHERE id=?"
+    pool.execute(
+        "UPDATE products SET stock_quantity = stock_quantity + ?, updated_at=datetime('now') WHERE id=?",
+        params![delta, id]
     )
-    .bind(delta)
-    .bind(&id)
-    .execute(pool.inner())
     .await
     .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn delete_product(id: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    sqlx::query("UPDATE products SET is_deleted=1, updated_at=datetime('now') WHERE id=?")
-        .bind(&id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
+pub async fn delete_product(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+    pool.execute(
+        "UPDATE products SET is_deleted=1, updated_at=datetime('now') WHERE id=?",
+        params![id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
 
@@ -167,22 +195,25 @@ pub async fn delete_product(id: String, pool: State<'_, SqlitePool>) -> Result<(
 pub async fn create_category(
     name: String,
     khmer_name: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
-    let max_order: (i64,) = sqlx::query_as("SELECT COALESCE(MAX(sort_order), 0) FROM categories WHERE is_deleted=0")
-        .fetch_one(pool.inner())
+    let mut rows = pool.query("SELECT COALESCE(MAX(sort_order), 0) FROM categories WHERE is_deleted=0", ())
         .await
         .map_err(|e| format!("Database error: {}", e))?;
+    
+    let max_order: i64 = if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        row.get(0).unwrap_or(0)
+    } else {
+        0
+    };
 
-    sqlx::query("INSERT INTO categories (id, name, khmer_name, sort_order) VALUES (?, ?, ?, ?)")
-        .bind(&id)
-        .bind(&name)
-        .bind(&khmer_name)
-        .bind(max_order.0 + 1)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
+    pool.execute(
+        "INSERT INTO categories (id, name, khmer_name, sort_order) VALUES (?, ?, ?, ?)",
+        params![id.clone(), name, khmer_name.unwrap_or_default(), max_order + 1]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
     Ok(id)
 }
 
@@ -191,26 +222,25 @@ pub async fn update_category(
     id: String,
     name: String,
     khmer_name: Option<String>,
-    pool: State<'_, SqlitePool>,
+    pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    sqlx::query("UPDATE categories SET name=?, khmer_name=?, updated_at=datetime('now') WHERE id=?")
-        .bind(&name)
-        .bind(&khmer_name)
-        .bind(&id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
+    pool.execute(
+        "UPDATE categories SET name=?, khmer_name=?, updated_at=datetime('now') WHERE id=?",
+        params![name, khmer_name.unwrap_or_default(), id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn delete_category(id: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    // Soft delete
-    sqlx::query("UPDATE categories SET is_deleted=1, updated_at=datetime('now') WHERE id=?")
-        .bind(&id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
+pub async fn delete_category(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+    pool.execute(
+        "UPDATE categories SET is_deleted=1, updated_at=datetime('now') WHERE id=?",
+        params![id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
 

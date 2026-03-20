@@ -21,13 +21,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 
 # Database
-sqlx = { version = "0.8", features = [
-  "sqlite",
-  "runtime-tokio",
-  "macros",
-  "chrono",
-  "migrate"
-] }
+libsql = { version = "0.3.4", features = ["core", "replication", "remote", "serde"] }
 
 # Async
 tokio = { version = "1", features = ["full"] }
