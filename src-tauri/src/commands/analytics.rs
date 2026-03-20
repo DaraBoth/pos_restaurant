@@ -40,7 +40,7 @@ pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) ->
     
     let query = if period == "today" {
         r#"
-        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
+        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
@@ -50,7 +50,7 @@ pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) ->
         "#
     } else {
         r#"
-        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
+        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
@@ -85,7 +85,7 @@ pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connectio
     
     let query = if period == "today" {
         r#"
-        SELECT c.id, c.name, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
+        SELECT c.id, c.name, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
@@ -96,7 +96,7 @@ pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connectio
         "#
     } else {
         r#"
-        SELECT c.id, c.name, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
+        SELECT c.id, c.name, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
@@ -167,7 +167,7 @@ pub async fn get_peak_hours(period: String, db: State<'_, Arc<Connection>>) -> R
 #[tauri::command]
 pub async fn get_slow_movers(db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
     let query = r#"
-        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_time), 0) as total_revenue
+        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM products p
         LEFT JOIN order_items oi ON oi.product_id = p.id
         LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'paid' AND o.is_deleted = 0 AND o.created_at >= datetime('now', 'localtime', '-30 days')

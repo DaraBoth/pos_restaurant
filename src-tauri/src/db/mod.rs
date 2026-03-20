@@ -16,6 +16,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("008", include_str!("migrations/008_customer_info.sql")),
     ("009", include_str!("migrations/009_table_sessions_and_rounds.sql")),
     ("010", include_str!("migrations/010_inventory_recipes.sql")),
+    ("011", include_str!("migrations/011_ensure_missing_columns.sql")),
 ];
 
 /// Execute a single SQL string that may contain multiple statements separated by `;`.
