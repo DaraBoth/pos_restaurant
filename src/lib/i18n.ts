@@ -231,6 +231,16 @@ export const translations = {
         newCategory: '+ New Category',
         outOfStock: 'Out of stock',
         notAvailableShort: 'N/A',
+        categories: 'Categories',
+        inventoryAudit: 'Inventory Audit',
+        inventoryDesc: 'Stock levels and movement tracking.',
+        categoriesDesc: 'Product classification and groups.',
+        dashboard: 'Dashboard',
+        lowStock: 'Low Stock',
+        lowStockItems: 'Items below minimum stock level',
+        stockLevel: 'Stock',
+        minStock: 'Min',
+        reorder: 'Reorder',
     },
     km: {
         // Auth
@@ -458,6 +468,16 @@ export const translations = {
         newCategory: 'បន្ថែមប្រភេទ',
         outOfStock: 'អស់ស្តុក',
         notAvailableShort: 'មិនមាន',
+        categories: 'ប្រភេទ',
+        inventoryAudit: 'ត្រួតពិនិត្យស្តុក',
+        inventoryDesc: 'កម្រិតស្តុកនិងការតាមដាន។',
+        categoriesDesc: 'ការចាត់ថ្នាក់ផលិតផល។',
+        dashboard: 'ផ្ទាំង',
+        lowStock: 'ស្តុកទាប',
+        lowStockItems: 'មុខទំនិញក្រោមកម្រិត',
+        stockLevel: 'ស្តុក',
+        minStock: 'អប្បបរមា',
+        reorder: 'បន្ថែម',
     },
 } as const;
 

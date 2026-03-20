@@ -1,57 +1,89 @@
 'use client';
-import Link from 'next/link';
+import { useState } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { Package, Users, RefreshCw, ClipboardList, Building2, ArrowRight, TrendingUp } from 'lucide-react';
+import {
+    LayoutDashboard, TrendingUp, Package, LayoutGrid,
+    Users, RefreshCw, ClipboardList, Building2, Layers, BoxesIcon
+} from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 
-const QUICK_LINKS: { href: string; labelKey: TranslationKey; descKey: TranslationKey; icon: any; color: string }[] = [
-    { href: '/management/analytics', labelKey: 'analytics',    descKey: 'analyticsDesc', icon: TrendingUp, color: '#22c55e' },
-    { href: '/management/products',  labelKey: 'products',     descKey: 'productsDesc', icon: Package, color: '#0ea5e9' },
-    { href: '/management/users',     labelKey: 'users',        descKey: 'staffDesc', icon: Users, color: '#a78bfa' },
-    { href: '/management/exchange-rate', labelKey: 'exchangeRate', descKey: 'exchangeRateDesc', icon: RefreshCw, color: '#fbbf24' },
-    { href: '/management/orders',    labelKey: 'orderHistory', descKey: 'orderHistoryDesc', icon: ClipboardList, color: '#f97316' },
-    { href: '/management/settings',  labelKey: 'settings',     descKey: 'settingsDesc', icon: Building2, color: '#f43f5e' },
+// ── Sub-view components (imported statically — no lazy chunk loading) ──
+import DashboardView from './views/DashboardView';
+import AnalyticsView from './views/AnalyticsView';
+import ProductsView from './views/ProductsView';
+import TablesView from './views/TablesView';
+import UsersView from './views/UsersView';
+import ExchangeRateView from './views/ExchangeRateView';
+import OrdersView from './views/OrdersView';
+import SettingsView from './views/SettingsView';
+import CategoriesView from './views/CategoriesView';
+import InventoryView from './views/InventoryView';
+
+type Tab = 'dashboard' | 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'exchange-rate' | 'orders' | 'inventory' | 'settings';
+
+const TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
+    { id: 'dashboard',     labelKey: 'dashboard',    icon: LayoutDashboard },
+    { id: 'analytics',     labelKey: 'analytics',    icon: TrendingUp },
+    { id: 'products',      labelKey: 'products',     icon: Package },
+    { id: 'categories',    labelKey: 'categories',   icon: Layers },
+    { id: 'inventory',     labelKey: 'inventory',    icon: BoxesIcon },
+    { id: 'tables',        labelKey: 'floorPlan',    icon: LayoutGrid },
+    { id: 'users',         labelKey: 'users',        icon: Users },
+    { id: 'exchange-rate', labelKey: 'exchangeRate',  icon: RefreshCw },
+    { id: 'orders',        labelKey: 'orderHistory', icon: ClipboardList },
+    { id: 'settings',      labelKey: 'settings',     icon: Building2 },
 ];
 
-export default function ManagementDashboard() {
-    const { t, lang } = useLanguage();
+const TAB_COMPONENTS: Record<Tab, React.FC> = {
+    dashboard: DashboardView,
+    analytics: AnalyticsView,
+    products: ProductsView,
+    categories: CategoriesView,
+    inventory: InventoryView,
+    tables: TablesView,
+    users: UsersView,
+    'exchange-rate': ExchangeRateView,
+    orders: OrdersView,
+    settings: SettingsView,
+};
+
+export default function ManagementPage() {
+    const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+    const { t } = useLanguage();
+
+    const ActiveComponent = TAB_COMPONENTS[activeTab];
 
     return (
-        <div className="animate-fade-in">
-            <div className="mb-4">
-                <h1 className="text-base font-black text-[var(--foreground)] mb-0.5">
-                    {t('management')}
-                </h1>
-                <p className="text-xs text-[var(--text-secondary)]">
-                    {t('manageOperations')}
-                </p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {QUICK_LINKS.map(({ href, labelKey, descKey, icon: Icon, color }) => (
-                    <Link
-                        key={href}
-                        href={href}
-                        className="group flex flex-col p-3.5 rounded-xl transition-all bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent-blue)]/35 hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
-                    >
-                        <div className="flex items-start justify-between mb-3">
-                            <div
-                                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                                style={{ background: `${color}18`, border: `1px solid ${color}30` }}
+        <>
+            {/* Horizontal tab bar */}
+            <header className="flex-shrink-0 bg-[var(--bg-card)] border-b border-[var(--border)] overflow-x-auto no-scrollbar">
+                <nav className="px-3 flex items-center h-11 gap-0.5 min-w-max">
+                    {TABS.map(({ id, labelKey, icon: Icon }) => {
+                        const active = activeTab === id;
+                        return (
+                            <button
+                                key={id}
+                                onClick={() => setActiveTab(id)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${
+                                    active
+                                        ? 'bg-[var(--accent-blue)] text-white'
+                                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--foreground)]'
+                                }`}
                             >
-                                <Icon size={18} style={{ color }} strokeWidth={2} />
-                            </div>
-                            <ArrowRight size={14} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-blue)] transition-colors mt-1" />
-                        </div>
-                        <h2 className={`text-sm font-bold text-[var(--foreground)] mb-1 ${lang === 'km' ? 'khmer' : ''}`}>
-                            {t(labelKey)}
-                        </h2>
-                        <p className={`text-xs text-[var(--text-secondary)] leading-snug line-clamp-2 ${lang === 'km' ? 'khmer' : ''}`}>
-                            {t(descKey)}
-                        </p>
-                    </Link>
-                ))}
-            </div>
-        </div>
+                                <Icon size={13} strokeWidth={active ? 2.5 : 2} />
+                                <span>{t(labelKey)}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+            </header>
+
+            {/* Content area */}
+            <main className="flex-1 overflow-y-auto p-4 min-w-0 no-scrollbar bg-[var(--bg-dark)]">
+                <div className="max-w-7xl mx-auto h-full">
+                    <ActiveComponent />
+                </div>
+            </main>
+        </>
     );
 }
