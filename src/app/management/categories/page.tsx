@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { getCategories, deleteCategory, Category } from '@/lib/tauri-commands';
-import { Layers, Plus, Trash2, Edit3, Search, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { Layers, Plus, Trash2, Edit3, Search } from 'lucide-react';
 import CategoryModal from '@/components/management/CategoryModal';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function CategoriesManagement() {
+    const { t } = useLanguage();
     const [categories, setCategories] = useState<Category[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -35,86 +36,99 @@ export default function CategoriesManagement() {
         }
     }
 
-    const filteredCategories = categories.filter(c => 
+    const filtered = categories.filter(c =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.khmer_name && c.khmer_name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (
-        <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#181a20] p-6 lg:p-8 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-48 h-48 bg-[var(--accent)]/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-[80px] pointer-events-none" />
-                
-                <div className="flex items-center gap-6 relative z-10">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent)]/10 border border-[var(--accent)]/20 shadow-lg">
-                        <Layers size={28} className="text-[var(--accent)]" />
+        <div className="animate-fade-in space-y-3 pb-6">
+            {/* Header — matches Products page style */}
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[var(--accent)]/15 border border-[var(--accent)]/30">
+                        <Layers size={14} className="text-[var(--accent)]" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-black text-white tracking-tight">Catalog Groups</h1>
-                        <p className="text-xs font-bold text-[#8a8a99] uppercase tracking-[0.2em] opacity-60">Classification & Structure</p>
+                        <h1 className="text-sm font-black text-[var(--foreground)] leading-none">
+                            {t('category')}
+                        </h1>
+                        <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-semibold uppercase tracking-widest">
+                            {filtered.length} {t('category')}
+                        </p>
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 relative z-10">
+                <div className="flex items-center gap-2">
                     <div className="relative">
-                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8a8a99]" />
-                        <input 
+                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+                        <input
                             type="text"
-                            placeholder="Search categories..."
+                            placeholder={t('searchItems')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="bg-[#0f1115] border border-white/5 rounded-2xl pl-12 pr-6 py-2.5 text-sm text-white focus:border-[var(--accent)] outline-none transition-all w-full sm:w-48"
+                            className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors w-36"
                         />
                     </div>
-                    
                     <button
                         onClick={() => { setEditingCategory(null); setIsModalOpen(true); }}
-                        className="px-6 py-2.5 rounded-2xl bg-[var(--accent)] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all"
                     >
-                        <Plus size={18} strokeWidth={3} />
-                        Add Group
+                        <Plus size={13} strokeWidth={3} />
+                        Add
                     </button>
                 </div>
             </div>
 
-            {/* Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredCategories.map(cat => (
-                    <div key={cat.id} className="bg-[#181a20] p-6 rounded-3xl border border-white/5 group hover:border-[var(--accent)]/30 transition-all relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                                onClick={() => { setEditingCategory(cat); setIsModalOpen(true); }}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-[var(--accent)] hover:text-black text-[#8a8a99] transition-all"
-                            >
-                                <Edit3 size={14} />
-                            </button>
-                            <button
-                                onClick={() => handleDelete(cat.id)}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500 text-white text-[#8a8a99] transition-all"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
-                        
-                        <div className="w-10 h-10 rounded-xl bg-[#0f1115] flex items-center justify-center mb-4 border border-white/5 group-hover:border-[var(--accent)]/30 transition-colors">
-                            <Layers size={18} className="text-[var(--accent)]" />
-                        </div>
-                        
-                        <h3 className="text-lg font-black text-white mb-1">{cat.name}</h3>
-                        <p className="text-sm font-bold text-[#8a8a99] khmer">{cat.khmer_name || '---'}</p>
-                    </div>
-                ))}
-            </div>
+            {/* Category grid */}
+            {filtered.length === 0 ? (
+                <div className="pos-card p-10 text-center">
+                    <Layers size={32} className="mx-auto mb-3 text-[var(--text-secondary)] opacity-30" />
+                    <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
+                        No categories found
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {filtered.map(cat => (
+                        <div
+                            key={cat.id}
+                            className="pos-card p-4 group hover:border-[var(--accent)]/40 transition-all relative"
+                        >
+                            {/* Action buttons — visible on hover */}
+                            <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={() => { setEditingCategory(cat); setIsModalOpen(true); }}
+                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-secondary)] transition-all"
+                                >
+                                    <Edit3 size={11} />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(cat.id)}
+                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
+                                >
+                                    <Trash2 size={11} />
+                                </button>
+                            </div>
 
-            {filteredCategories.length === 0 && (
-                <div className="py-20 text-center bg-[#181a20] rounded-[2.5rem] border border-white/5">
-                    <Layers size={48} className="mx-auto mb-4 text-[#8a8a99] opacity-20" />
-                    <p className="text-[#8a8a99] font-bold uppercase tracking-widest text-xs">No categories found</p>
+                            {/* Icon */}
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--accent)]/10 border border-[var(--accent)]/20 mb-3 group-hover:bg-[var(--accent)]/20 transition-colors">
+                                <Layers size={15} className="text-[var(--accent)]" />
+                            </div>
+
+                            {/* Name */}
+                            <p className="text-sm font-black text-[var(--foreground)] leading-tight truncate pr-8">
+                                {cat.name}
+                            </p>
+                            <p className="text-[11px] text-[var(--text-secondary)] khmer mt-0.5 truncate">
+                                {cat.khmer_name || '—'}
+                            </p>
+                        </div>
+                    ))}
                 </div>
             )}
 
-            <CategoryModal 
+            <CategoryModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSave={loadData}

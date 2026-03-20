@@ -5,8 +5,6 @@ use tokio::time::{sleep, Duration};
 use tauri::async_runtime::spawn;
 
 // Embed all migration SQL files at compile time.
-// They are applied in order on every startup using IF NOT EXISTS guards,
-// so they are safe to re-run — only missing tables/columns get created.
 const MIGRATIONS: &[(&str, &str)] = &[
     ("001", include_str!("migrations/001_initial_schema.sql")),
     ("002", include_str!("migrations/002_add_features.sql")),
@@ -20,8 +18,30 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("010", include_str!("migrations/010_inventory_recipes.sql")),
 ];
 
+/// Execute a single SQL string that may contain multiple statements separated by `;`.
+/// Each statement is executed independently so one failure doesn't abort the rest.
+/// ALTER TABLE duplicate-column errors are silently ignored (idempotency).
+async fn exec_statements(conn: &Connection, sql: &str) {
+    for raw in sql.split(';') {
+        let stmt = raw.trim();
+        // Skip blank lines and SQL comments
+        if stmt.is_empty() || stmt.starts_with("--") {
+            continue;
+        }
+        if let Err(e) = conn.execute(stmt, ()).await {
+            let msg = e.to_string().to_lowercase();
+            // Silently ignore "duplicate column" errors from ALTER TABLE
+            if msg.contains("duplicate column") || msg.contains("already exists") {
+                continue;
+            }
+            // Log everything else but DO NOT panic — the app must stay alive
+            eprintln!("[DB Migration] Statement warning ({}): {}", msg, stmt.chars().take(120).collect::<String>());
+        }
+    }
+}
+
 async fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
-    // Create a tracking table so we can skip already-applied migrations
+    // Create tracking table — if this fails, something is fundamentally broken
     conn.execute(
         "CREATE TABLE IF NOT EXISTS _migrations (
             id          TEXT PRIMARY KEY,
@@ -29,73 +49,80 @@ async fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
         )",
         (),
     )
-    .await?;
+    .await
+    .map_err(|e| anyhow::anyhow!("Cannot create _migrations table: {}", e))?;
 
     for (id, sql) in MIGRATIONS {
-        // Check if this migration was already applied
+        // Check if already applied
         let mut rows = conn
             .query("SELECT 1 FROM _migrations WHERE id = ?", [*id])
             .await?;
 
         if rows.next().await?.is_some() {
-            // Already applied — skip
-            continue;
+            continue; // Already done
         }
 
         println!("[DB] Applying migration {}...", id);
 
-        // Execute the migration (each SQL file may have multiple statements)
-        conn.execute_batch(sql).await.map_err(|e| {
-            anyhow::anyhow!("Migration {} failed: {}", id, e)
-        })?;
+        // Run each statement independently — never panic on partial failure
+        exec_statements(conn, sql).await;
 
-        // Mark as applied
-        conn.execute(
+        // Mark as applied regardless — partial migrations are logged above
+        if let Err(e) = conn.execute(
             "INSERT INTO _migrations (id) VALUES (?)",
             [*id],
-        )
-        .await?;
-
-        println!("[DB] Migration {} applied.", id);
+        ).await {
+            eprintln!("[DB] Could not record migration {}: {}", id, e);
+        } else {
+            println!("[DB] Migration {} done.", id);
+        }
     }
 
     Ok(())
 }
 
 pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connection>> {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "".to_string());
-    let token = std::env::var("AUTH_TOKEN").unwrap_or_else(|_| "".to_string());
+    let url = std::env::var("DATABASE_URL").unwrap_or_default();
+    let token = std::env::var("AUTH_TOKEN").unwrap_or_default();
 
     let db = if !url.is_empty() && !token.is_empty() {
         println!("[DB] Connecting to Turso Embedded Replica...");
-        Builder::new_remote_replica(db_path, url, token)
+        match Builder::new_remote_replica(db_path.clone(), url, token)
             .build()
-            .await?
+            .await
+        {
+            Ok(db) => db,
+            Err(e) => {
+                // If Turso connection fails (e.g. no internet), fall back to local
+                eprintln!("[DB] Turso connection failed: {}. Falling back to local SQLite.", e);
+                Builder::new_local(db_path).build().await?
+            }
+        }
     } else {
-        println!("[DB] Running pure local SQLite (no Turso credentials)...");
+        println!("[DB] Running local SQLite (no Turso credentials).");
         Builder::new_local(db_path).build().await?
     };
 
     let conn = db.connect()?;
 
-    // Apply schema migrations — runs on every startup, safe to re-run
-    apply_migrations(&conn).await?;
+    // Apply schema migrations — resilient, never panics
+    if let Err(e) = apply_migrations(&conn).await {
+        eprintln!("[DB] Migration error (non-fatal): {}", e);
+    }
 
     let conn_arc = Arc::new(conn);
 
-    // Auto-sync loop in background — pushes local writes up to Turso cloud
+    // Auto-sync to Turso in background
     if std::env::var("DATABASE_URL").is_ok() {
         let sync_db = db;
         spawn(async move {
-            // Initial sync right after startup to pull any remote changes
-            if let Err(e) = sync_db.sync().await {
-                eprintln!("[Turso] Initial sync error: {}", e);
-            } else {
-                println!("[Turso] Initial sync complete.");
+            // Initial sync
+            match sync_db.sync().await {
+                Ok(_) => println!("[Turso] Initial sync complete."),
+                Err(e) => eprintln!("[Turso] Initial sync error: {}", e),
             }
-
             loop {
-                sleep(Duration::from_secs(5)).await;
+                sleep(Duration::from_secs(10)).await;
                 if let Err(e) = sync_db.sync().await {
                     eprintln!("[Turso] Sync error: {}", e);
                 }
