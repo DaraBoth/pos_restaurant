@@ -20,6 +20,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("012", include_str!("migrations/012_restore_depleted_stock.sql")),
     ("013", include_str!("migrations/013_fix_missing_session_columns.sql")),
     ("014", include_str!("migrations/014_expand_role_check.sql")),
+    ("015", include_str!("migrations/015_floor_tables_restaurant_id.sql")),
 ];
 
 /// Execute a single SQL string that may contain multiple statements separated by `;`.
@@ -123,6 +124,11 @@ async fn ensure_critical_columns(conn: &Connection) {
         let _ = conn.execute("ALTER TABLE floor_tables ADD COLUMN seat_count INTEGER NOT NULL DEFAULT 4", ()).await;
         println!("[DB] Added missing column floor_tables.seat_count");
     }
+    // floor_tables.restaurant_id
+    if !column_exists(conn, "floor_tables", "restaurant_id").await {
+        let _ = conn.execute("ALTER TABLE floor_tables ADD COLUMN restaurant_id TEXT REFERENCES restaurants(id)", ()).await;
+        println!("[DB] Added missing column floor_tables.restaurant_id");
+    }
     // table_sessions table
     let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS table_sessions (
@@ -142,22 +148,52 @@ async fn ensure_critical_columns(conn: &Connection) {
     }
 }
 
-pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connection>> {
-    // option_env! reads values baked in at compile time by build.rs.
-    // Falls back to runtime env vars for flexibility (e.g. CI overrides).
-    let url   = option_env!("DATABASE_URL").unwrap_or("").to_string();
-    let token = option_env!("AUTH_TOKEN").unwrap_or("").to_string();
-    // Allow runtime override to take precedence if set
-    let url   = std::env::var("DATABASE_URL").unwrap_or(url);
-    let token = std::env::var("AUTH_TOKEN").unwrap_or(token);
+/// Read KEY=VALUE lines from a .env file and return the value for a given key.
+fn read_dotenv(key: &str) -> Option<String> {
+    // Try project root (.env sits one level above src-tauri/)
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let env_path = manifest_dir.parent().unwrap_or(manifest_dir).join(".env");
+    let contents = std::fs::read_to_string(&env_path).ok()?;
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') { continue; }
+        if let Some((k, v)) = line.split_once('=') {
+            if k.trim() == key {
+                let v = v.trim().trim_matches('"').trim_matches('\'');
+                return Some(v.to_string());
+            }
+        }
+    }
+    None
+}
 
+pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connection>> {
+    // Priority (highest → lowest):
+    //   1. OS environment variable  (CI / developer shell export)
+    //   2. .env file read at runtime (dev mode — no recompile needed)
+    //   3. option_env! compile-time baked value (production builds)
+    let baked_url   = option_env!("DATABASE_URL").unwrap_or("").to_string();
+    let baked_token = option_env!("AUTH_TOKEN").unwrap_or("").to_string();
+    let url   = std::env::var("DATABASE_URL")
+        .ok()
+        .or_else(|| read_dotenv("DATABASE_URL"))
+        .unwrap_or(baked_url);
+    let token = std::env::var("AUTH_TOKEN")
+        .ok()
+        .or_else(|| read_dotenv("AUTH_TOKEN"))
+        .unwrap_or(baked_token);
+
+    let mut is_remote = false;
     let db = if !url.is_empty() && !token.is_empty() {
         println!("[DB] Connecting to Turso Embedded Replica...");
-        match Builder::new_remote_replica(db_path.clone(), url, token)
+        match Builder::new_remote_replica(db_path.clone(), url.clone(), token)
             .build()
             .await
         {
-            Ok(db) => db,
+            Ok(db) => {
+                is_remote = true;
+                db
+            }
             Err(e) => {
                 // If Turso connection fails (e.g. no internet), fall back to local
                 eprintln!("[DB] Turso connection failed: {}. Falling back to local SQLite.", e);
@@ -182,8 +218,8 @@ pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connect
 
     let conn_arc = Arc::new(conn);
 
-    // Auto-sync to Turso in background
-    if std::env::var("DATABASE_URL").is_ok() {
+    // Auto-sync to Turso in background — only when we have a real remote replica
+    if is_remote {
         let sync_db = db;
         spawn(async move {
             // Initial sync

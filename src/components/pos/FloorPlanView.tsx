@@ -27,7 +27,7 @@ export default function FloorPlanView() {
     async function load() {
         setLoading(true);
         try {
-            setTables(await getTables());
+            setTables(await getTables(user?.restaurant_id ?? undefined));
         } catch (e) {
             console.error(e);
         } finally {
@@ -137,7 +137,7 @@ export default function FloorPlanView() {
                             <span>{t('takeout')}</span>
                         </button>
                         {canManage && (
-                            <Link href="/management/tables" className="text-xs text-[var(--accent-blue)] hover:underline">
+                            <Link href="/management?tab=tables" className="text-xs text-[var(--accent-blue)] hover:underline">
                                 {t('addTablesHint')}
                             </Link>
                         )}

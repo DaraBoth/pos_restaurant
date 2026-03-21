@@ -6,17 +6,20 @@ import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
 import FloorPlanView from '@/components/pos/FloorPlanView';
 import HoldPaymentModal from '@/components/pos/HoldPaymentModal';
+import ReceiptPreviewModal from '@/components/pos/ReceiptPreviewModal';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { printReceipt, getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
 
 export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isHoldOpen, setIsHoldOpen] = useState(false);
-    const { tableId, isTakeout, items, clearOrder } = useOrder();
+    const [receiptPayload, setReceiptPayload] = useState<ReceiptPrintPayload | null>(null);
+    const { tableId, isTakeout, items, clearOrder, localCart } = useOrder();
     const { lang, t } = useLanguage();
 
     // No table and not takeout → show floor plan
-    if (!tableId && !isTakeout) {
+    if (!tableId && !isTakeout && localCart.length === 0) {
         return <FloorPlanView />;
     }
 
@@ -77,13 +80,23 @@ export default function POSPage() {
             {isCheckoutOpen && (
                 <CheckoutModal
                     onClose={() => setIsCheckoutOpen(false)}
-                    onComplete={() => setIsCheckoutOpen(false)}
+                    onComplete={(payload) => {
+                        setIsCheckoutOpen(false);
+                        setReceiptPayload(payload);
+                    }}
                 />
             )}
             {isHoldOpen && (
                 <HoldPaymentModal
                     onClose={() => setIsHoldOpen(false)}
                     onComplete={() => { setIsHoldOpen(false); clearOrder(); }}
+                />
+            )}
+            {receiptPayload && (
+                <ReceiptPreviewModal
+                    html={getReceiptHtml(receiptPayload)}
+                    onClose={() => setReceiptPayload(null)}
+                    onPrint={() => { printReceipt(receiptPayload); setReceiptPayload(null); }}
                 />
             )}
         </>

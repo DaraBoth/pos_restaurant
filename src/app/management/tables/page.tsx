@@ -4,9 +4,11 @@ import { Trash2, Plus, LayoutGrid, Users2 } from 'lucide-react';
 import { getTables, createTable, deleteTable } from '@/lib/tauri-commands';
 import type { FloorTable } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function TablesManagementPage() {
     const { t } = useLanguage();
+    const { user } = useAuth();
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [newName, setNewName] = useState('');
     const [seatCount, setSeatCount] = useState(4);
@@ -19,7 +21,7 @@ export default function TablesManagementPage() {
     async function load() {
         setLoading(true);
         try {
-            setTables(await getTables());
+            setTables(await getTables(user?.restaurant_id ?? undefined));
         } catch (e) {
             console.error(e);
         } finally {
@@ -37,7 +39,7 @@ export default function TablesManagementPage() {
         setCreating(true);
         setError('');
         try {
-            await createTable(name, seatCount);
+            await createTable(name, seatCount, user?.restaurant_id ?? undefined);
             setNewName('');
             setSeatCount(4);
             await load();

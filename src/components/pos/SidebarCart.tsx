@@ -1,20 +1,22 @@
-'use client';
+﻿'use client';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useState } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle } from 'lucide-react';
+import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2 } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
 export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => void; onHold: () => void }) {
-    const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds } = useOrder();
+    const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
+            localCart, addToLocalCart, updateLocalCartQty, commitLocalCart } = useOrder();
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
+    const [committing, setCommitting] = useState(false);
 
     async function handleNoteSave(id: string) {
         try {
@@ -67,6 +69,20 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
 
     const isEmpty = items.length === 0;
     const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+    const localCartTotalCents = localCart.reduce((s, i) => s + i.priceCents * i.qty, 0);
+    const localCartTotalQty = localCart.reduce((s, i) => s + i.qty, 0);
+
+    async function handlePlaceOrder() {
+        if (!user || localCart.length === 0) return;
+        setCommitting(true);
+        try {
+            await commitLocalCart(user.id);
+        } catch (e) {
+            console.error('Failed to place order', e);
+        } finally {
+            setCommitting(false);
+        }
+    }
 
     return (
         <>
@@ -81,9 +97,9 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                         <span className="text-xs font-bold text-[var(--foreground)]">
                             {t('currentOrder')}
                         </span>
-                        {totalQty > 0 && (
+                        {(orderId ? totalQty : localCartTotalQty) > 0 && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[var(--accent)] text-white">
-                                {totalQty}
+                                {orderId ? totalQty : localCartTotalQty}
                             </span>
                         )}
                     </div>
@@ -137,15 +153,59 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
 
                 {/* Items List */}
                 <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-0 no-scrollbar bg-[var(--bg-dark)]">
-                    {isEmpty ? (
+                    {/* ── LOCAL CART (before order is placed) ── */}
+                    {!orderId && localCart.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center gap-2 opacity-30">
                             <ShoppingCart size={28} className="text-[var(--text-secondary)]" />
                             <p className="text-xs font-semibold text-[var(--text-secondary)] text-center">
                                 {t('emptyOrder')}
                             </p>
                         </div>
-                    ) : (
-                        items.map(item => {
+                    )}
+                    {!orderId && localCart.map(item => (
+                        <div key={item.productId} className="p-2 rounded-xl border bg-[var(--bg-elevated)] border-[var(--border)]">
+                            <div className="flex justify-between items-start gap-2 mb-1.5">
+                                <div className="flex-1 min-w-0">
+                                    <p className={`text-xs font-semibold text-[var(--foreground)] truncate mb-0.5 ${lang === 'km' ? 'khmer' : ''}`}>
+                                        {lang === 'km' ? (item.khmerName || item.productName) : item.productName}
+                                    </p>
+                                    <p className="text-[10px] font-mono text-[var(--text-secondary)]">
+                                        {formatUsd(item.priceCents)}
+                                    </p>
+                                </div>
+                                <span className="text-xs font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
+                                    {formatUsd(item.priceCents * item.qty)}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)]">
+                                <button
+                                    onClick={() => updateLocalCartQty(item.productId, item.qty - 1)}
+                                    className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
+                                >
+                                    {item.qty <= 1 ? <Trash2 size={11} /> : <Minus size={11} />}
+                                </button>
+                                <span className="font-bold font-mono text-xs flex-1 text-center text-[var(--foreground)]">
+                                    {item.qty}
+                                </span>
+                                <button
+                                    onClick={() => updateLocalCartQty(item.productId, item.qty + 1)}
+                                    className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
+                                >
+                                    <Plus size={11} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    {/* ── COMMITTED ORDER (after Place Order) ── */}
+                    {orderId && isEmpty && (
+                        <div className="h-full flex flex-col items-center justify-center gap-2 opacity-30">
+                            <ShoppingCart size={28} className="text-[var(--text-secondary)]" />
+                            <p className="text-xs font-semibold text-[var(--text-secondary)] text-center">
+                                {t('emptyOrder')}
+                            </p>
+                        </div>
+                    )}
+                    {orderId && items.map(item => {
                             return (
                                 <div
                                     key={item.id}
@@ -217,8 +277,7 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                                     )}
                                 </div>
                             );
-                        })
-                    )}
+                        })}
                 </div>
 
                 {/* Footer */}
@@ -226,7 +285,9 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                     <div className="space-y-0.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                         <div className="flex justify-between">
                             <span>{t('subtotal')}</span>
-                            <span className="font-mono text-[var(--foreground)]">{formatUsd(totals.subtotalCents)}</span>
+                            <span className="font-mono text-[var(--foreground)]">
+                                {orderId ? formatUsd(totals.subtotalCents) : formatUsd(localCartTotalCents)}
+                            </span>
                         </div>
                     </div>
 
@@ -234,41 +295,66 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                         <div>
                             <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-0.5">{t('total')}</p>
                             <p className="text-lg font-black font-mono text-[var(--foreground)] leading-none">
-                                {formatUsd(totals.totalUsdCents)}
+                                {orderId ? formatUsd(totals.totalUsdCents) : formatUsd(localCartTotalCents)}
                             </p>
                         </div>
                         <p className="text-xs font-mono text-[var(--text-secondary)] opacity-50">
-                            {formatKhr(totals.totalKhr)}
+                            {orderId ? formatKhr(totals.totalKhr) : ''}
                         </p>
                     </div>
 
-                    {/* Void + Hold + Checkout */}
-                    <div className="grid grid-cols-3 gap-1.5">
-                        <button
-                            onClick={handleVoid}
-                            disabled={!orderId}
-                            className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-40 active:scale-95"
-                        >
-                            <XCircle size={12} strokeWidth={2.5} />
-                            {t('cancel')}
-                        </button>
-                        <button
-                            onClick={onHold}
-                            disabled={isEmpty || !orderId}
-                            className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-yellow-500/8 border border-yellow-500/25 text-yellow-400/80 hover:text-yellow-400 hover:border-yellow-500/45 transition-all disabled:opacity-40 active:scale-95"
-                        >
-                            <PauseCircle size={12} strokeWidth={2.5} />
-                            Hold
-                        </button>
-                        <button
-                            className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
-                            disabled={isEmpty || !orderId}
-                            onClick={onCheckout}
-                        >
-                            <CreditCard size={12} strokeWidth={2.5} />
-                            {t('checkout')}
-                        </button>
-                    </div>
+                    {/* LOCAL CART mode: Place Order button */}
+                    {!orderId && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                                onClick={clearOrder}
+                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
+                            >
+                                <XCircle size={12} strokeWidth={2.5} />
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={handlePlaceOrder}
+                                disabled={localCart.length === 0 || committing}
+                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-all disabled:opacity-40 active:scale-95"
+                            >
+                                {committing
+                                    ? <Loader2 size={12} className="animate-spin" />
+                                    : <ClipboardList size={12} strokeWidth={2.5} />
+                                }
+                                Place Order
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ORDER mode: Void + Hold + Checkout */}
+                    {orderId && (
+                        <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                                onClick={handleVoid}
+                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
+                            >
+                                <XCircle size={12} strokeWidth={2.5} />
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={onHold}
+                                disabled={isEmpty}
+                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-yellow-500/8 border border-yellow-500/25 text-yellow-400/80 hover:text-yellow-400 hover:border-yellow-500/45 transition-all disabled:opacity-40 active:scale-95"
+                            >
+                                <PauseCircle size={12} strokeWidth={2.5} />
+                                Hold
+                            </button>
+                            <button
+                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                disabled={isEmpty}
+                                onClick={onCheckout}
+                            >
+                                <CreditCard size={12} strokeWidth={2.5} />
+                                {t('checkout')}
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

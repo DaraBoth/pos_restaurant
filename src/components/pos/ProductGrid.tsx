@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import {
     getProducts, getCategories, Product, Category,
-    createOrder as apiCreateOrder, addOrderItem as apiAddOrderItem,
     getOrderItems
 } from '@/lib/tauri-commands';
 import { useOrder } from '@/providers/OrderProvider';
@@ -28,7 +27,7 @@ export default function ProductGrid() {
     const [addingId, setAddingId] = useState<string | null>(null);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
-    const { orderId, tableId, setOrderId, setItems } = useOrder();
+    const { orderId, tableId, setOrderId, setItems, addToLocalCart } = useOrder();
     const { user } = useAuth();
     const { t, lang } = useLanguage();
 
@@ -51,7 +50,7 @@ export default function ProductGrid() {
     }, [selectedCategory]);
 
     useEffect(() => {
-        if (!orderId) { setItems([]); return; }
+        if (!orderId) return;
         getOrderItems(orderId).then(items => setItems(items)).catch(console.error);
     }, [orderId, setItems]);
 
@@ -59,15 +58,7 @@ export default function ProductGrid() {
         if (product.is_available === 0 || product.stock_quantity <= 0) return;
         setAddingId(product.id);
         try {
-            let currentOrderId = orderId;
-            if (!currentOrderId) {
-                const userId = user?.id ?? 'system';
-                currentOrderId = await apiCreateOrder(userId, tableId || undefined);
-                setOrderId(currentOrderId);
-            }
-            await apiAddOrderItem(currentOrderId, product.id, 1);
-            const updatedItems = await getOrderItems(currentOrderId);
-            setItems(updatedItems);
+            addToLocalCart(product);
         } catch (e) {
             console.error('Failed to add item:', e);
         } finally {

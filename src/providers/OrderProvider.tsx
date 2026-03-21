@@ -1,7 +1,15 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { OrderItem, Order, getExchangeRate, getActiveOrderForTable, getSessionRounds, getOrderItems } from '@/lib/tauri-commands';
+import { OrderItem, Order, Product, getExchangeRate, getActiveOrderForTable, getSessionRounds, getOrderItems, createOrder as apiCreateOrder, addOrderItem as apiAddOrderItem } from '@/lib/tauri-commands';
 import { calculateTotals, OrderTotals } from '@/lib/currency';
+
+export interface LocalCartItem {
+    productId: string;
+    productName: string;
+    khmerName?: string;
+    priceCents: number;
+    qty: number;
+}
 
 interface OrderContextValue {
     orderId: string | null;
@@ -12,6 +20,7 @@ interface OrderContextValue {
     sessionId: string | null;
     rounds: Order[];
     isTakeout: boolean;
+    localCart: LocalCartItem[];
     setOrderId: (id: string | null) => void;
     setItems: (items: OrderItem[]) => void;
     setTableId: (t: string) => void;
@@ -22,6 +31,9 @@ interface OrderContextValue {
     refreshRate: () => void;
     clearOrder: () => void;
     loadTableSession: (tId: string) => Promise<void>;
+    addToLocalCart: (product: Product) => void;
+    updateLocalCartQty: (productId: string, qty: number) => void;
+    commitLocalCart: (userId: string) => Promise<void>;
 }
 
 const EMPTY_TOTALS: OrderTotals = {
@@ -31,10 +43,12 @@ const EMPTY_TOTALS: OrderTotals = {
 const OrderContext = createContext<OrderContextValue>({
     orderId: null, items: [], totals: EMPTY_TOTALS,
     exchangeRate: 4100, tableId: '', sessionId: null, rounds: [], isTakeout: false,
+    localCart: [],
     setOrderId: () => { }, setItems: () => { }, setTableId: () => { },
     setSessionId: () => { }, setRounds: () => { }, switchRound: async () => {},
     setTakeout: () => { }, refreshRate: () => { }, clearOrder: () => { },
     loadTableSession: async () => {},
+    addToLocalCart: () => { }, updateLocalCartQty: () => { }, commitLocalCart: async () => {},
 });
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
@@ -45,6 +59,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [rounds, setRounds] = useState<Order[]>([]);
     const [isTakeout, setTakeout] = useState(false);
+    const [localCart, setLocalCart] = useState<LocalCartItem[]>([]);
 
     const subtotalCents = items.reduce(
         (sum, item) => sum + item.price_at_order * item.quantity, 0
@@ -71,6 +86,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         setSessionId(null);
         setRounds([]);
         setTakeout(false);
+        setLocalCart([]);
     }, []);
 
     const loadTableSession = useCallback(async (tId: string) => {
@@ -109,6 +125,46 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    const addToLocalCart = useCallback((product: Product) => {
+        setLocalCart(prev => {
+            const existing = prev.find(i => i.productId === product.id);
+            if (existing) {
+                return prev.map(i => i.productId === product.id ? { ...i, qty: i.qty + 1 } : i);
+            }
+            return [...prev, {
+                productId: product.id,
+                productName: product.name,
+                khmerName: product.khmer_name,
+                priceCents: product.price_cents,
+                qty: 1,
+            }];
+        });
+    }, []);
+
+    const updateLocalCartQty = useCallback((productId: string, qty: number) => {
+        if (qty <= 0) {
+            setLocalCart(prev => prev.filter(i => i.productId !== productId));
+        } else {
+            setLocalCart(prev => prev.map(i => i.productId === productId ? { ...i, qty } : i));
+        }
+    }, []);
+
+    const commitLocalCart = useCallback(async (userId: string) => {
+        if (localCart.length === 0) return;
+        const newOrderId = await apiCreateOrder(userId, tableId || undefined);
+        for (const item of localCart) {
+            await apiAddOrderItem(newOrderId, item.productId, item.qty);
+        }
+        if (tableId) {
+            await loadTableSession(tableId);
+        } else {
+            setOrderId(newOrderId);
+            const updatedItems = await getOrderItems(newOrderId);
+            setItemsState(updatedItems);
+        }
+        setLocalCart([]);
+    }, [localCart, tableId, loadTableSession]);
+
     useEffect(() => {
         refreshRate();
     }, [refreshRate]);
@@ -116,8 +172,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     return (
         <OrderContext.Provider value={{
             orderId, items, totals, exchangeRate, tableId, sessionId, rounds, isTakeout,
+            localCart,
             setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout,
             refreshRate, clearOrder, loadTableSession, switchRound,
+            addToLocalCart, updateLocalCartQty, commitLocalCart,
         }}>
             {children}
         </OrderContext.Provider>

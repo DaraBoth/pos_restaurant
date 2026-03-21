@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/providers/LanguageProvider';
 import {
     LayoutDashboard, TrendingUp, Package, LayoutGrid,
@@ -50,6 +51,12 @@ const TAB_COMPONENTS: Record<Tab, React.FC> = {
 export default function ManagementPage() {
     const [activeTab, setActiveTab] = useState<Tab>('dashboard');
     const { t } = useLanguage();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const tab = searchParams.get('tab') as Tab | null;
+        if (tab && tab in TAB_COMPONENTS) setActiveTab(tab);
+    }, [searchParams]);
 
     const ActiveComponent = TAB_COMPONENTS[activeTab];
 

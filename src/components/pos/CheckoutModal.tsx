@@ -6,15 +6,14 @@ import { checkoutOrder, checkoutSession, getOrderItems, getRestaurant, PaymentIn
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
 import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
-import { printReceipt, getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
-import ReceiptPreviewModal from '@/components/pos/ReceiptPreviewModal';
+import { getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
 
 export default function CheckoutModal({
     onClose,
     onComplete
 }: {
     onClose: () => void;
-    onComplete: () => void;
+    onComplete: (payload: ReceiptPrintPayload) => void;
 }) {
     const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds } = useOrder();
     const { t } = useLanguage();
@@ -23,7 +22,6 @@ export default function CheckoutModal({
     const [method, setMethod] = useState<'cash' | 'khqr' | 'card'>('cash');
     const [loading, setLoading] = useState(false);
     const [discountPct, setDiscountPct] = useState<number>(0);
-    const [receiptPreview, setReceiptPreview] = useState<{ html: string; payload: ReceiptPrintPayload } | null>(null);
 
     const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
     const [combinedTotals, setCombinedTotals] = useState(totals);
@@ -141,8 +139,7 @@ export default function CheckoutModal({
                 totals: discountedTotals,
             };
             clearOrder();
-            onComplete();
-            setReceiptPreview({ html: getReceiptHtml(payload), payload });
+            onComplete(payload);
         } catch (e) {
             console.error(e);
             alert(t('error'));
@@ -316,13 +313,6 @@ export default function CheckoutModal({
                 </div>
             </div>
         </div>
-        {receiptPreview && (
-            <ReceiptPreviewModal
-                html={receiptPreview.html}
-                onClose={() => setReceiptPreview(null)}
-                onPrint={() => { printReceipt(receiptPreview.payload); setReceiptPreview(null); }}
-            />
-        )}
         </>
     );
 }

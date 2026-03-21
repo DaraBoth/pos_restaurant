@@ -4,9 +4,12 @@ use std::sync::Arc;
 use crate::models::FloorTable;
 
 #[tauri::command]
-pub async fn get_tables(pool: State<'_, Arc<Connection>>) -> Result<Vec<FloorTable>, String> {
-    let mut rows = pool.query(
-        "SELECT
+pub async fn get_tables(
+    restaurant_id: Option<String>,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Vec<FloorTable>, String> {
+    let sql = "
+        SELECT
             ft.id,
             ft.name,
             ft.seat_count,
@@ -23,11 +26,12 @@ pub async fn get_tables(pool: State<'_, Arc<Connection>>) -> Result<Vec<FloorTab
             END AS status
          FROM floor_tables ft
          WHERE ft.is_deleted = 0
-         ORDER BY ft.name",
-         ()
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+           AND (ft.restaurant_id = ?1 OR ?1 IS NULL)
+         ORDER BY ft.name";
+
+    let mut rows = pool.query(sql, params![restaurant_id])
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
 
     let mut tables = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -46,14 +50,15 @@ pub async fn get_tables(pool: State<'_, Arc<Connection>>) -> Result<Vec<FloorTab
 pub async fn create_table(
     name: String,
     seat_count: Option<i64>,
+    restaurant_id: Option<String>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<FloorTable, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let seats = seat_count.unwrap_or(4);
-    
+
     pool.execute(
-        "INSERT INTO floor_tables (id, name, status, seat_count) VALUES (?, ?, 'free', ?)",
-        params![id.clone(), name.clone(), seats]
+        "INSERT INTO floor_tables (id, name, status, seat_count, restaurant_id) VALUES (?, ?, 'free', ?, ?)",
+        params![id.clone(), name.clone(), seats, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
