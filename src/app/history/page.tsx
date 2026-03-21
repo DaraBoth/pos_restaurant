@@ -1,11 +1,12 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getOrders, Order, getOrderItems, OrderItem, getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { printReceipt } from '@/lib/receipt';
 import { 
     History, RefreshCw, TableProperties, ChevronDown, 
-    ChevronUp, Download, Calendar, Filter, Search, Clock, Trash2, CheckCircle, ReceiptText
+    ChevronUp, Download, Calendar, Clock, ReceiptText,
+    LayoutList, LayoutGrid, Printer
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -31,6 +32,8 @@ export default function HistoryPage() {
     const [filter, setFilter] = useState<StatusFilter>('all');
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
     const [orderDetails, setOrderDetails] = useState<Record<string, OrderItem[]>>({});
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const loadingItemsRef = useRef<Set<string>>(new Set());
     
     // Default to today
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
@@ -65,6 +68,31 @@ export default function HistoryPage() {
             setLoading(false);
         }
     }
+
+    // When in grid mode, auto-load items for all visible orders
+    const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+
+    useEffect(() => {
+        if (viewMode !== 'grid' || filtered.length === 0) return;
+        const toLoad = filtered.filter(o => !orderDetails[o.id] && !loadingItemsRef.current.has(o.id));
+        if (toLoad.length === 0) return;
+        toLoad.forEach(o => loadingItemsRef.current.add(o.id));
+        Promise.all(
+            toLoad.map(o =>
+                getOrderItems(o.id)
+                    .then(items => ({ id: o.id, items }))
+                    .catch(() => ({ id: o.id, items: [] as OrderItem[] }))
+            )
+        ).then(results => {
+            setOrderDetails(prev => {
+                const next = { ...prev };
+                results.forEach(r => { next[r.id] = r.items; });
+                return next;
+            });
+            results.forEach(r => loadingItemsRef.current.delete(r.id));
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode, filter, orders]);
 
     async function toggleRow(orderId: string) {
         setExpandedRows(prev => {
@@ -102,8 +130,6 @@ export default function HistoryPage() {
         const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         saveAs(blob, `DineOS_Report_${startDate}_to_${endDate}.xlsx`);
     };
-
-    const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
 
     // Stats
     const completed = orders.filter(o => o.status === 'completed');
@@ -175,24 +201,44 @@ export default function HistoryPage() {
 
             {/* ── Tabs & Content ── */}
             <div className="space-y-3">
-                <div className="flex gap-2 overflow-x-auto pb-2 container-snap">
-                    {STATUS_TABS.map(tab => (
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-2 overflow-x-auto pb-2 container-snap">
+                        {STATUS_TABS.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setFilter(tab.id)}
+                                className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${filter === tab.id
+                                    ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
+                                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
+                                    }`}
+                            >
+                                {tab.label}
+                                <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-white/5'}`}>
+                                    {orders.filter(o => o.status === tab.id || tab.id === 'all').length}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                    {/* View mode toggle */}
+                    <div className="flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-1 flex-shrink-0">
                         <button
-                            key={tab.id}
-                            onClick={() => setFilter(tab.id)}
-                            className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${filter === tab.id
-                                ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
-                                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
-                                }`}
+                            onClick={() => setViewMode('table')}
+                            title="Table view"
+                            className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                         >
-                            {tab.label}
-                            <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-white/5'}`}>
-                                {orders.filter(o => o.status === tab.id || tab.id === 'all').length}
-                            </span>
+                            <LayoutList size={15} strokeWidth={2.5} />
                         </button>
-                    ))}
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            title="Receipt grid view"
+                            className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                        >
+                            <LayoutGrid size={15} strokeWidth={2.5} />
+                        </button>
+                    </div>
                 </div>
 
+                {viewMode === 'table' ? (
                 <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-2xl relative">
                     <div className="overflow-x-auto container-snap">
                         <table className="w-full text-left">
@@ -355,6 +401,144 @@ export default function HistoryPage() {
                         </table>
                     </div>
                 </div>
+                ) : (
+                /* ── Receipt Grid View ── */
+                filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 gap-3 opacity-30">
+                        <ReceiptText size={36} />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">No matching transactions</span>
+                    </div>
+                ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+                    {filtered.map(o => {
+                        const style = STATUS_STYLES[o.status] ?? STATUS_STYLES['void'];
+                        const items = orderDetails[o.id];
+                        const dt = new Date(o.created_at + 'Z');
+                        return (
+                            <div
+                                key={o.id}
+                                className="flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)]/40 transition-all shadow-xl"
+                            >
+                                {/* Receipt tape top */}
+                                <div
+                                    className="h-1.5 w-full"
+                                    style={{ background: `linear-gradient(90deg, ${style.text}55 0%, ${style.text} 50%, ${style.text}55 100%)` }}
+                                />
+
+                                {/* Header */}
+                                <div className="px-4 pt-4 pb-3 border-b border-dashed border-white/10">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <span
+                                            className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
+                                            style={{ background: style.bg, color: style.text, borderColor: style.border }}
+                                        >
+                                            {o.status}
+                                        </span>
+                                        {o.table_id ? (
+                                            <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
+                                                <TableProperties size={9} />
+                                                {o.table_id}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[9px] font-black opacity-25 uppercase tracking-widest">Takeout</span>
+                                        )}
+                                    </div>
+                                    <p className="font-mono text-xs font-black text-[var(--accent)] tracking-widest">
+                                        #{o.id.split('-')[0].toUpperCase()}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 mt-1 text-[var(--text-secondary)] opacity-50">
+                                        <Clock size={10} />
+                                        <span className="text-[10px] font-mono font-bold">
+                                            {dt.toLocaleDateString()} · {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Items */}
+                                <div className="flex-1 px-4 py-3 space-y-1.5 min-h-[80px]">
+                                    {items ? (
+                                        items.length === 0 ? (
+                                            <p className="text-[10px] opacity-20 font-black uppercase tracking-widest text-center py-2">No items</p>
+                                        ) : (
+                                            items.map(item => (
+                                                <div key={item.id} className="flex items-center justify-between text-[11px]">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span className="font-mono font-black text-[var(--accent)] w-7 text-right flex-shrink-0">
+                                                            {item.quantity}×
+                                                        </span>
+                                                        <span className="font-medium truncate text-[var(--foreground)] opacity-80">
+                                                            {item.product_name}
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-mono font-black text-[var(--foreground)] opacity-70 flex-shrink-0 ml-2">
+                                                        {formatUsd(item.price_at_order * item.quantity)}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )
+                                    ) : (
+                                        <div className="flex items-center justify-center py-4 opacity-25">
+                                            <RefreshCw size={16} className="animate-spin" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Totals */}
+                                <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-white/10 space-y-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total</span>
+                                        <span
+                                            className="font-mono font-black text-sm"
+                                            style={{ color: o.status === 'void' ? undefined : 'var(--accent)' }}
+                                        >
+                                            <span className={o.status === 'void' ? 'line-through opacity-30' : ''}>
+                                                {formatUsd(o.total_usd)}
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-25">KHR</span>
+                                        <span className={`font-mono text-[10px] font-bold opacity-40 ${o.status === 'void' ? 'line-through' : ''}`}>
+                                            {formatKhr(o.total_khr)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Print button */}
+                                <div className="px-3 pb-3">
+                                    <button
+                                        onClick={() => {
+                                            if (restaurant && items) {
+                                                printReceipt({
+                                                    restaurant,
+                                                    orderId: o.id,
+                                                    tableId: o.table_id || undefined,
+                                                    customerName: o.customer_name,
+                                                    customerPhone: o.customer_phone,
+                                                    items,
+                                                    payments: [],
+                                                    totals: {
+                                                        subtotalCents: o.total_usd,
+                                                        vatCents: 0,
+                                                        pltCents: 0,
+                                                        totalUsdCents: o.total_usd,
+                                                        totalKhr: o.total_khr
+                                                    }
+                                                });
+                                            }
+                                        }}
+                                        disabled={!items || !restaurant}
+                                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
+                                    >
+                                        <Printer size={11} strokeWidth={2.5} />
+                                        Print Receipt
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                ))}
             </div>
         </div>
     );

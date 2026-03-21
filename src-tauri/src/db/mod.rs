@@ -18,6 +18,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("010", include_str!("migrations/010_inventory_recipes.sql")),
     ("011", include_str!("migrations/011_ensure_missing_columns.sql")),
     ("012", include_str!("migrations/012_restore_depleted_stock.sql")),
+    ("013", include_str!("migrations/013_fix_missing_session_columns.sql")),
 ];
 
 /// Execute a single SQL string that may contain multiple statements separated by `;`.
@@ -83,6 +84,63 @@ async fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Checks whether a column exists in a table using PRAGMA table_info.
+async fn column_exists(conn: &Connection, table: &str, col: &str) -> bool {
+    let sql = format!("PRAGMA table_info({})", table);
+    let mut rows = match conn.query(&sql, ()).await {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+    while let Ok(Some(row)) = rows.next().await {
+        if row.get::<String>(1).unwrap_or_default().to_lowercase() == col.to_lowercase() {
+            return true;
+        }
+    }
+    false
+}
+
+/// Unconditionally ensures every column that migrations may have missed is present.
+/// Uses PRAGMA table_info to check first — never errors, never panics.
+async fn ensure_critical_columns(conn: &Connection) {
+    // orders.session_id
+    if !column_exists(conn, "orders", "session_id").await {
+        let _ = conn.execute("ALTER TABLE orders ADD COLUMN session_id TEXT", ()).await;
+        println!("[DB] Added missing column orders.session_id");
+    }
+    // orders.round_number
+    if !column_exists(conn, "orders", "round_number").await {
+        let _ = conn.execute("ALTER TABLE orders ADD COLUMN round_number INTEGER NOT NULL DEFAULT 1", ()).await;
+        println!("[DB] Added missing column orders.round_number");
+    }
+    // order_items.kitchen_status
+    if !column_exists(conn, "order_items", "kitchen_status").await {
+        let _ = conn.execute("ALTER TABLE order_items ADD COLUMN kitchen_status TEXT NOT NULL DEFAULT 'pending'", ()).await;
+        println!("[DB] Added missing column order_items.kitchen_status");
+    }
+    // floor_tables.seat_count
+    if !column_exists(conn, "floor_tables", "seat_count").await {
+        let _ = conn.execute("ALTER TABLE floor_tables ADD COLUMN seat_count INTEGER NOT NULL DEFAULT 4", ()).await;
+        println!("[DB] Added missing column floor_tables.seat_count");
+    }
+    // table_sessions table
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS table_sessions (
+            id           TEXT PRIMARY KEY,
+            table_id     TEXT,
+            status       TEXT NOT NULL DEFAULT 'active',
+            created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+            completed_at TEXT
+        )", ()
+    ).await;
+    // orders.customer_name / customer_phone
+    if !column_exists(conn, "orders", "customer_name").await {
+        let _ = conn.execute("ALTER TABLE orders ADD COLUMN customer_name TEXT", ()).await;
+    }
+    if !column_exists(conn, "orders", "customer_phone").await {
+        let _ = conn.execute("ALTER TABLE orders ADD COLUMN customer_phone TEXT", ()).await;
+    }
+}
+
 pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connection>> {
     let url = std::env::var("DATABASE_URL").unwrap_or_default();
     let token = std::env::var("AUTH_TOKEN").unwrap_or_default();
@@ -111,6 +169,10 @@ pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connect
     if let Err(e) = apply_migrations(&conn).await {
         eprintln!("[DB] Migration error (non-fatal): {}", e);
     }
+
+    // Safety net: unconditionally ensure critical columns exist, regardless of
+    // migration history. ALTER TABLE silently ignores "duplicate column" errors.
+    ensure_critical_columns(&conn).await;
 
     let conn_arc = Arc::new(conn);
 

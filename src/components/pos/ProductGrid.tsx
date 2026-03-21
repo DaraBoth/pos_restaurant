@@ -166,7 +166,7 @@ export default function ProductGrid() {
                                     key={product.id}
                                     onClick={() => handleProductClick(product)}
                                     disabled={unavailable}
-                                    title={unavailable ? (outOfStock ? t('outOfStock') : t('unavailable')) : displayName}
+                                    title={unavailable ? t('unavailable') : displayName}
                                     className={`group flex flex-col text-left relative overflow-hidden rounded-xl transition-all duration-150 active:scale-95 ${
                                         isAdding ? 'scale-95 ring-2 ring-[var(--accent-green)]' : ''
                                     } ${unavailable ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'}`}
