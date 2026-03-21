@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/providers/LanguageProvider';
 import {
@@ -49,6 +49,14 @@ const TAB_COMPONENTS: Record<Tab, React.FC> = {
 };
 
 export default function ManagementPage() {
+    return (
+        <Suspense>
+            <ManagementContent />
+        </Suspense>
+    );
+}
+
+function ManagementContent() {
     const [activeTab, setActiveTab] = useState<Tab>('dashboard');
     const { t } = useLanguage();
     const searchParams = useSearchParams();
