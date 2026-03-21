@@ -157,8 +157,7 @@ export default function ProductGrid() {
                     <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
                         {sortedFiltered.map((product, idx) => {
                             const isAdding = addingId === product.id;
-                            const outOfStock = product.stock_quantity <= 0;
-                            const unavailable = product.is_available === 0 || outOfStock;
+                            const unavailable = product.is_available === 0;
                             const cardColor = CARD_COLORS[idx % CARD_COLORS.length];
                             const displayName = lang === 'km' ? (product.khmer_name || product.name) : product.name;
 
@@ -204,11 +203,11 @@ export default function ProductGrid() {
                                             </div>
                                         )}
 
-                                        {/* Out of stock overlay */}
+                                        {/* Unavailable overlay (admin-disabled) */}
                                         {unavailable && (
                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                                 <span className="text-[10px] font-black text-red-400 uppercase tracking-widest bg-black/60 px-2 py-1 rounded-full">
-                                                    {outOfStock ? t('soldOut') : t('notAvailableShort')}
+                                                    {t('notAvailableShort')}
                                                 </span>
                                             </div>
                                         )}

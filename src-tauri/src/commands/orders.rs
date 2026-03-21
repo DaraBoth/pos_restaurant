@@ -675,8 +675,9 @@ async fn release_table_if_no_open_orders(table_name: &str, pool: &Arc<Connection
 }
 
 async fn deduct_inventory(product_id: &str, qty: i64, pool: &Arc<Connection>) -> Result<(), String> {
-    pool.execute("UPDATE products SET stock_quantity = stock_quantity - ?, updated_at=datetime('now') WHERE id = ?", params![qty, product_id.to_string()])
-        .await.map_err(|e| format!("Stock deduction error: {}", e))?;
+    // Do NOT decrement products.stock_quantity here — products are made fresh in a restaurant.
+    // Admins use the is_available flag to mark items unavailable.
+    // Only deduct raw ingredient inventory_items based on recipes.
 
     let mut ing_rows = pool.query(
         "SELECT inventory_item_id, usage_percentage FROM product_ingredients WHERE product_id = ?",
