@@ -22,6 +22,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("014", include_str!("migrations/014_expand_role_check.sql")),
     ("015", include_str!("migrations/015_floor_tables_restaurant_id.sql")),
     ("016", include_str!("migrations/016_floor_tables_composite_unique.sql")),
+    ("017", include_str!("migrations/017_fix_floor_tables_composite_unique.sql")),
 ];
 
 /// Execute a single SQL string that may contain multiple statements separated by `;`.
@@ -29,9 +30,15 @@ const MIGRATIONS: &[(&str, &str)] = &[
 /// ALTER TABLE duplicate-column errors are silently ignored (idempotency).
 async fn exec_statements(conn: &Connection, sql: &str) {
     for raw in sql.split(';') {
-        let stmt = raw.trim();
-        // Skip blank lines and SQL comments
-        if stmt.is_empty() || stmt.starts_with("--") {
+        // Strip leading blank lines and comment lines to get to the actual SQL.
+        // This handles migration files that have -- section headers before each statement.
+        let stripped: String = raw
+            .lines()
+            .skip_while(|l| { let t = l.trim(); t.is_empty() || t.starts_with("--") })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let stmt = stripped.trim();
+        if stmt.is_empty() {
             continue;
         }
         if let Err(e) = conn.execute(stmt, ()).await {
