@@ -31,6 +31,13 @@ export default function LoginPage() {
         try {
             const session = await login(username, password);
             setUser(session);
+
+            // Super admin goes to their own console
+            if (session.role === 'super_admin') {
+                router.replace('/super-admin');
+                return;
+            }
+
             // Check if restaurant setup is needed (first install)
             try {
                 const status = await getSetupStatus();

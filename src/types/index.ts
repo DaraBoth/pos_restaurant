@@ -6,9 +6,22 @@
 export interface UserSession {
     id: string;
     username: string;
-    role: 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef';
+    role: 'super_admin' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef';
     full_name?: string;
     khmer_name?: string;
+    restaurant_id?: string;
+}
+
+export interface RestaurantSummary {
+    id: string;
+    name: string;
+    khmer_name?: string;
+    address?: string;
+    phone?: string;
+    created_at: string;
+    admin_id?: string;
+    admin_username?: string;
+    admin_full_name?: string;
 }
 
 // --------------- Restaurant ---------------

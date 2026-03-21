@@ -19,6 +19,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("011", include_str!("migrations/011_ensure_missing_columns.sql")),
     ("012", include_str!("migrations/012_restore_depleted_stock.sql")),
     ("013", include_str!("migrations/013_fix_missing_session_columns.sql")),
+    ("014", include_str!("migrations/014_expand_role_check.sql")),
 ];
 
 /// Execute a single SQL string that may contain multiple statements separated by `;`.
@@ -142,8 +143,13 @@ async fn ensure_critical_columns(conn: &Connection) {
 }
 
 pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<Arc<Connection>> {
-    let url = std::env::var("DATABASE_URL").unwrap_or_default();
-    let token = std::env::var("AUTH_TOKEN").unwrap_or_default();
+    // option_env! reads values baked in at compile time by build.rs.
+    // Falls back to runtime env vars for flexibility (e.g. CI overrides).
+    let url   = option_env!("DATABASE_URL").unwrap_or("").to_string();
+    let token = option_env!("AUTH_TOKEN").unwrap_or("").to_string();
+    // Allow runtime override to take precedence if set
+    let url   = std::env::var("DATABASE_URL").unwrap_or(url);
+    let token = std::env::var("AUTH_TOKEN").unwrap_or(token);
 
     let db = if !url.is_empty() && !token.is_empty() {
         println!("[DB] Connecting to Turso Embedded Replica...");

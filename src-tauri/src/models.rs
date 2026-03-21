@@ -20,6 +20,20 @@ pub struct UserSession {
     pub role: String,
     pub full_name: Option<String>,
     pub khmer_name: Option<String>,
+    pub restaurant_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestaurantSummary {
+    pub id: String,
+    pub name: String,
+    pub khmer_name: Option<String>,
+    pub address: Option<String>,
+    pub phone: Option<String>,
+    pub created_at: String,
+    pub admin_id: Option<String>,
+    pub admin_username: Option<String>,
+    pub admin_full_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

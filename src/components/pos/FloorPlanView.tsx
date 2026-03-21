@@ -99,16 +99,16 @@ export default function FloorPlanView() {
                         </div>
                     ))}
                     {/* Manage shortcut — admin/manager only */}
-                    {canManage && (
+                    {/* {canManage && (
                         <Link
-                            href="/management/tables"
+                            href="/management?TablesView"
                             className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors ml-1"
                             title={t('manageTables')}
                         >
                             <Settings2 size={11} />
                             <span>{t('manage')}</span>
                         </Link>
-                    )}
+                    )} */}
                 </div>
             </div>
 

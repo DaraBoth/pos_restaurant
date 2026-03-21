@@ -24,7 +24,11 @@ pub fn run() {
                     .await
                     .expect("Failed to initialize database")
             });
-
+            // Seed the built-in super admin account if not present
+            let pool_for_seed = std::sync::Arc::clone(&pool);
+            tauri::async_runtime::spawn(async move {
+                commands::auth::seed_super_admin(&pool_for_seed).await;
+            });
             app_handle.manage(pool);
 
             Ok(())
@@ -36,6 +40,8 @@ pub fn run() {
             commands::auth::get_users,
             commands::auth::update_user,
             commands::auth::delete_user,
+            commands::auth::list_all_restaurants,
+            commands::auth::create_restaurant_with_admin,
             commands::restaurant::get_restaurant,
             commands::restaurant::get_setup_status,
             commands::restaurant::update_restaurant,

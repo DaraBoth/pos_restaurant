@@ -14,7 +14,7 @@ interface UserModalProps {
 export default function UserModal({ isOpen, onClose, onSave, user }: UserModalProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<'admin' | 'manager' | 'cashier' | 'waiter' | 'chef'>('cashier');
+    const [role, setRole] = useState<'super_admin' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef'>('cashier');
     const [fullName, setFullName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [loading, setLoading] = useState(false);

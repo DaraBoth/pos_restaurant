@@ -6,6 +6,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { getSetupStatus } from '@/lib/tauri-commands';
 
 const PUBLIC_PATHS = ['/login'];
+const SUPER_ADMIN_PATH = '/super-admin';
 const SETUP_PATH = '/setup';
 
 export default function RouteGuard({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,25 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                     setChecking(false);
                     initialCheckDone.current = true;
                 }
+                return;
+            }
+
+            // Super admin bypasses all restaurant checks
+            if (user?.role === 'super_admin') {
+                if (!pathname.startsWith(SUPER_ADMIN_PATH)) {
+                    router.replace(SUPER_ADMIN_PATH);
+                    return;
+                }
+                if (!cancelled) {
+                    setChecking(false);
+                    initialCheckDone.current = true;
+                }
+                return;
+            }
+
+            // Block super-admin routes for non-super_admin users
+            if (pathname.startsWith(SUPER_ADMIN_PATH)) {
+                router.replace('/login');
                 return;
             }
 

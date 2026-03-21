@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
 import { LogOut, LayoutGrid, Settings, History, Globe, ChefHat, UtensilsCrossed } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
+import { SyncStatus } from '@/components/ui/SyncStatus';
 import Link from 'next/link';
 
 const NavItem = ({
@@ -84,6 +85,9 @@ export default function SidebarNav() {
 
             {/* Footer */}
             <div className="px-2 mt-2 space-y-1.5">
+                {/* Sync status */}
+                <SyncStatus />
+
                 <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]">
                     <button
                         onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
