@@ -6,9 +6,9 @@ use tauri::async_runtime::spawn;
 
 pub mod sync;
 
-// ─── Credentials baked at compile time by build.rs ─────────────────────────
-const BAKED_URL:   &str = env!("DATABASE_URL");
-const BAKED_TOKEN: &str = env!("AUTH_TOKEN");
+// ─── Credentials baked at compile time ─────────────────────────
+const BAKED_URL:   &str = "libsql://dineos-cloud-ariesbries.aws-ap-northeast-1.turso.io";
+const BAKED_TOKEN: &str = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM5OTU1ODcsImlkIjoiMDE5ZDBhNjAtMjUwMS03ODM1LTlhNTItN2MwNjY2NmVhYjIwIiwicmlkIjoiZTcwOTA3ZTktOWQ0OC00MWY3LWIyNDctZTA0NDlhY2NkZGYwIn0.Vv6o6couFDlsxOchsQ6mMtK_YJaFANAZ778AGjC7V1sL13OlCI2L8758sq79HziGdWmn000VWQFb0looWzdYBg";
 
 // ─── Migration SQL files embedded at compile time ───────────────────────────
 const MIGRATIONS: &[(&str, &str)] = &[
