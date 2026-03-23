@@ -10,14 +10,15 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'void';
 
-const STATUS_TABS: { id: StatusFilter; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'open', label: 'Open' },
-    { id: 'completed', label: 'Completed' },
-    { id: 'void', label: 'Void' },
+const STATUS_TABS: { id: StatusFilter; labelKey: any }[] = [
+    { id: 'all', labelKey: 'allFilter' },
+    { id: 'open', labelKey: 'open' },
+    { id: 'completed', labelKey: 'completed' },
+    { id: 'void', labelKey: 'void' },
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
@@ -27,6 +28,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
 };
 
 export default function HistoryPage() {
+    const { t, lang } = useLanguage();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
@@ -144,8 +146,8 @@ export default function HistoryPage() {
                         <History size={18} className="text-[var(--accent)]" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">Order History</h1>
-                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">Transaction Audit</p>
+                        <h1 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">{t('orderHistory')}</h1>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">{t('transactionAuditSub')}</p>
                     </div>
                 </div>
 
@@ -172,7 +174,7 @@ export default function HistoryPage() {
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
                     >
                         <Download size={14} />
-                        Export
+                        {t('exportBtn')}
                     </button>
 
                     <button
@@ -187,10 +189,10 @@ export default function HistoryPage() {
             {/* ── Summary Stat Pills ── */}
             <div className="flex flex-wrap gap-3">
                 {[
-                    { label: 'Revenue', value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
-                    { label: 'Open', value: String(orders.filter(o => o.status === 'open').length), accent: '#f97316' },
-                    { label: 'Completed', value: String(completed.length), accent: '#22c55e' },
-                    { label: 'Void', value: String(orders.filter(o => o.status === 'void').length), accent: '#ef4444' },
+                    { label: t('revenue'), value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
+                    { label: t('open'), value: String(orders.filter(o => o.status === 'open').length), accent: '#f97316' },
+                    { label: t('completed'), value: String(completed.length), accent: '#22c55e' },
+                    { label: t('void'), value: String(orders.filter(o => o.status === 'void').length), accent: '#ef4444' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
@@ -212,7 +214,7 @@ export default function HistoryPage() {
                                     : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
                                     }`}
                             >
-                                {tab.label}
+                                {t(tab.labelKey)}
                                 <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-white/5'}`}>
                                     {orders.filter(o => o.status === tab.id || tab.id === 'all').length}
                                 </span>
@@ -245,7 +247,7 @@ export default function HistoryPage() {
                             <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border)]">
                                 <tr>
                                     <th className="px-4 py-2.5 w-12"></th>
-                                    {['Order #', 'Date & Time', 'Table', 'Status', 'Total USD', 'Total KHR'].map(h => (
+                                    {[t('receiptId'), t('timestamp'), t('tableLabel'), t('orderStatus'), t('totalUsd'), t('totalKhr')].map(h => (
                                         <th
                                             key={h}
                                             className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60"
@@ -265,7 +267,7 @@ export default function HistoryPage() {
                                 ) : filtered.length === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="px-4 py-16 text-center opacity-30 font-black uppercase tracking-[0.2em] text-xs">
-                                            No matching transactions
+                                            {t('noMatchingTransactions')}
                                         </td>
                                     </tr>
                                 ) : (
@@ -301,7 +303,7 @@ export default function HistoryPage() {
                                                                 {o.table_id}
                                                             </span>
                                                         ) : (
-                                                            <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">Takeout</span>
+                                                            <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">{t('takeout')}</span>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-2.5">
@@ -309,7 +311,7 @@ export default function HistoryPage() {
                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
                                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                         >
-                                                            {o.status}
+                                                            {t(o.status as any)}
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: o.status === 'void' ? 'inherit' : 'var(--accent)' }}>
@@ -331,7 +333,7 @@ export default function HistoryPage() {
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="flex items-center gap-2">
                                                                         <ReceiptText size={14} className="text-[var(--accent)]" />
-                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Itemized Transaction Audit</h4>
+                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">{t('itemizedAudit')}</h4>
                                                                     </div>
                                                                     <div className="flex items-center gap-4">
                                                                         <button
@@ -373,7 +375,7 @@ export default function HistoryPage() {
                                                                                         {item.quantity}x
                                                                                     </div>
                                                                                     <div>
-                                                                                        <p className="text-xs font-black text-white leading-tight">{item.product_name}</p>
+                                                                                        <p className="text-xs font-black text-white leading-tight">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
                                                                                         <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{formatUsd(item.price_at_order)} / unit</p>
                                                                                     </div>
                                                                                 </div>
@@ -386,7 +388,7 @@ export default function HistoryPage() {
                                                                 ) : (
                                                                     <div className="flex flex-col items-center justify-center py-10 gap-4 opacity-30">
                                                                         <RefreshCw size={24} className="animate-spin" />
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest">Compiling details...</span>
+                                                                        <span className="text-[10px] font-black uppercase tracking-widest">{t('compilingDetails')}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -406,7 +408,7 @@ export default function HistoryPage() {
                 filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-3 opacity-30">
                         <ReceiptText size={36} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">No matching transactions</span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('noMatchingTransactions')}</span>
                     </div>
                 ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
@@ -432,7 +434,7 @@ export default function HistoryPage() {
                                             className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                         >
-                                            {o.status}
+                                            {t(o.status as any)}
                                         </span>
                                         {o.table_id ? (
                                             <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
@@ -440,7 +442,7 @@ export default function HistoryPage() {
                                                 {o.table_id}
                                             </span>
                                         ) : (
-                                            <span className="text-[9px] font-black opacity-25 uppercase tracking-widest">Takeout</span>
+                                            <span className="text-[9px] font-black opacity-25 uppercase tracking-widest">{t('takeout')}</span>
                                         )}
                                     </div>
                                     <p className="font-mono text-xs font-black text-[var(--accent)] tracking-widest">
@@ -458,7 +460,7 @@ export default function HistoryPage() {
                                 <div className="flex-1 px-4 py-3 space-y-1.5 min-h-[80px]">
                                     {items ? (
                                         items.length === 0 ? (
-                                            <p className="text-[10px] opacity-20 font-black uppercase tracking-widest text-center py-2">No items</p>
+                                            <p className="text-[10px] opacity-20 font-black uppercase tracking-widest text-center py-2">{t('emptyOrder')}</p>
                                         ) : (
                                             items.map(item => (
                                                 <div key={item.id} className="flex items-center justify-between text-[11px]">
@@ -467,7 +469,7 @@ export default function HistoryPage() {
                                                             {item.quantity}×
                                                         </span>
                                                         <span className="font-medium truncate text-[var(--foreground)] opacity-80">
-                                                            {item.product_name}
+                                                            {lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
                                                         </span>
                                                     </div>
                                                     <span className="font-mono font-black text-[var(--foreground)] opacity-70 flex-shrink-0 ml-2">
@@ -486,7 +488,7 @@ export default function HistoryPage() {
                                 {/* Totals */}
                                 <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-white/10 space-y-1">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('total')}</span>
                                         <span
                                             className="font-mono font-black text-sm"
                                             style={{ color: o.status === 'void' ? undefined : 'var(--accent)' }}
@@ -497,7 +499,7 @@ export default function HistoryPage() {
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-25">KHR</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-25">{t('khr')}</span>
                                         <span className={`font-mono text-[10px] font-bold opacity-40 ${o.status === 'void' ? 'line-through' : ''}`}>
                                             {formatKhr(o.total_khr)}
                                         </span>
@@ -531,7 +533,7 @@ export default function HistoryPage() {
                                         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         <Printer size={11} strokeWidth={2.5} />
-                                        Print Receipt
+                                        {t('printReceipt')}
                                     </button>
                                 </div>
                             </div>
