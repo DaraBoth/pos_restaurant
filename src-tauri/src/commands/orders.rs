@@ -76,9 +76,12 @@ pub async fn create_order(
     }
 
     let id = uuid::Uuid::new_v4().to_string();
+    // Use explicit NULL for takeout orders (no table); store "" (empty) only for table orders
+    let table_id_val = table_id.clone().unwrap_or_default();
+    let session_id_val = session_id.unwrap_or_default();
     pool.execute(
-        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, ?, ?, ?, 'open')",
-        params![id.clone(), user_id, table_id.clone().unwrap_or_default(), session_id.unwrap_or_default(), round_number]
+        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 'open')",
+        params![id.clone(), user_id, table_id_val, session_id_val, round_number]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     if let Some(table_name) = &table_id {

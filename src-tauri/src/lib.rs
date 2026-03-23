@@ -1,7 +1,28 @@
 mod commands;
 mod db;
 mod models;
+use db::RemoteDb;
 use tauri::Manager;
+use std::sync::Arc;
+
+/// Tauri command: called from frontend after login to kick off the
+/// per-restaurant sync daemon.  restaurant_id comes from the login response.
+#[tauri::command]
+async fn trigger_sync(
+    restaurant_id: String,
+    local: tauri::State<'_, Arc<libsql::Connection>>,
+    remote: tauri::State<'_, RemoteDb>,
+) -> Result<(), String> {
+    if let Some(remote_conn) = &remote.0 {
+        let local_arc  = Arc::clone(&*local);
+        let remote_arc = Arc::clone(remote_conn);
+        db::start_sync_daemon(local_arc, remote_arc, restaurant_id);
+        Ok(())
+    } else {
+        // No remote — silently succeed (offline mode)
+        Ok(())
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -10,7 +31,6 @@ pub fn run() {
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
-            // Determine database path in app data directory
             let app_dir = app_handle
                 .path()
                 .app_data_dir()
@@ -18,22 +38,27 @@ pub fn run() {
             std::fs::create_dir_all(&app_dir).expect("Failed to create app data dir");
             let db_path = app_dir.join("khpos.db");
 
-            // Initialize DB synchronously via blocking spawn
-            let pool = tauri::async_runtime::block_on(async {
+            // Initialize both local and remote connections
+            let (local_conn, remote_conn) = tauri::async_runtime::block_on(async {
                 db::init_db(db_path, "khpos_secure_key_2024")
                     .await
                     .expect("Failed to initialize database")
             });
+
             // Seed the built-in super admin account if not present
-            let pool_for_seed = std::sync::Arc::clone(&pool);
+            let pool_for_seed = Arc::clone(&local_conn);
             tauri::async_runtime::spawn(async move {
                 commands::auth::seed_super_admin(&pool_for_seed).await;
             });
-            app_handle.manage(pool);
+
+            // Register states — Arc<Connection> for all existing commands, RemoteDb for sync
+            app_handle.manage(local_conn);
+            app_handle.manage(RemoteDb(remote_conn));
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            trigger_sync,
             // Auth
             commands::auth::login,
             commands::auth::create_user,
@@ -71,7 +96,10 @@ pub fn run() {
             commands::orders::add_round,
             commands::orders::checkout_order,
             commands::orders::checkout_session,
-            
+            commands::orders::hold_order,
+            commands::orders::void_order,
+            commands::orders::get_revenue_summary,
+            commands::orders::get_revenue_by_period,
             // Inventory
             commands::inventory::get_inventory_items,
             commands::inventory::create_inventory_item,
@@ -80,17 +108,11 @@ pub fn run() {
             commands::inventory::get_product_ingredients,
             commands::inventory::set_product_ingredient,
             commands::inventory::remove_product_ingredient,
-            
             // Analytics
             commands::analytics::get_top_products,
             commands::analytics::get_revenue_by_category,
             commands::analytics::get_peak_hours,
             commands::analytics::get_slow_movers,
-
-            commands::orders::hold_order,
-            commands::orders::void_order,
-            commands::orders::get_revenue_summary,
-            commands::orders::get_revenue_by_period,
             // Exchange Rates & DB
             commands::exchange::get_exchange_rate,
             commands::exchange::set_exchange_rate,

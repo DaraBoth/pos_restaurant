@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { TableProperties, ShoppingCart, ArrowLeft, ShoppingBag } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
 import SidebarCart from '@/components/pos/SidebarCart';
@@ -8,6 +8,7 @@ import FloorPlanView from '@/components/pos/FloorPlanView';
 import HoldPaymentModal from '@/components/pos/HoldPaymentModal';
 import ReceiptPreviewModal from '@/components/pos/ReceiptPreviewModal';
 import { useOrder } from '@/providers/OrderProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { printReceipt, getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
 
@@ -15,8 +16,23 @@ export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isHoldOpen, setIsHoldOpen] = useState(false);
     const [receiptPayload, setReceiptPayload] = useState<ReceiptPrintPayload | null>(null);
-    const { tableId, isTakeout, items, clearOrder, localCart } = useOrder();
+    const { tableId, isTakeout, items, clearOrder, localCart, orderId, commitLocalCart } = useOrder();
+    const { user } = useAuth();
     const { lang, t } = useLanguage();
+
+    // For takeout: commit local cart first (creates the order), then open checkout
+    const handleCheckout = useCallback(async () => {
+        if (!orderId && isTakeout && localCart.length > 0 && user) {
+            try {
+                await commitLocalCart(user.id);
+            } catch (e) {
+                console.error('Failed to commit takeout cart:', e);
+                return;
+            }
+        }
+        setIsCheckoutOpen(true);
+    }, [orderId, isTakeout, localCart, user, commitLocalCart]);
+
 
     // No table and not takeout → show floor plan
     if (!tableId && !isTakeout && localCart.length === 0) {
@@ -73,7 +89,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Sidebar Cart */}
-                <SidebarCart onCheckout={() => setIsCheckoutOpen(true)} onHold={() => setIsHoldOpen(true)} />
+                <SidebarCart onCheckout={handleCheckout} onHold={() => setIsHoldOpen(true)} />
                 </div>
             </div>
 

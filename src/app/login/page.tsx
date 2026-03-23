@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { login, getSetupStatus } from '@/lib/tauri-commands';
+import { login, getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle } from 'lucide-react';
 
 export default function LoginPage() {
@@ -31,6 +31,11 @@ export default function LoginPage() {
         try {
             const session = await login(username, password);
             setUser(session);
+
+            // Start per-restaurant cloud sync daemon in background (non-blocking)
+            if (session.restaurant_id) {
+                triggerSync(session.restaurant_id).catch(() => {/* offline — ignore */});
+            }
 
             // Super admin goes to their own console
             if (session.role === 'super_admin') {

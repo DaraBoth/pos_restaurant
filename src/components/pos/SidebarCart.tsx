@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -303,7 +303,7 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                         </p>
                     </div>
 
-                    {/* LOCAL CART mode: Place Order button */}
+                    {/* LOCAL CART mode: Place Order (table) or Checkout (takeout) */}
                     {!orderId && (
                         <div className="grid grid-cols-2 gap-1.5">
                             <button
@@ -314,15 +314,15 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                                 {t('cancel')}
                             </button>
                             <button
-                                onClick={handlePlaceOrder}
+                                onClick={onCheckout}
                                 disabled={localCart.length === 0 || committing}
-                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
                             >
                                 {committing
                                     ? <Loader2 size={12} className="animate-spin" />
-                                    : <ClipboardList size={12} strokeWidth={2.5} />
+                                    : <CreditCard size={12} strokeWidth={2.5} />
                                 }
-                                Place Order
+                                {t('checkout')}
                             </button>
                         </div>
                     )}
