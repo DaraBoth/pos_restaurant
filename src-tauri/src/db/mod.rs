@@ -31,6 +31,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("017", include_str!("migrations/017_fix_floor_tables_composite_unique.sql")),
     ("018", include_str!("migrations/018_updated_at_triggers.sql")),
     ("019", include_str!("migrations/019_fix_trigger_recursion.sql")),
+    ("020", include_str!("migrations/020_drop_all_triggers.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
