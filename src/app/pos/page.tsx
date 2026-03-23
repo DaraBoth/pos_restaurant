@@ -20,18 +20,18 @@ export default function POSPage() {
     const { user } = useAuth();
     const { lang, t } = useLanguage();
 
-    // For takeout: commit local cart first (creates the order), then open checkout
+    // Commit local cart first if no order exists yet (table or takeout), then open checkout
     const handleCheckout = useCallback(async () => {
-        if (!orderId && isTakeout && localCart.length > 0 && user) {
+        if (!orderId && localCart.length > 0 && user) {
             try {
                 await commitLocalCart(user.id);
             } catch (e) {
-                console.error('Failed to commit takeout cart:', e);
+                console.error('Failed to commit cart:', e);
                 return;
             }
         }
         setIsCheckoutOpen(true);
-    }, [orderId, isTakeout, localCart, user, commitLocalCart]);
+    }, [orderId, localCart, user, commitLocalCart]);
 
 
     // No table and not takeout → show floor plan

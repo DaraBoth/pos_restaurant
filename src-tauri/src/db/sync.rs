@@ -91,7 +91,7 @@ pub async fn pull_table(
     remote: &Connection,
     local: &Connection,
     table: &str,
-    pk: &str,
+    _pk: &str,
     mode: SyncMode,
     restaurant_id: &str,
     since: &str,

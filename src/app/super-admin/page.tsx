@@ -68,12 +68,24 @@ function CreateRestaurantModal({ onClose, onCreated }: {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl animate-fade-in overflow-hidden">
+        <div className="fixed inset-0 z-50 flex justify-end">
+            {/* Backdrop */}
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={onClose}
+            />
+
+            {/* Drawer panel — slides in from the right */}
+            <div
+                className="relative w-full max-w-md h-full bg-[var(--bg-card)] border-l border-[var(--border)] shadow-2xl flex flex-col overflow-hidden"
+                style={{ animation: 'slideInRight 0.28s cubic-bezier(0.32,0.72,0,1) both' }}
+            >
+                {/* Top accent stripe */}
+                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent flex-shrink-0" />
+
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
+                    <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center">
                             <Building2 size={15} className="text-[var(--accent)]" />
                         </div>
@@ -87,7 +99,8 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                {/* Scrollable form body */}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
                     {/* Restaurant section */}
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-1.5">
@@ -100,7 +113,6 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                         </div>
                     </div>
 
-                    {/* Divider */}
                     <div className="border-t border-dashed border-white/10" />
 
                     {/* Admin section */}
@@ -140,19 +152,23 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                             <AlertTriangle size={13} strokeWidth={2.5} /> {error}
                         </div>
                     )}
-
-                    <div className="flex gap-3 pt-1">
-                        <button type="button" onClick={onClose}
-                            className="flex-1 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
-                            Cancel
-                        </button>
-                        <button type="submit" disabled={loading}
-                            className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] text-black text-sm font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
-                            {loading ? 'Creating…' : 'Create'}
-                        </button>
-                    </div>
                 </form>
+
+                {/* Sticky footer buttons */}
+                <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-elevated)]">
+                    <button type="button" onClick={onClose}
+                        className="flex-1 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] text-black text-sm font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {loading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
+                        {loading ? 'Creating…' : 'Create'}
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -255,12 +271,15 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 // ─── Restaurant Detail Drawer ────────────────────────────────────────────
 function RestaurantDrawer({ r, onClose }: { r: RestaurantSummary; onClose: () => void }) {
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl animate-fade-in overflow-hidden">
-                <div className="h-1 w-full bg-gradient-to-r from-[var(--accent)]/30 via-[var(--accent)] to-[var(--accent)]/30" />
+        <div className="fixed inset-0 z-50 flex justify-end">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div
+                className="relative w-full max-w-sm h-full bg-[var(--bg-card)] border-l border-[var(--border)] shadow-2xl flex flex-col overflow-hidden"
+                style={{ animation: 'slideInRight 0.28s cubic-bezier(0.32,0.72,0,1) both' }}
+            >
+                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent flex-shrink-0" />
 
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <Store size={16} className="text-[var(--accent)]" />
                         <h2 className="font-black text-sm">{r.name}</h2>
@@ -270,7 +289,7 @@ function RestaurantDrawer({ r, onClose }: { r: RestaurantSummary; onClose: () =>
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
                     <Row icon={Store} label="Restaurant ID" value={r.id.split('-')[0].toUpperCase()} mono />
                     {r.address && <Row icon={MapPin} label="Address" value={r.address} />}
                     {r.phone && <Row icon={Phone} label="Phone" value={r.phone} />}
@@ -288,6 +307,13 @@ function RestaurantDrawer({ r, onClose }: { r: RestaurantSummary; onClose: () =>
                         <AlertTriangle size={13} className="flex-shrink-0" />
                         Full POS view coming in a future update.
                     </div>
+                </div>
+
+                <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-elevated)]">
+                    <button onClick={onClose}
+                        className="w-full py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>

@@ -36,10 +36,12 @@ export default function UsersManagement() {
         }
     }
 
-    const filteredUsers = users.filter(u =>
-        u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (u.full_name && u.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredUsers = users
+        .filter(u => u.role !== 'super_admin')  // never show platform super admin to restaurant staff
+        .filter(u =>
+            u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (u.full_name && u.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
 
     return (
         <div className="animate-fade-in space-y-4 pb-6">

@@ -29,6 +29,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("015", include_str!("migrations/015_floor_tables_restaurant_id.sql")),
     ("016", include_str!("migrations/016_floor_tables_composite_unique.sql")),
     ("017", include_str!("migrations/017_fix_floor_tables_composite_unique.sql")),
+    ("018", include_str!("migrations/018_updated_at_triggers.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
