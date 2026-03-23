@@ -32,6 +32,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("018", include_str!("migrations/018_updated_at_triggers.sql")),
     ("019", include_str!("migrations/019_fix_trigger_recursion.sql")),
     ("020", include_str!("migrations/020_drop_all_triggers.sql")),
+    ("021", include_str!("migrations/021_add_restaurant_ids.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -178,6 +179,13 @@ pub fn start_sync_daemon(
 ) {
     spawn(async move {
         println!("[Sync] Daemon started for restaurant={}", restaurant_id);
+
+        // Apply migrations to remote DB safely on this tokio worker thread (avoids 1MB main stack overflow)
+        if let Err(e) = apply_migrations(&remote).await {
+            eprintln!("[DB] Remote Migration error: {}", e);
+        }
+        ensure_critical_columns(&remote).await;
+        sync::ensure_sync_table(&remote).await;
 
         // Initial sync immediately
         sync::sync_restaurant(&local, &remote, &restaurant_id).await;
