@@ -40,19 +40,27 @@ pub async fn create_order(
     let mut round_number = 1;
 
     if let Some(table_name) = &table_id {
+        let mut real_table_id = String::new();
+        let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ?", params![table_name.clone()]).await.map_err(|e| e.to_string())?;
+        if let Some(trow) = trows.next().await.map_err(|e| e.to_string())? {
+            real_table_id = trow.get::<String>(0).unwrap_or_default();
+        } else {
+            return Err(format!("Table {} does not exist", table_name));
+        }
+
         let mut rows = pool.query(
             "SELECT id FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1",
             params![table_name.clone()]
-        ).await.map_err(|e| format!("Database error: {}", e))?;
+        ).await.map_err(|e| format!("Query open orders error: {}", e))?;
 
         if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
             return Ok(row.get::<String>(0).unwrap_or_default());
         }
 
         let mut session_rows = pool.query(
-            "SELECT id FROM table_sessions WHERE table_id = ? AND status = 'active'",
-            params![table_name.clone()]
-        ).await.map_err(|e| format!("Database error: {}", e))?;
+            "SELECT id FROM table_sessions WHERE (table_id = ? OR table_id = ?) AND status = 'active'",
+            params![real_table_id.clone(), table_name.clone()]
+        ).await.map_err(|e| format!("Query active sessions error: {}", e))?;
 
         if let Some(s_row) = session_rows.next().await.map_err(|e| e.to_string())? {
             let sid = s_row.get::<String>(0).unwrap_or_default();
@@ -61,7 +69,7 @@ pub async fn create_order(
             let mut round_rows = pool.query(
                 "SELECT MAX(round_number) FROM orders WHERE session_id = ? AND is_deleted = 0",
                 params![sid]
-            ).await.map_err(|e| format!("Database error: {}", e))?;
+            ).await.map_err(|e| format!("Query MAX round_number error: {}", e))?;
             
             if let Some(r_row) = round_rows.next().await.map_err(|e| e.to_string())? {
                 if let Ok(val) = r_row.get::<i64>(0) {
@@ -70,7 +78,7 @@ pub async fn create_order(
             }
         } else {
             let sid = uuid::Uuid::new_v4().to_string();
-            pool.execute("INSERT INTO table_sessions (id, table_id, status) VALUES (?, ?, 'active')", params![sid.clone(), table_name.clone()]).await.map_err(|e| format!("Database error: {}", e))?;
+            pool.execute("INSERT INTO table_sessions (id, table_id, status) VALUES (?, ?, 'active')", params![sid.clone(), real_table_id.clone()]).await.map_err(|e| format!("Insert table_sessions error (sid={}, table_id={}): {}", sid, real_table_id, e))?;
             session_id = Some(sid);
         }
     }
@@ -81,11 +89,15 @@ pub async fn create_order(
     let session_id_val = session_id.unwrap_or_default();
     pool.execute(
         "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 'open')",
-        params![id.clone(), user_id, table_id_val, session_id_val, round_number]
-    ).await.map_err(|e| format!("Database error: {}", e))?;
+        params![id.clone(), user_id.clone(), table_id_val.clone(), session_id_val.clone(), round_number]
+    ).await.map_err(|e| format!("Insert orders error (id={}, user_id={}, table_id={}, session_id={}): {}", id, user_id, table_id_val, session_id_val, e))?;
 
     if let Some(table_name) = &table_id {
-        set_table_status(table_name, "busy", &pool).await?;
+        let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ?", params![table_name.clone()]).await.map_err(|e| e.to_string())?;
+        if let Some(trow) = trows.next().await.map_err(|e| e.to_string())? {
+            let real_tid = trow.get::<String>(0).unwrap_or_default();
+            set_table_status(&real_tid, "busy", &pool).await?;
+        }
     }
 
     Ok(id)
@@ -141,7 +153,7 @@ pub async fn add_order_item(
     pool.execute(
         "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
         params![id.clone(), order_id.clone(), product_id.clone(), quantity, price_cents, note.clone().unwrap_or_default()]
-    ).await.map_err(|e| format!("Database error: {}", e))?;
+    ).await.map_err(|e| format!("Insert order_items error (order_id={}, product_id={}): {}", order_id, product_id, e))?;
 
     recalculate_order_totals(&order_id, &pool).await?;
 

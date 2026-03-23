@@ -103,19 +103,22 @@ pub async fn pull_table(
     }
 
     let col_list = cols.join(", ");
+    let prefixed_cols = cols.iter().map(|c| format!("{}.{}", table, c)).collect::<Vec<_>>().join(", ");
     let placeholders = cols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
 
     let sql = match mode {
-        SyncMode::Direct => format!(
-            "SELECT {} FROM {} WHERE restaurant_id = ? AND updated_at > ?",
-            col_list, table
-        ),
+        SyncMode::Direct => {
+            let filter_col = if table == "restaurants" { "id" } else { "restaurant_id" };
+            format!(
+                "SELECT {} FROM {} WHERE {} = ? AND updated_at > ?",
+                col_list, table, filter_col
+            )
+        },
         SyncMode::ViaOrders => format!(
-            "SELECT {t}.{collist} FROM {t}
-             JOIN orders o ON {t}.order_id = o.id
-             WHERE o.restaurant_id = ? AND {t}.updated_at > ?",
-            t = table,
-            collist = col_list
+            "SELECT {} FROM {}
+             JOIN orders o ON {}.order_id = o.id
+             WHERE o.restaurant_id = ? AND {}.updated_at > ?",
+            prefixed_cols, table, table, table
         ),
         SyncMode::NoFilter => format!(
             "SELECT {} FROM {} WHERE updated_at > 'EPOCH_PLACEHOLDER'",
@@ -161,18 +164,22 @@ pub async fn push_table(
     if cols.is_empty() { return Ok(0); }
 
     let col_list = cols.join(", ");
+    let prefixed_cols = cols.iter().map(|c| format!("{}.{}", table, c)).collect::<Vec<_>>().join(", ");
     let placeholders = cols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
 
     let sql = match mode {
-        SyncMode::Direct => format!(
-            "SELECT {} FROM {} WHERE restaurant_id = ? AND updated_at > ?",
-            col_list, table
-        ),
+        SyncMode::Direct => {
+            let filter_col = if table == "restaurants" { "id" } else { "restaurant_id" };
+            format!(
+                "SELECT {} FROM {} WHERE {} = ? AND updated_at > ?",
+                col_list, table, filter_col
+            )
+        },
         SyncMode::ViaOrders => format!(
-            "SELECT {t}.{collist} FROM {t}
-             JOIN orders o ON {t}.order_id = o.id
-             WHERE o.restaurant_id = ? AND {t}.updated_at > ?",
-            t = table, collist = col_list
+            "SELECT {} FROM {}
+             JOIN orders o ON {}.order_id = o.id
+             WHERE o.restaurant_id = ? AND {}.updated_at > ?",
+            prefixed_cols, table, table, table
         ),
         SyncMode::NoFilter => format!(
             "SELECT {} FROM {} WHERE updated_at > ?",

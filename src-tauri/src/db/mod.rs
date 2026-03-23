@@ -12,27 +12,7 @@ const BAKED_TOKEN: &str = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJp
 
 // ─── Migration SQL files embedded at compile time ───────────────────────────
 const MIGRATIONS: &[(&str, &str)] = &[
-    ("001", include_str!("migrations/001_initial_schema.sql")),
-    ("002", include_str!("migrations/002_add_features.sql")),
-    ("003", include_str!("migrations/003_add_images_and_inventory.sql")),
-    ("004", include_str!("migrations/004_restaurant_setup_and_minimal_seed.sql")),
-    ("005", include_str!("migrations/005_add_restaurant_logo.sql")),
-    ("006", include_str!("migrations/006_recalculate_existing_orders.sql")),
-    ("007", include_str!("migrations/007_kitchen_and_tables.sql")),
-    ("008", include_str!("migrations/008_customer_info.sql")),
-    ("009", include_str!("migrations/009_table_sessions_and_rounds.sql")),
-    ("010", include_str!("migrations/010_inventory_recipes.sql")),
-    ("011", include_str!("migrations/011_ensure_missing_columns.sql")),
-    ("012", include_str!("migrations/012_restore_depleted_stock.sql")),
-    ("013", include_str!("migrations/013_fix_missing_session_columns.sql")),
-    ("014", include_str!("migrations/014_expand_role_check.sql")),
-    ("015", include_str!("migrations/015_floor_tables_restaurant_id.sql")),
-    ("016", include_str!("migrations/016_floor_tables_composite_unique.sql")),
-    ("017", include_str!("migrations/017_fix_floor_tables_composite_unique.sql")),
-    ("018", include_str!("migrations/018_updated_at_triggers.sql")),
-    ("019", include_str!("migrations/019_fix_trigger_recursion.sql")),
-    ("020", include_str!("migrations/020_drop_all_triggers.sql")),
-    ("021", include_str!("migrations/021_add_restaurant_ids.sql")),
+    ("001_baseline", include_str!("migrations/001_baseline.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
