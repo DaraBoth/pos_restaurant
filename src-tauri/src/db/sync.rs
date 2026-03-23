@@ -138,7 +138,7 @@ pub async fn pull_table(
         // Build values vec
         let mut vals: Vec<libsql::Value> = Vec::new();
         for i in 0..cols.len() {
-            vals.push(row.get_value(i).unwrap_or(libsql::Value::Null));
+            vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
         }
         local.execute(&upsert, vals).await.ok();
         count += 1;
@@ -194,7 +194,7 @@ pub async fn push_table(
     while let Some(row) = rows.next().await? {
         let mut vals: Vec<libsql::Value> = Vec::new();
         for i in 0..cols.len() {
-            vals.push(row.get_value(i).unwrap_or(libsql::Value::Null));
+            vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
         }
         remote.execute(&upsert, vals).await.ok();
         count += 1;
