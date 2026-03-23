@@ -5,10 +5,10 @@ import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useState } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2 } from 'lucide-react';
+import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
-export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => void; onHold: () => void }) {
+export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
     const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
             localCart, addToLocalCart, updateLocalCartQty, commitLocalCart } = useOrder();
     const { t, lang } = useLanguage();
@@ -17,6 +17,8 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
     const [committing, setCommitting] = useState(false);
+
+
 
     async function handleNoteSave(id: string) {
         try {
@@ -313,17 +315,32 @@ export default function SidebarCart({ onCheckout, onHold }: { onCheckout: () => 
                                 <XCircle size={12} strokeWidth={2.5} />
                                 {t('cancel')}
                             </button>
-                            <button
-                                onClick={onCheckout}
-                                disabled={localCart.length === 0 || committing}
-                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
-                            >
-                                {committing
-                                    ? <Loader2 size={12} className="animate-spin" />
-                                    : <CreditCard size={12} strokeWidth={2.5} />
-                                }
-                                {t('checkout')}
-                            </button>
+
+                            {isTakeout ? (
+                                <button
+                                    onClick={onCheckout}
+                                    disabled={localCart.length === 0 || committing}
+                                    className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                >
+                                    {committing
+                                        ? <Loader2 size={12} className="animate-spin" />
+                                        : <CreditCard size={12} strokeWidth={2.5} />
+                                    }
+                                    {t('checkout')}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handlePlaceOrder}
+                                    disabled={localCart.length === 0 || committing}
+                                    className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                >
+                                    {committing
+                                        ? <Loader2 size={12} className="animate-spin" />
+                                        : <Check size={12} strokeWidth={2.5} />
+                                    }
+                                    Place Order
+                                </button>
+                            )}
                         </div>
                     )}
 

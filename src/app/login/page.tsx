@@ -47,7 +47,7 @@ export default function LoginPage() {
             try {
                 const status = await getSetupStatus();
                 if (status.needs_restaurant_setup) {
-                    router.replace('/management/settings');
+                    router.replace('/setup');
                     return;
                 }
             } catch {

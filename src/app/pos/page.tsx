@@ -89,7 +89,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Sidebar Cart */}
-                <SidebarCart onCheckout={handleCheckout} onHold={() => setIsHoldOpen(true)} />
+                <SidebarCart onCheckout={handleCheckout} onHold={() => setIsHoldOpen(true)} isTakeout={isTakeout} />
                 </div>
             </div>
 
