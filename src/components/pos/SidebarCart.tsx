@@ -81,6 +81,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             await commitLocalCart(user.id);
         } catch (e) {
             console.error('Failed to place order', e);
+            alert('Failed to place order: ' + String(e));
         } finally {
             setCommitting(false);
         }
