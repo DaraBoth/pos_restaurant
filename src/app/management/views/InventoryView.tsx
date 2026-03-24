@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { getProducts, getCategories, updateStock, Product, Category } from '@/lib/tauri-commands';
+import { useAuth } from '@/providers/AuthProvider';
 import { BoxesIcon, Search, AlertTriangle, Minus, Plus, Package } from 'lucide-react';
 
 const LOW_STOCK_THRESHOLD = 10;
@@ -12,14 +13,20 @@ export default function InventoryView() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [showLowOnly, setShowLowOnly] = useState(false);
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
 
     useEffect(() => {
         loadData();
     }, []);
 
     async function loadData() {
+        if (!restaurantId) return;
         try {
-            const [prods, cats] = await Promise.all([getProducts(), getCategories()]);
+            const [prods, cats] = await Promise.all([
+                getProducts(undefined, restaurantId),
+                getCategories(restaurantId)
+            ]);
             setProducts(prods);
             setCategories(cats);
         } catch (e) {
@@ -29,7 +36,7 @@ export default function InventoryView() {
 
     async function handleStockChange(id: string, currentStock: number, delta: number) {
         try {
-            await updateStock(id, delta);
+            await updateStock(id, delta, restaurantId || '');
             setProducts(prev =>
                 prev.map(p => p.id === id ? { ...p, stock_quantity: Math.max(0, p.stock_quantity + delta) } : p)
             );

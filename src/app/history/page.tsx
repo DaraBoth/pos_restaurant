@@ -76,7 +76,7 @@ export default function HistoryPage() {
 
     async function loadRestaurant() {
         try {
-            const data = await getRestaurant();
+            const data = await getRestaurant(restaurantId || undefined);
             setRestaurant(data);
         } catch (e) {
             console.error(e);

@@ -6,5 +6,6 @@ export const getKitchenOrders = (restaurant_id?: string) =>
 
 export const updateKitchenItemStatus = (
     item_id: string,
-    status: 'pending' | 'cooking' | 'done'
-) => call<void>('update_kitchen_item_status', { itemId: item_id, status });
+    status: 'pending' | 'cooking' | 'done',
+    restaurant_id: string
+) => call<void>('update_kitchen_item_status', { itemId: item_id, status, restaurantId: restaurant_id });

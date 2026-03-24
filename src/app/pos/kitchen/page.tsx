@@ -103,7 +103,7 @@ export default function KitchenPage() {
         const ids = items.map(i => i.id);
         setUpdatingIds(prev => new Set([...prev, ...ids]));
         try {
-            await Promise.all(items.map(i => updateKitchenItemStatus(i.id, nextStatus)));
+            await Promise.all(items.map(i => updateKitchenItemStatus(i.id, nextStatus, restaurantId || '')));
             await refresh();
         } catch (e) {
             console.error(e);
@@ -121,7 +121,7 @@ export default function KitchenPage() {
         if (!cfg.next) return;
         setUpdatingIds(prev => new Set([...prev, item.id]));
         try {
-            await updateKitchenItemStatus(item.id, cfg.next);
+            await updateKitchenItemStatus(item.id, cfg.next, restaurantId || '');
             await refresh();
         } catch (e) {
             console.error(e);

@@ -9,9 +9,12 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function OrdersManagement() {
     const { t } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -28,7 +31,7 @@ export default function OrdersManagement() {
     async function loadOrders() {
         setLoading(true);
         try {
-            const data = await getOrders(undefined, startDate, endDate);
+            const data = await getOrders(undefined, startDate, endDate, restaurantId || undefined);
             setOrders(data);
         } catch (e) {
             console.error(e);
@@ -48,7 +51,7 @@ export default function OrdersManagement() {
 
         if (!orderDetails[orderId]) {
             try {
-                const items = await getOrderItems(orderId);
+                const items = await getOrderItems(orderId, restaurantId || '');
                 setOrderDetails(prev => ({ ...prev, [orderId]: items }));
             } catch (e) {
                 console.error('Failed to load order items:', e);
