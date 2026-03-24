@@ -198,6 +198,7 @@ pub struct DbStatus {
     pub connected: bool,
     pub path: String,
     pub mode: String, // "local" or "synced"
+    pub error_message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

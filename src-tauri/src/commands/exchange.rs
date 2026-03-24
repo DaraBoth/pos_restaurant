@@ -42,14 +42,36 @@ pub async fn set_exchange_rate(
 }
 
 #[tauri::command]
-pub async fn get_db_status(pool: State<'_, Arc<Connection>>) -> Result<DbStatus, String> {
+pub async fn get_db_status(
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, crate::db::RemoteDb>,
+) -> Result<DbStatus, String> {
     let mut rows = pool.query("SELECT 1", ()).await.map_err(|e| e.to_string())?;
-    let ok = rows.next().await.is_ok();
+    let local_ok = rows.next().await.is_ok();
+    
+    let mut remote_connected = false;
+    let mut error_message = None;
+
+    if let Some(conn) = &remote.0 {
+        match conn.query("SELECT 1", ()).await {
+            Ok(mut r) => {
+                remote_connected = r.next().await.is_ok();
+            }
+            Err(e) => {
+                error_message = Some(e.to_string());
+            }
+        }
+    } else {
+        error_message = Some("No remote connection initialized".to_string());
+    }
+
+    let mode = if remote.0.is_none() { "local" } else { "synced" };
 
     Ok(DbStatus {
-        connected: ok,
-        path: "Turso Synced Database".to_string(),
-        mode: "synced".to_string(),
+        connected: local_ok && (remote.0.is_none() || remote_connected),
+        path: if remote.0.is_some() { "Turso Cloud" } else { "Local SQLite" }.to_string(),
+        mode: mode.to_string(),
+        error_message,
     })
 }
 

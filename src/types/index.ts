@@ -166,6 +166,7 @@ export interface DbStatus {
     connected: boolean;
     path: string;
     mode: string;
+    error_message?: string;
 }
 
 // --------------- Analytics ---------------

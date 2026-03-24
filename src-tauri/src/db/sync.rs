@@ -143,8 +143,11 @@ pub async fn pull_table(
         for i in 0..cols.len() {
             vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
         }
-        local.execute(&upsert, vals).await.ok();
-        count += 1;
+        if let Err(e) = local.execute(&upsert, vals).await {
+            eprintln!("[Sync] Pull insert failed for table {}: {}", table, e);
+        } else {
+            count += 1;
+        }
     }
 
     Ok(count)
@@ -203,8 +206,11 @@ pub async fn push_table(
         for i in 0..cols.len() {
             vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
         }
-        remote.execute(&upsert, vals).await.ok();
-        count += 1;
+        if let Err(e) = remote.execute(&upsert, vals).await {
+            eprintln!("[Sync] Push insert failed for table {}: {}", table, e);
+        } else {
+            count += 1;
+        }
     }
 
     Ok(count)
@@ -253,6 +259,9 @@ pub async fn sync_restaurant(
 
     if total > 0 {
         println!("[Sync] restaurant={} synced {} rows (since {})", restaurant_id, total, since);
+    } else {
+        // Minimal heartbeat to show it's alive
+        println!("[Sync] Heartbeat: restaurant={} is up to date (no new changes).", restaurant_id);
     }
     set_last_sync_at(local, restaurant_id, &now).await;
     total

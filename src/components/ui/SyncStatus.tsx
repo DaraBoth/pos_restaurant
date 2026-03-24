@@ -17,36 +17,46 @@ import { useEffect, useState, useRef } from 'react';
 import { getDbStatus } from '@/lib/tauri-commands';
 import { Cloud, CloudOff, CloudUpload, Check } from 'lucide-react';
 
-type SyncState = 'offline' | 'syncing' | 'synced' | 'local';
+type SyncState = 'offline' | 'syncing' | 'synced' | 'local' | 'error';
 
 const CONFIG: Record<SyncState, { icon: React.ElementType; label: string; color: string; pulse: boolean }> = {
     offline: { icon: CloudOff,    label: 'Offline',    color: '#ef4444', pulse: false },
     syncing: { icon: CloudUpload, label: 'Syncing…',   color: '#f59e0b', pulse: true  },
     synced:  { icon: Check,       label: 'Up to date', color: '#22c55e', pulse: false },
     local:   { icon: Cloud,       label: 'Local mode', color: '#6b7280', pulse: false },
+    error:   { icon: CloudOff,    label: 'Sync Error', color: '#f97316', pulse: false },
 };
 
 export function SyncStatus() {
     const [state, setState] = useState<SyncState>('synced');
+    const [tooltip, setTooltip] = useState('Checking...');
     const syncingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     async function checkStatus() {
-        if (!navigator.onLine) {
+        // High-level check for browser's internet connectivity
+        if (typeof window !== 'undefined' && !navigator.onLine) {
             setState('offline');
             return;
         }
+
         try {
             const status = await getDbStatus();
+            setTooltip(status.error_message || `Last checked: ${new Date().toLocaleTimeString()}`);
+
             if (status.mode === 'local') {
                 setState('local');
             } else if (status.connected) {
-                setState(prev => prev === 'syncing' ? 'syncing' : 'synced');
+                // If we were in error state but now connected, clear it
+                setState(prev => (prev === 'error' || prev === 'offline') ? 'synced' : prev);
             } else {
-                setState('offline');
+                // If we have internet but cloud is unreachable, it's a Sync Error
+                setState('error');
             }
         } catch {
-            setState(prev => navigator.onLine ? prev : 'offline');
+            // If the command itself fails, we are likely having network issues
+            setState('offline');
+            setTooltip('Failed to communicate with the database service');
         }
     }
 
@@ -92,12 +102,12 @@ export function SyncStatus() {
 
     return (
         <div
-            className="flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all"
+            className="flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all cursor-help"
             style={{
                 background: `${cfg.color}12`,
                 borderColor: `${cfg.color}30`,
             }}
-            title={`Sync status: ${cfg.label}`}
+            title={tooltip}
         >
             {/* Dot indicator */}
             <span className="relative flex-shrink-0">
