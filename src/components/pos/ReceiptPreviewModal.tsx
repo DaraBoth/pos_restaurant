@@ -46,13 +46,13 @@ export default function ReceiptPreviewModal({ html, onClose, onPrint }: Props) {
                 </div>
 
                 {/* Receipt iframe */}
-                <div className="flex-1 overflow-auto bg-[#f0f0f0] p-4 flex items-start justify-center">
-                    <div className="bg-white shadow-lg" style={{ width: 300 }}>
+                <div className="flex-1 overflow-auto bg-[#e5e5e5] py-6 flex items-start justify-center">
+                    <div className="bg-white shadow-xl flex-shrink-0" style={{ width: 210, minHeight: '60%' }}>
                         <iframe
                             ref={iframeRef}
                             srcDoc={html}
                             title="Receipt Preview"
-                            style={{ width: 300, height: 600, border: 'none', display: 'block' }}
+                            style={{ width: '100%', height: 600, border: 'none', display: 'block' }}
                             scrolling="yes"
                         />
                     </div>

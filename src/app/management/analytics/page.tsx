@@ -100,13 +100,13 @@ export default function AnalyticsPage() {
     ] : [];
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6 pb-24 max-w-7xl mx-auto px-2">
             {/* Page header */}
-            <div>
-                <h1 className="text-base font-black text-[var(--foreground)]">
+            <div className="flex flex-col">
+                <h1 className="text-lg font-black text-[var(--foreground)] uppercase tracking-widest leading-none">
                     {t('revenueReport')}
                 </h1>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-2 opacity-60">
                     {t('revenueOverview')}
                 </p>
             </div>
@@ -126,34 +126,37 @@ export default function AnalyticsPage() {
             {!loading && !error && summary && (
                 <>
                     {/* Stat Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {statCards.map((card, i) => (
-                            <div key={i} className={`pos-card p-3.5 border ${card.bg}`}>
-                                <div className="flex items-start justify-between mb-2">
-                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-secondary)]">{card.label}</p>
-                                    <card.icon size={14} className={card.color} />
+                            <div key={i} className={`rounded-2xl border bg-[var(--bg-card)] p-5 transition-all hover:border-[var(--accent)]/30 relative overflow-hidden ${card.bg.includes('green') ? 'border-green-500/10' : card.bg.includes('blue') ? 'border-blue-500/10' : card.bg.includes('purple') ? 'border-purple-500/10' : 'border-orange-500/10'}`}>
+                                <div className={`absolute top-0 left-0 w-1 h-full ${card.bg.split(' ')[0]}`} />
+                                <div className="flex items-start justify-between mb-4">
+                                    <p className={`text-[10px] font-black uppercase tracking-widest ${card.color}`}>{card.label}</p>
+                                    <div className={`p-1.5 rounded-lg ${card.bg.split(' ')[0]}`}>
+                                        <card.icon size={14} className={card.color} strokeWidth={2.5} />
+                                    </div>
                                 </div>
-                                <p className={`text-xl font-black font-mono ${card.color} leading-none`}>{card.value}</p>
-                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">{card.sub}</p>
+                                <p className="text-2xl font-black font-mono text-[var(--foreground)] tracking-tight leading-none">{card.value}</p>
+                                <p className={`text-[9px] font-bold uppercase tracking-[0.2em] mt-2 opacity-60 ${card.color}`}>{card.sub}</p>
                             </div>
                         ))}
                     </div>
 
                     {/* Chart section */}
-                    <div className="pos-card p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-sm font-bold text-[var(--foreground)]">
+                    <div className="rounded-2xl border border-white/5 bg-[var(--bg-card)] p-6">
+                        <div className="flex items-center justify-between mb-6 pb-4 border-b border-dashed border-white/5">
+                            <h2 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
                                 {t('revenueChart')}
                             </h2>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                                 {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
                                     <button
                                         key={p}
                                         onClick={() => setPeriod(p)}
-                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${
                                             period === p
-                                                ? 'bg-[var(--accent-blue)] text-white'
-                                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] border border-[var(--border)]'
+                                                ? 'bg-[var(--accent-blue)] text-white shadow-md'
+                                                : 'text-[var(--text-secondary)] bg-[var(--bg-elevated)] border border-[var(--border)] hover:text-white hover:border-[var(--accent-blue)]/50'
                                         }`}
                                     >
                                         {t(PERIOD_LABELS[p])}
@@ -163,42 +166,44 @@ export default function AnalyticsPage() {
                         </div>
 
                         {chartData.length === 0 ? (
-                            <div className="h-32 flex items-center justify-center">
-                                <p className="text-xs text-[var(--text-secondary)]">
+                            <div className="h-48 flex items-center justify-center opacity-30">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                                     {t('noRevenueData')}
                                 </p>
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-4">
                                 {/* Bar chart */}
-                                <div className="flex items-end gap-1 h-32">
+                                <div className="flex items-end gap-1.5 h-48">
                                     {chartData.map((day, i) => {
                                         const height = maxRevenue > 0 ? (day.total_usd / maxRevenue) * 100 : 0;
                                         return (
                                             <div
                                                 key={day.date}
-                                                className="flex-1 flex flex-col items-center gap-1 group"
+                                                className="flex-1 flex flex-col items-center gap-2 group relative"
                                                 title={`${day.date}: ${formatUsd(day.total_usd)} (${day.order_count} ${t('orders')})`}
                                             >
-                                                <div className="w-full flex flex-col justify-end" style={{ height: '6rem' }}>
+                                                <div className="w-full flex flex-col justify-end h-full relative">
                                                     <div
-                                                        className="w-full rounded-t-md bg-[var(--accent-blue)] group-hover:bg-[var(--accent-green)] transition-colors"
-                                                        style={{ height: `${Math.max(height, 2)}%`, minHeight: '3px' }}
-                                                    />
+                                                        className="w-full rounded-md bg-[var(--accent-blue)]/80 group-hover:bg-[var(--accent-blue)] transition-all relative overflow-hidden shadow-sm"
+                                                        style={{ height: `${Math.max(height, 2)}%`, minHeight: '4px' }}
+                                                    >
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-white/20" />
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
                                 {/* Labels */}
-                                <div className="flex gap-1">
+                                <div className="flex gap-1.5 pt-2">
                                     {chartData.map(day => {
                                         const d = new Date(day.date);
                                         const label = chartData.length <= 14
                                             ? `${d.getMonth()+1}/${d.getDate()}`
                                             : `${d.getMonth()+1}/${d.getDate()}`;
                                         return (
-                                            <div key={day.date} className="flex-1 text-center text-[9px] text-[var(--text-secondary)] truncate">
+                                            <div key={day.date} className="flex-1 text-center text-[9px] font-mono font-bold text-[var(--text-secondary)] opacity-60 truncate">
                                                 {label}
                                             </div>
                                         );
@@ -206,16 +211,16 @@ export default function AnalyticsPage() {
                                 </div>
 
                                 {/* Summary row */}
-                                <div className="pt-2 border-t border-[var(--border)] flex items-center gap-6 text-xs">
-                                    <div>
-                                        <span className="text-[var(--text-secondary)]">{t('total')}: </span>
-                                        <span className="font-bold font-mono text-green-400">
+                                <div className="mt-4 pt-4 border-t border-dashed border-white/5 flex items-center gap-8">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50 mb-1">{t('total')}</span>
+                                        <span className="font-black font-mono text-lg text-[var(--accent-green)] leading-none">
                                             {formatUsd(chartData.reduce((s, d) => s + d.total_usd, 0))}
                                         </span>
                                     </div>
-                                    <div>
-                                        <span className="text-[var(--text-secondary)]">{t('orders')}: </span>
-                                        <span className="font-bold text-blue-400">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50 mb-1">{t('orders')}</span>
+                                        <span className="font-black text-lg text-[var(--accent-blue)] leading-none">
                                             {chartData.reduce((s, d) => s + d.order_count, 0)}
                                         </span>
                                     </div>
@@ -228,99 +233,109 @@ export default function AnalyticsPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         
                         {/* Top Products Widget */}
-                        <div className="pos-card p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Flame size={18} className="text-orange-400" />
-                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                        <div className="rounded-2xl border border-white/5 bg-[var(--bg-card)] p-6">
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-dashed border-white/5">
+                                <div className="bg-orange-500/10 p-2 rounded-xl border border-orange-500/20">
+                                    <Flame size={16} className="text-orange-400" />
+                                </div>
+                                <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
                                     Top Products
                                 </h3>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {topProducts.slice(0, 5).map((p, i) => (
                                     <div key={p.id} className="flex items-center justify-between p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 font-black text-xs flex items-center justify-center">
+                                            <div className="w-7 h-7 rounded-lg bg-[var(--bg-dark)] border border-white/5 text-orange-400 font-mono font-black text-[10px] flex items-center justify-center shadow-inner">
                                                 {i + 1}
                                             </div>
-                                            <div className="font-bold text-sm text-[var(--foreground)]">{p.name}</div>
+                                            <div className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wide">{p.name}</div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="font-mono font-bold text-green-400">{formatUsd(p.total_revenue)}</div>
-                                            <div className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest">{p.order_count} Sold</div>
+                                            <div className="font-mono font-black text-sm text-[var(--accent-green)] leading-none mb-1">{formatUsd(p.total_revenue)}</div>
+                                            <div className="text-[9px] text-[var(--text-secondary)] font-bold uppercase tracking-[0.2em] opacity-60">{p.order_count} Sold</div>
                                         </div>
                                     </div>
                                 ))}
-                                {topProducts.length === 0 && <div className="text-xs text-[var(--text-secondary)] text-center py-4">No data</div>}
+                                {topProducts.length === 0 && <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center py-6 opacity-40">No data</div>}
                             </div>
                         </div>
 
                         {/* Revenue by Category Widget */}
-                        <div className="pos-card p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                                <PieChart size={18} className="text-blue-400" />
-                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                        <div className="rounded-2xl border border-white/5 bg-[var(--bg-card)] p-6">
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-dashed border-white/5">
+                                <div className="bg-blue-500/10 p-2 rounded-xl border border-blue-500/20">
+                                    <PieChart size={16} className="text-blue-400" />
+                                </div>
+                                <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
                                     Revenue By Category
                                 </h3>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {categoryRevenue.map((c) => (
-                                    <div key={c.id} className="flex items-center justify-between p-3 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]">
-                                        <div className="font-bold text-sm text-[var(--foreground)]">{c.name}</div>
-                                        <div className="font-mono font-bold text-blue-400">{formatUsd(c.total_revenue)}</div>
+                                    <div key={c.id} className="flex items-center justify-between p-3.5 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)]">
+                                        <div className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wide">{c.name}</div>
+                                        <div className="font-mono font-black text-sm text-[var(--accent-blue)]">{formatUsd(c.total_revenue)}</div>
                                     </div>
                                 ))}
-                                {categoryRevenue.length === 0 && <div className="text-xs text-[var(--text-secondary)] text-center py-4">No data</div>}
+                                {categoryRevenue.length === 0 && <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center py-6 opacity-40">No data</div>}
                             </div>
                         </div>
 
                         {/* Peak Hours Widget */}
-                        <div className="pos-card p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Clock size={18} className="text-purple-400" />
-                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                        <div className="rounded-2xl border border-white/5 bg-[var(--bg-card)] p-6">
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-dashed border-white/5">
+                                <div className="bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
+                                    <Clock size={16} className="text-purple-400" />
+                                </div>
+                                <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
                                     Peak Ordering Hours
                                 </h3>
                             </div>
-                            <div className="flex items-end gap-1 h-32 mt-4">
+                            <div className="flex items-end gap-1.5 h-36 mt-4">
                                 {peakHours.length > 0 ? (() => {
                                     const maxOrders = Math.max(...peakHours.map(h => h.order_count));
                                     return peakHours.map(ph => {
                                         const height = (ph.order_count / maxOrders) * 100;
                                         return (
-                                            <div key={ph.hour} className="flex-1 flex flex-col items-center gap-1 group" title={`${ph.hour} : ${ph.order_count} orders`}>
-                                                <div className="w-full flex flex-col justify-end h-24">
+                                            <div key={ph.hour} className="flex-1 flex flex-col items-center gap-2 group relative" title={`${ph.hour} : ${ph.order_count} orders`}>
+                                                <div className="w-full flex flex-col justify-end h-full">
                                                     <div 
-                                                        className="w-full rounded-t-md bg-purple-500/50 group-hover:bg-purple-400 transition-colors"
-                                                        style={{ height: `${Math.max(height, 5)}%` }} 
-                                                    />
+                                                        className="w-full rounded-md bg-purple-500/50 group-hover:bg-purple-400 transition-colors relative overflow-hidden"
+                                                        style={{ height: `${Math.max(height, 5)}%`, minHeight: '4px' }}
+                                                    >
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-white/30" />
+                                                    </div>
                                                 </div>
-                                                <span className="text-[9px] text-[var(--text-secondary)] font-mono">{ph.hour.split(':')[0]}h</span>
+                                                <span className="text-[9px] text-[var(--text-secondary)] font-mono font-bold opacity-60 pt-1">{ph.hour.split(':')[0]}h</span>
                                             </div>
                                         )
                                     });
-                                })() : <div className="text-xs text-[var(--text-secondary)] text-center w-full py-4">No data</div>}
+                                })() : <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center w-full py-6 opacity-40">No data</div>}
                             </div>
                         </div>
 
                         {/* Slow Movers Widget */}
-                        <div className="pos-card p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                                <AlertTriangle size={18} className="text-rose-400" />
-                                <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
+                        <div className="rounded-2xl border border-white/5 bg-[var(--bg-card)] p-6">
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-dashed border-white/5">
+                                <div className="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
+                                    <AlertTriangle size={16} className="text-rose-400" />
+                                </div>
+                                <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
                                     Slow Movers (Last 30 Days)
                                 </h3>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {slowMovers.slice(0, 5).map(sm => (
-                                    <div key={sm.id} className="flex items-center justify-between p-3 bg-rose-500/5 rounded-xl border border-rose-500/10">
-                                        <div className="font-bold text-sm text-[var(--foreground)]">{sm.name}</div>
-                                        <div className="text-right">
-                                            <div className="font-mono font-bold text-rose-400">{sm.order_count} Sold</div>
-                                            <div className="text-[10px] text-rose-400/60 font-bold uppercase tracking-widest">Action Needed</div>
+                                    <div key={sm.id} className="flex items-center justify-between p-3.5 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                                        <div className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wide">{sm.name}</div>
+                                        <div className="text-right flex flex-col gap-0.5">
+                                            <div className="font-mono font-black text-sm text-rose-400 leading-none">{sm.order_count} Sold</div>
+                                            <div className="text-[9px] text-rose-400/60 font-bold uppercase tracking-[0.2em]">Action Needed</div>
                                         </div>
                                     </div>
                                 ))}
-                                {slowMovers.length === 0 && <div className="text-xs text-green-400 font-bold text-center py-4 bg-green-500/10 rounded-xl border border-green-500/20">All products are selling well!</div>}
+                                {slowMovers.length === 0 && <div className="text-[10px] text-[var(--accent-green)] font-black uppercase tracking-[0.2em] text-center p-6 bg-[var(--accent-green)]/10 rounded-xl border border-[var(--accent-green)]/20 shadow-inner">All products are selling well!</div>}
                             </div>
                         </div>
 

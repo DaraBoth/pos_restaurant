@@ -270,3 +270,133 @@ pub async fn seed_super_admin(conn: &Arc<Connection>) {
     ).await;
     println!("[Auth] Super admin seeded — username: superadmin  password: superadmin123");
 }
+
+/// Allows Superadmin to manually override restaurant admin details without entering the restaurant
+#[tauri::command]
+pub async fn superadmin_update_admin(
+    admin_id: String,
+    new_username: Option<String>,
+    new_password: Option<String>,
+    new_full_name: Option<String>,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    
+    // First, fetch the existing data so we can reuse it if fields are omitted
+    let mut rows = pool.query(
+        "SELECT username, password_hash, full_name FROM users WHERE id = ? AND role = 'admin'",
+        params![admin_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "Admin account not found".to_string())?;
+
+    let existing_username: String = row.get(0).unwrap_or_default();
+    let existing_hash: String = row.get(1).unwrap_or_default();
+    let existing_fullname: Option<String> = row.get(2).ok();
+
+    // Determine target values
+    let final_username = new_username.unwrap_or(existing_username);
+    let final_fullname = new_full_name.or(existing_fullname).unwrap_or_default();
+
+    let final_hash = if let Some(pwd) = new_password {
+        let salt = SaltString::generate(&mut OsRng);
+        Argon2::default()
+            .hash_password(pwd.as_bytes(), &salt)
+            .map_err(|e| format!("Hash error: {}", e))?
+            .to_string()
+    } else {
+        existing_hash
+    };
+
+    pool.execute(
+        "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ?",
+        params![final_username, final_hash, final_fullname, admin_id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_superadmin_profile(
+    superadmin_id: String,
+    new_username: Option<String>,
+    new_password: Option<String>,
+    new_full_name: Option<String>,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    let mut rows = pool.query(
+        "SELECT username, password_hash, full_name FROM users WHERE id = ? AND role = 'super_admin'",
+        params![superadmin_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "Super admin account not found".to_string())?;
+
+    let existing_username: String = row.get(0).unwrap_or_default();
+    let existing_hash: String = row.get(1).unwrap_or_default();
+    let existing_fullname: Option<String> = row.get(2).ok();
+
+    let final_username = new_username.unwrap_or(existing_username);
+    let final_fullname = new_full_name.or(existing_fullname).unwrap_or_default();
+
+    let final_hash = if let Some(pwd) = new_password {
+        let salt = SaltString::generate(&mut OsRng);
+        Argon2::default()
+            .hash_password(pwd.as_bytes(), &salt)
+            .map_err(|e| format!("Hash error: {}", e))?
+            .to_string()
+    } else {
+        existing_hash
+    };
+
+    pool.execute(
+        "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ? AND role = 'super_admin'",
+        params![final_username, final_hash, final_fullname, superadmin_id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+pub struct SuperadminUserView {
+    pub id: String,
+    pub restaurant_id: Option<String>,
+    pub restaurant_name: Option<String>,
+    pub username: String,
+    pub role: String,
+    pub full_name: Option<String>,
+    pub created_at: String,
+}
+
+#[tauri::command]
+pub async fn superadmin_get_all_users(
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Vec<SuperadminUserView>, String> {
+    let mut rows = pool.query(
+        "SELECT u.id, u.restaurant_id, r.name, u.username, u.role, u.full_name, u.created_at
+         FROM users u
+         LEFT JOIN restaurants r ON u.restaurant_id = r.id AND r.is_deleted = 0
+         WHERE u.is_deleted = 0
+         ORDER BY r.name, u.role, u.username",
+        ()
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut list = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        list.push(SuperadminUserView {
+            id: row.get(0).unwrap_or_default(),
+            restaurant_id: row.get(1).ok(),
+            restaurant_name: row.get(2).ok(),
+            username: row.get(3).unwrap_or_default(),
+            role: row.get(4).unwrap_or_default(),
+            full_name: row.get(5).ok(),
+            created_at: row.get(6).unwrap_or_default(),
+        });
+    }
+    
+    Ok(list)
+}

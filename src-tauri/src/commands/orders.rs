@@ -40,13 +40,13 @@ pub async fn create_order(
     let mut round_number = 1;
 
     if let Some(table_name) = &table_id {
-        let mut real_table_id = String::new();
         let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ?", params![table_name.clone()]).await.map_err(|e| e.to_string())?;
-        if let Some(trow) = trows.next().await.map_err(|e| e.to_string())? {
-            real_table_id = trow.get::<String>(0).unwrap_or_default();
+        
+        let real_table_id = if let Some(trow) = trows.next().await.map_err(|e| e.to_string())? {
+            trow.get::<String>(0).unwrap_or_default()
         } else {
             return Err(format!("Table {} does not exist", table_name));
-        }
+        };
 
         let mut rows = pool.query(
             "SELECT id FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1",

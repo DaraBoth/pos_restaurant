@@ -41,3 +41,40 @@ export const createRestaurantWithAdmin = (params: {
     adminPassword: params.adminPassword,
     adminFullName: params.adminFullName,
 });
+
+export const superadminUpdateAdmin = (params: {
+    adminId: string;
+    newUsername?: string;
+    newPassword?: string;
+    newFullName?: string;
+}) => call<void>('superadmin_update_admin', {
+    adminId: params.adminId,
+    newUsername: params.newUsername,
+    newPassword: params.newPassword,
+    newFullName: params.newFullName,
+});
+
+export const updateSuperadminProfile = (params: {
+    superadminId: string;
+    newUsername?: string;
+    newPassword?: string;
+    newFullName?: string;
+}) => call<void>('update_superadmin_profile', {
+    superadminId: params.superadminId,
+    newUsername: params.newUsername,
+    newPassword: params.newPassword,
+    newFullName: params.newFullName,
+});
+
+export interface SuperadminUserView {
+    id: string;
+    restaurant_id: string | null;
+    restaurant_name: string | null;
+    username: string;
+    role: string;
+    full_name: string | null;
+    created_at: string;
+}
+
+export const superadminGetAllUsers = () =>
+    call<SuperadminUserView[]>('superadmin_get_all_users');

@@ -58,7 +58,7 @@ export default function ProductGrid() {
         if (product.is_available === 0 || product.stock_quantity <= 0) return;
         setAddingId(product.id);
         try {
-            addToLocalCart(product);
+            await addToLocalCart(product);
         } catch (e) {
             console.error('Failed to add item:', e);
         } finally {

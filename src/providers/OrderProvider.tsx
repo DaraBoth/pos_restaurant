@@ -31,7 +31,7 @@ interface OrderContextValue {
     refreshRate: () => void;
     clearOrder: () => void;
     loadTableSession: (tId: string) => Promise<void>;
-    addToLocalCart: (product: Product) => void;
+    addToLocalCart: (product: Product) => Promise<void> | void;
     updateLocalCartQty: (productId: string, qty: number) => void;
     commitLocalCart: (userId: string) => Promise<void>;
 }
@@ -48,7 +48,7 @@ const OrderContext = createContext<OrderContextValue>({
     setSessionId: () => { }, setRounds: () => { }, switchRound: async () => {},
     setTakeout: () => { }, refreshRate: () => { }, clearOrder: () => { },
     loadTableSession: async () => {},
-    addToLocalCart: () => { }, updateLocalCartQty: () => { }, commitLocalCart: async () => {},
+    addToLocalCart: async () => { }, updateLocalCartQty: () => { }, commitLocalCart: async () => {},
 });
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
@@ -125,7 +125,18 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    const addToLocalCart = useCallback((product: Product) => {
+    const addToLocalCart = useCallback(async (product: Product) => {
+        if (orderId) {
+            try {
+                await apiAddOrderItem(orderId, product.id, 1);
+                const currentItems = await getOrderItems(orderId);
+                setItemsState(currentItems);
+            } catch (e) {
+                console.error('Failed to add live item:', e);
+            }
+            return;
+        }
+
         setLocalCart(prev => {
             const existing = prev.find(i => i.productId === product.id);
             if (existing) {
@@ -139,7 +150,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
                 qty: 1,
             }];
         });
-    }, []);
+    }, [orderId]);
 
     const updateLocalCartQty = useCallback((productId: string, qty: number) => {
         if (qty <= 0) {

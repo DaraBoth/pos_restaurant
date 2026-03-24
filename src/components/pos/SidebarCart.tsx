@@ -4,8 +4,8 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
-import { useState } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 
 export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
@@ -17,6 +17,13 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
     const [committing, setCommitting] = useState(false);
+    const roundsScrollRef = useRef<HTMLDivElement>(null);
+
+    const scrollRounds = (dir: 'left' | 'right') => {
+        if (roundsScrollRef.current) {
+            roundsScrollRef.current.scrollBy({ left: dir === 'left' ? -150 : 150, behavior: 'smooth' });
+        }
+    };
 
 
 
@@ -126,30 +133,49 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
 
                 {/* Rounds Scroller (only for table sessions) */}
                 {tableId && sessionId && rounds.length > 0 && (
-                    <div className="flex-shrink-0 px-2 py-1.5 bg-[var(--bg-elevated)] border-b border-[var(--border)] overflow-x-auto no-scrollbar flex items-center gap-1.5 snap-x">
-                        {rounds.map(round => {
-                            const isActive = round.id === orderId;
-                            return (
-                                <button
-                                    key={round.id}
-                                    onClick={() => switchRound(round.id)}
-                                    className={`snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide transition-all ${
-                                        isActive
-                                            ? 'bg-[var(--accent-blue)] text-white shadow-sm'
-                                            : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
-                                    }`}
-                                >
-                                    Round {round.round_number}
-                                    {isActive && <span className="ml-1.5 opacity-80">(View)</span>}
-                                </button>
-                            );
-                        })}
+                    <div className="flex-shrink-0 relative bg-[var(--bg-elevated)] border-b border-[var(--border)] group/rounds">
                         <button
-                            onClick={handleAddRound}
-                            className="snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center gap-1"
+                            onClick={() => scrollRounds('left')}
+                            className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-[var(--bg-elevated)] to-transparent flex items-center justify-start opacity-0 group-hover/rounds:opacity-100 transition-opacity z-10"
                         >
-                            <Plus size={11} strokeWidth={3} />
-                            New Round
+                            <ChevronLeft size={16} className="text-[var(--text-secondary)] hover:text-white ml-0.5 bg-[var(--bg-dark)]/80 rounded-full" />
+                        </button>
+
+                        <div 
+                            ref={roundsScrollRef}
+                            className="px-2 py-1.5 overflow-x-auto no-scrollbar flex items-center gap-1.5 snap-x"
+                        >
+                            {rounds.map(round => {
+                                const isActive = round.id === orderId;
+                                return (
+                                    <button
+                                        key={round.id}
+                                        onClick={() => switchRound(round.id)}
+                                        className={`snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide transition-all ${
+                                            isActive
+                                                ? 'bg-[var(--accent-blue)] text-white shadow-sm'
+                                                : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
+                                        }`}
+                                    >
+                                        Round {round.round_number}
+                                        {isActive && <span className="ml-1.5 opacity-80">(View)</span>}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                onClick={handleAddRound}
+                                className="snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center gap-1"
+                            >
+                                <Plus size={11} strokeWidth={3} />
+                                New Round
+                            </button>
+                        </div>
+                        
+                        <button
+                            onClick={() => scrollRounds('right')}
+                            className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-[var(--bg-elevated)] to-transparent flex items-center justify-end opacity-0 group-hover/rounds:opacity-100 transition-opacity z-10"
+                        >
+                            <ChevronRight size={16} className="text-[var(--text-secondary)] hover:text-white mr-0.5 bg-[var(--bg-dark)]/80 rounded-full" />
                         </button>
                     </div>
                 )}
@@ -379,6 +405,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             <TableOrderHistoryModal
                 isOpen={isHistoryOpen}
                 tableId={tableId}
+                sessionId={sessionId}
                 onClose={() => setIsHistoryOpen(false)}
             />
         </>

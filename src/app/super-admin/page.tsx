@@ -3,14 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import {
-    listAllRestaurants, createRestaurantWithAdmin,
-} from '@/lib/tauri-commands';
-import type { RestaurantSummary } from '@/lib/tauri-commands';
+    listAllRestaurants, createRestaurantWithAdmin, superadminUpdateAdmin,
+    updateSuperadminProfile, superadminGetAllUsers, SuperadminUserView
+} from '@/lib/api/auth';
+import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import {
     ShieldCheck, LogOut, Plus, RefreshCw, Store,
     User, Phone, MapPin, Calendar, ChevronRight,
-    X, Eye, EyeOff, Building2, AlertTriangle, Check,
+    X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search
 } from 'lucide-react';
 
 // ─── Create Restaurant Modal ────────────────────────────────────────────
@@ -269,7 +270,7 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 }
 
 // ─── Restaurant Detail Drawer ────────────────────────────────────────────
-function RestaurantDrawer({ r, onClose }: { r: RestaurantSummary; onClose: () => void }) {
+function RestaurantDrawer({ r, onClose, onEditAdmin }: { r: RestaurantSummary; onClose: () => void; onEditAdmin: (r: RestaurantSummary) => void }) {
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -296,9 +297,19 @@ function RestaurantDrawer({ r, onClose }: { r: RestaurantSummary; onClose: () =>
                     <Row icon={Calendar} label="Created" value={new Date(r.created_at + 'Z').toLocaleDateString()} />
 
                     <div className="border-t border-white/5 pt-4 space-y-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-1.5">
-                            <User size={10} /> Admin Account
-                        </p>
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-1.5">
+                                <User size={10} /> Admin Account
+                            </p>
+                            {r.admin_id && (
+                                <button
+                                    onClick={() => onEditAdmin(r)}
+                                    className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
+                                >
+                                    <Pen size={10} /> Edit
+                                </button>
+                            )}
+                        </div>
                         <Row icon={User} label="Username" value={r.admin_username ?? '—'} mono />
                         {r.admin_full_name && <Row icon={User} label="Full Name" value={r.admin_full_name} />}
                     </div>
@@ -341,6 +352,9 @@ export default function SuperAdminPage() {
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [selected, setSelected] = useState<RestaurantSummary | null>(null);
+    const [editAdmin, setEditAdmin] = useState<RestaurantSummary | null>(null);
+    const [showEditProfile, setShowEditProfile] = useState(false);
+    const [showGlobalUsers, setShowGlobalUsers] = useState(false);
 
     useEffect(() => {
         if (user?.role !== 'super_admin') {
@@ -387,12 +401,16 @@ export default function SuperAdminPage() {
                 <div className="flex items-center gap-3">
                     <SyncStatus />
 
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                    <button
+                        onClick={() => setShowEditProfile(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-all text-left"
+                        title="Edit Profile"
+                    >
                         <ShieldCheck size={12} className="text-purple-400" />
                         <span className="text-xs font-black text-purple-300 uppercase tracking-widest">
                             {user?.full_name || user?.username}
                         </span>
-                    </div>
+                    </button>
 
                     <button
                         onClick={handleLogout}
@@ -434,6 +452,13 @@ export default function SuperAdminPage() {
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                         </button>
                         <button
+                            onClick={() => setShowGlobalUsers(true)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-white font-black text-xs uppercase tracking-widest hover:border-blue-500/50 hover:bg-blue-500/10 transition-all"
+                        >
+                            <Users size={14} className="text-blue-400" />
+                            Global Users
+                        </button>
+                        <button
                             onClick={() => setShowCreate(true)}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-[var(--accent)]/20"
                         >
@@ -465,7 +490,6 @@ export default function SuperAdminPage() {
                 )}
             </main>
 
-            {/* ── Modals ── */}
             {showCreate && (
                 <CreateRestaurantModal
                     onClose={() => setShowCreate(false)}
@@ -473,8 +497,364 @@ export default function SuperAdminPage() {
                 />
             )}
             {selected && (
-                <RestaurantDrawer r={selected} onClose={() => setSelected(null)} />
+                <RestaurantDrawer 
+                    r={selected} 
+                    onClose={() => setSelected(null)} 
+                    onEditAdmin={(r) => setEditAdmin(r)} 
+                />
             )}
+            {editAdmin && (
+                <EditAdminModal
+                    r={editAdmin}
+                    onClose={() => setEditAdmin(null)}
+                    onUpdated={() => { setEditAdmin(null); load(); }}
+                />
+            )}
+            {showEditProfile && (
+                <EditProfileModal
+                    onClose={() => setShowEditProfile(false)}
+                />
+            )}
+            {showGlobalUsers && (
+                <GlobalUsersModal
+                    onClose={() => setShowGlobalUsers(false)}
+                />
+            )}
+        </div>
+    );
+}
+
+// ─── Edit Admin Modal ────────────────────────────────────────────────────────
+function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClose: () => void; onUpdated: () => void }) {
+    const [username, setUsername] = useState(r.admin_username || '');
+    const [fullName, setFullName] = useState(r.admin_full_name || '');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    async function handleSave(e: React.FormEvent) {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            await superadminUpdateAdmin({
+                adminId: r.admin_id!,
+                newUsername: username || undefined,
+                newFullName: fullName || undefined,
+                newPassword: password || undefined,
+            });
+            onUpdated();
+        } catch (err: any) {
+            setError(err.toString());
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div
+                className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+            >
+                <div className="px-5 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-elevated)]">
+                    <div className="flex items-center gap-2">
+                        <User size={16} className="text-blue-400" />
+                        <h3 className="font-black text-sm">Edit Admin Account</h3>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]">
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSave} className="p-5 space-y-4">
+                    {error && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Error Saving</span>
+                            <p className="text-[11px] font-medium text-red-300">{error}</p>
+                        </div>
+                    )}
+                    
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
+                            <input
+                                type="text"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name <span className="opacity-50">(optional)</span></label>
+                            <input
+                                type="text"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={fullName}
+                                onChange={e => setFullName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">New Password <span className="opacity-50">(leave blank to keep)</span></label>
+                            <input
+                                type="password"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full mt-2 py-2.5 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all flex items-center justify-center"
+                    >
+                        {loading ? <RefreshCw className="animate-spin" size={14} strokeWidth={3} /> : 'Save Changes'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// ─── Edit Superadmin Profile Modal ───────────────────────────────────────────
+function EditProfileModal({ onClose }: { onClose: () => void }) {
+    const { user, setUser } = useAuth();
+    const router = useRouter();
+
+    const [username, setUsername] = useState(user?.username || '');
+    const [fullName, setFullName] = useState(user?.full_name || '');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    async function handleSave(e: React.FormEvent) {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            await updateSuperadminProfile({
+                superadminId: user!.id,
+                newUsername: username || undefined,
+                newFullName: fullName || undefined,
+                newPassword: password || undefined,
+            });
+            // Immediately log out to force re-auth visually, or just close and update state
+            if (password) {
+                // Better to force logout on password change
+                setUser(null);
+                router.replace('/login');
+            } else {
+                setUser({ ...user!, username, full_name: fullName });
+                onClose();
+            }
+        } catch (err: any) {
+            setError(err.toString());
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div
+                className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+            >
+                <div className="px-5 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-elevated)]">
+                    <div className="flex items-center gap-2">
+                        <ShieldCheck size={16} className="text-purple-400" />
+                        <h3 className="font-black text-sm">Edit Superadmin Profile</h3>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]">
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSave} className="p-5 space-y-4">
+                    {error && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Error Saving</span>
+                            <p className="text-[11px] font-medium text-red-300">{error}</p>
+                        </div>
+                    )}
+                    
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
+                            <input
+                                type="text"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name <span className="opacity-50">(optional)</span></label>
+                            <input
+                                type="text"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={fullName}
+                                onChange={e => setFullName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">New Password <span className="opacity-50">(leave blank to keep)</span></label>
+                            <input
+                                type="password"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                            />
+                        </div>
+                    </div>
+
+                    <p className="text-[10px] text-[var(--text-secondary)] text-center font-medium opacity-60">
+                        {password ? "You will be logged out after saving your new password." : ""}
+                    </p>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full mt-2 py-2.5 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all flex items-center justify-center"
+                    >
+                        {loading ? <RefreshCw className="animate-spin" size={14} strokeWidth={3} /> : 'Save Changes'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// ─── Global Users Directory Modal ────────────────────────────────────────────
+function GlobalUsersModal({ onClose }: { onClose: () => void }) {
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        load();
+    }, []);
+
+    async function load() {
+        setLoading(true);
+        try {
+            const data = await superadminGetAllUsers();
+            setUsers(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const filtered = users.filter(u => 
+        u.username.toLowerCase().includes(search.toLowerCase()) || 
+        (u.full_name && u.full_name.toLowerCase().includes(search.toLowerCase())) ||
+        (u.restaurant_name && u.restaurant_name.toLowerCase().includes(search.toLowerCase()))
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-8">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div
+                className="relative w-full max-w-4xl max-h-full bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+            >
+                <div className="px-6 py-5 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between bg-[var(--bg-elevated)] gap-4 flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                            <Users size={20} />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-sm uppercase tracking-widest text-white">Global User Directory</h3>
+                            <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
+                                Showing {users.length} registered accounts platform-wide
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-50" />
+                            <input
+                                type="text"
+                                placeholder="Search users by name, role, or origin..."
+                                className="w-full sm:w-64 bg-black/50 border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <button onClick={onClose} className="p-2.5 hover:bg-white/10 rounded-xl text-[var(--text-secondary)] bg-[var(--bg-base)] border border-[var(--border)] transition-all">
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-auto bg-[var(--background)]">
+                    {loading ? (
+                        <div className="flex items-center justify-center p-20 opacity-30 text-[var(--text-secondary)] flex-col gap-3">
+                            <RefreshCw size={24} className="animate-spin" />
+                            <span className="text-xs uppercase tracking-widest font-black">Scanning DB...</span>
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center p-20 gap-3 opacity-30 text-[var(--text-secondary)]">
+                            <Search size={32} />
+                            <span className="text-sm font-black uppercase tracking-widest">No users found</span>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="sticky top-0 bg-[var(--bg-elevated)] backdrop-blur text-[10px] uppercase font-black tracking-widest text-[var(--text-secondary)]">
+                                <tr>
+                                    <th className="px-6 py-4 font-black">User Details</th>
+                                    <th className="px-6 py-4 font-black">Role</th>
+                                    <th className="px-6 py-4 font-black">Restaurant Origin</th>
+                                    <th className="px-6 py-4 font-black text-right">Created</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--border)]">
+                                {filtered.map(u => (
+                                    <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
+                                        <td className="px-6 py-3">
+                                            <p className="font-bold text-white mb-0.5">{u.username}</p>
+                                            {u.full_name && <p className="text-[11px] text-[var(--text-secondary)]">{u.full_name}</p>}
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <div className={`inline-flex px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                                                u.role === 'admin' ? 'bg-blue-500/10 text-blue-400' :
+                                                u.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400' :
+                                                'bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)]'
+                                            }`}>
+                                                {u.role.replace('_', ' ')}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-3 text-[12px] font-medium text-[var(--text-secondary)]">
+                                            {u.restaurant_name ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Store size={12} className="opacity-50" />
+                                                    {u.restaurant_name}
+                                                </div>
+                                            ) : (
+                                                <span className="opacity-30 italic">Platform Layer</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-3 text-right text-[11px] text-[var(--text-secondary)] opacity-60 font-mono">
+                                            {new Date(u.created_at + 'Z').toLocaleDateString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

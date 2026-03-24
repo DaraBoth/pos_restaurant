@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { getOrders, Order, getOrderItems, OrderItem, getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { printReceipt } from '@/lib/receipt';
@@ -14,11 +14,33 @@ import { useLanguage } from '@/providers/LanguageProvider';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'void';
 
+export interface GroupedOrder {
+    id: string; // session_id or order_id
+    table_id: string | null;
+    status: StatusFilter;
+    created_at: string;
+    total_usd: number;
+    total_khr: number;
+    orders: Order[];
+}
+
+function combineOrderItems(items: OrderItem[]): OrderItem[] {
+    const map = new Map<string, OrderItem>();
+    for (const item of items) {
+        if (map.has(item.product_id)) {
+            map.get(item.product_id)!.quantity += item.quantity;
+        } else {
+            map.set(item.product_id, { ...item });
+        }
+    }
+    return Array.from(map.values());
+}
+
 const STATUS_TABS: { id: StatusFilter; labelKey: any }[] = [
     { id: 'all', labelKey: 'allFilter' },
     { id: 'open', labelKey: 'open' },
     { id: 'completed', labelKey: 'completed' },
-    { id: 'void', labelKey: 'void' },
+    { id: 'void', labelKey: 'hold' },
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
@@ -34,7 +56,7 @@ export default function HistoryPage() {
     const [filter, setFilter] = useState<StatusFilter>('all');
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
     const [orderDetails, setOrderDetails] = useState<Record<string, OrderItem[]>>({});
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
     const loadingItemsRef = useRef<Set<string>>(new Set());
     
     // Default to today
@@ -71,13 +93,54 @@ export default function HistoryPage() {
         }
     }
 
-    // When in grid mode, auto-load items for all visible orders
-    const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+    const groupedOrders = useMemo(() => {
+        const map = new Map<string, GroupedOrder>();
+        for (const o of orders) {
+            const key = o.session_id || o.id;
+            if (!map.has(key)) {
+                map.set(key, {
+                    id: key,
+                    table_id: o.table_id || null,
+                    status: o.status as StatusFilter,
+                    created_at: o.created_at,
+                    total_usd: 0,
+                    total_khr: 0,
+                    orders: []
+                });
+            }
+            const g = map.get(key)!;
+            g.total_usd += o.total_usd;
+            g.total_khr += o.total_khr;
+            g.orders.push(o);
+            // take earliest date
+            if (new Date(o.created_at) < new Date(g.created_at)) {
+                g.created_at = o.created_at;
+            }
+            // Upgrade group status
+            if (o.status === 'open') g.status = 'open';
+            else if (o.status === 'completed' && g.status === 'void') g.status = 'completed';
+        }
+        const flat = Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        if (filter === 'all') return flat;
+        return flat.filter(g => g.status === filter);
+    }, [orders, filter]);
+
+    const filtered = groupedOrders;
 
     useEffect(() => {
         if (viewMode !== 'grid' || filtered.length === 0) return;
-        const toLoad = filtered.filter(o => !orderDetails[o.id] && !loadingItemsRef.current.has(o.id));
+        
+        const toLoad: Order[] = [];
+        filtered.forEach(g => {
+            g.orders.forEach(o => {
+                if (!orderDetails[o.id] && !loadingItemsRef.current.has(o.id)) {
+                    toLoad.push(o);
+                }
+            });
+        });
+
         if (toLoad.length === 0) return;
+
         toLoad.forEach(o => loadingItemsRef.current.add(o.id));
         Promise.all(
             toLoad.map(o =>
@@ -96,33 +159,36 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, filter, orders]);
 
-    async function toggleRow(orderId: string) {
+    async function toggleRow(groupId: string) {
         setExpandedRows(prev => {
-            if (prev.includes(orderId)) {
-                return prev.filter(id => id !== orderId);
-            } else {
-                return [...prev, orderId];
-            }
+            if (prev.includes(groupId)) return prev.filter(id => id !== groupId);
+            return [...prev, groupId];
         });
 
-        if (!orderDetails[orderId]) {
-            try {
-                const items = await getOrderItems(orderId);
-                setOrderDetails(prev => ({ ...prev, [orderId]: items }));
-            } catch (e) {
-                console.error('Failed to load order items:', e);
+        const group = groupedOrders.find(g => g.id === groupId);
+        if (!group) return;
+
+        group.orders.forEach(async (order) => {
+            if (!orderDetails[order.id]) {
+                try {
+                    const items = await getOrderItems(order.id);
+                    setOrderDetails(prev => ({ ...prev, [order.id]: items }));
+                } catch (e) {
+                    console.error('Failed to load items', e);
+                }
             }
-        }
+        });
     }
 
     const handleExport = () => {
-        const exportData = filtered.map(o => ({
-            'Order #': o.id.split('-')[0].toUpperCase(),
-            'Date & Time': new Date(o.created_at + 'Z').toLocaleString(),
-            'Table': o.table_id || 'Takeout',
-            'Status': o.status,
-            'Total USD': (o.total_usd / 100).toFixed(2),
-            'Total KHR': o.total_khr.toLocaleString(),
+        const exportData = filtered.map(g => ({
+            'Session / Order #': g.id.split('-')[0].toUpperCase(),
+            'Date & Time': new Date(g.created_at + 'Z').toLocaleString(),
+            'Table': g.table_id || 'Takeout',
+            'Status': g.status === 'void' ? 'HOLD' : g.status,
+            'Total USD': (g.total_usd / 100).toFixed(2),
+            'Total KHR': g.total_khr.toLocaleString(),
+            'Total Rounds': g.orders.length,
         }));
 
         const ws = XLSX.utils.json_to_sheet(exportData);
@@ -134,8 +200,11 @@ export default function HistoryPage() {
     };
 
     // Stats
-    const completed = orders.filter(o => o.status === 'completed');
-    const totalRevenueCents = completed.reduce((s, o) => s + o.total_usd, 0);
+    const completed = groupedOrders.filter(g => g.status === 'completed');
+    const groupedAll = groupedOrders;
+    
+    // Total revenue is just the sum of completed groups
+    const totalRevenueCents = completed.reduce((s, g) => s + g.total_usd, 0);
 
     return (
         <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
@@ -190,9 +259,9 @@ export default function HistoryPage() {
             <div className="flex flex-wrap gap-3">
                 {[
                     { label: t('revenue'), value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
-                    { label: t('open'), value: String(orders.filter(o => o.status === 'open').length), accent: '#f97316' },
+                    { label: t('open'), value: String(groupedOrders.filter(g => g.status === 'open').length), accent: '#f97316' },
                     { label: t('completed'), value: String(completed.length), accent: '#22c55e' },
-                    { label: t('void'), value: String(orders.filter(o => o.status === 'void').length), accent: '#ef4444' },
+                    { label: 'HOLD', value: String(groupedOrders.filter(g => g.status === 'void').length), accent: '#ef4444' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
@@ -216,7 +285,7 @@ export default function HistoryPage() {
                             >
                                 {t(tab.labelKey)}
                                 <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-white/5'}`}>
-                                    {orders.filter(o => o.status === tab.id || tab.id === 'all').length}
+                                    {groupedOrders.filter(g => g.status === tab.id || tab.id === 'all').length}
                                 </span>
                             </button>
                         ))}
@@ -271,14 +340,14 @@ export default function HistoryPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filtered.map((o) => {
-                                        const isExpanded = expandedRows.includes(o.id);
-                                        const style = STATUS_STYLES[o.status] ?? STATUS_STYLES['cancelled'];
+                                    filtered.map((g) => {
+                                        const isExpanded = expandedRows.includes(g.id);
+                                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['void'];
                                         
                                         return (
-                                            <React.Fragment key={o.id}>
+                                            <React.Fragment key={g.id}>
                                                 <tr
-                                                    onClick={() => toggleRow(o.id)}
+                                                    onClick={() => toggleRow(g.id)}
                                                     className={`transition-all hover:bg-white/[0.03] cursor-pointer group ${isExpanded ? 'bg-white/[0.02]' : ''}`}
                                                 >
                                                     <td className="px-4 py-2.5">
@@ -287,20 +356,20 @@ export default function HistoryPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2.5 font-mono text-xs font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
-                                                        #{o.id.split('-')[0].toUpperCase()}
+                                                        {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
                                                     </td>
                                                     <td className="px-4 py-2.5">
-                                                        <div className="text-xs font-black mb-0.5">{new Date(o.created_at + 'Z').toLocaleDateString()}</div>
+                                                        <div className="text-xs font-black mb-0.5">{new Date(g.created_at + 'Z').toLocaleDateString()}</div>
                                                         <div className="text-[10px] font-bold font-mono opacity-40 flex items-center gap-1">
                                                             <Clock size={10} />
-                                                            {new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            {new Date(g.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2.5">
-                                                        {o.table_id ? (
+                                                        {g.table_id ? (
                                                             <span className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/20 text-[var(--accent)] w-fit uppercase tracking-widest">
                                                                 <TableProperties size={10} />
-                                                                {o.table_id}
+                                                                {g.table_id}
                                                             </span>
                                                         ) : (
                                                             <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">{t('takeout')}</span>
@@ -311,17 +380,17 @@ export default function HistoryPage() {
                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
                                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                         >
-                                                            {t(o.status as any)}
+                                                            {g.status === 'void' ? 'HOLD' : t(g.status as any)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: o.status === 'void' ? 'inherit' : 'var(--accent)' }}>
-                                                        <div className={o.status === 'void' ? 'line-through opacity-30 font-medium' : ''}>
-                                                            {formatUsd(o.total_usd)}
+                                                    <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: g.status === 'void' ? 'inherit' : 'var(--accent)' }}>
+                                                        <div className={g.status === 'void' ? 'line-through opacity-30 font-medium' : ''}>
+                                                            {formatUsd(g.total_usd)}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2.5 font-mono text-xs opacity-60 font-black">
-                                                        <div className={o.status === 'void' ? 'line-through opacity-20' : ''}>
-                                                            {formatKhr(o.total_khr)}
+                                                        <div className={g.status === 'void' ? 'line-through opacity-20' : ''}>
+                                                            {formatKhr(g.total_khr)}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -329,31 +398,32 @@ export default function HistoryPage() {
                                                 {isExpanded && (
                                                     <tr className="bg-black/30 animate-fade-in border-l-2 border-[var(--accent)]">
                                                         <td colSpan={7} className="px-5 py-4">
-                                                            <div className="space-y-3">
+                                                            <div className="space-y-4">
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="flex items-center gap-2">
                                                                         <ReceiptText size={14} className="text-[var(--accent)]" />
-                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">{t('itemizedAudit')}</h4>
+                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Master Table Receipt</h4>
                                                                     </div>
                                                                     <div className="flex items-center gap-4">
                                                                         <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                if (restaurant && orderDetails[o.id]) {
+                                                                                if (restaurant) {
+                                                                                    const allItems = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
                                                                                     printReceipt({
                                                                                         restaurant,
-                                                                                        orderId: o.id,
-                                                                                        tableId: o.table_id || undefined,
-                                                                                        customerName: o.customer_name,
-                                                                                        customerPhone: o.customer_phone,
-                                                                                        items: orderDetails[o.id],
+                                                                                        orderId: g.id,
+                                                                                        tableId: g.table_id || undefined,
+                                                                                        customerName: undefined,
+                                                                                        customerPhone: undefined,
+                                                                                        items: allItems,
                                                                                         payments: [],
                                                                                         totals: {
-                                                                                            subtotalCents: o.total_usd,
+                                                                                            subtotalCents: g.total_usd,
                                                                                             vatCents: 0,
                                                                                             pltCents: 0,
-                                                                                            totalUsdCents: o.total_usd,
-                                                                                            totalKhr: o.total_khr
+                                                                                            totalUsdCents: g.total_usd,
+                                                                                            totalKhr: g.total_khr
                                                                                         }
                                                                                     });
                                                                                 }
@@ -361,36 +431,46 @@ export default function HistoryPage() {
                                                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
                                                                         >
                                                                             <ReceiptText size={12} />
-                                                                            Print Receipt
+                                                                            Print Master Receipt
                                                                         </button>
                                                                     </div>
                                                                 </div>
                                                                 
-                                                                {orderDetails[o.id] ? (
-                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                                                        {orderDetails[o.id].map(item => (
-                                                                            <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] px-3 py-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--accent)]/30 transition-all">
-                                                                                <div className="flex items-center gap-3">
-                                                                                    <div className="w-8 h-8 rounded-lg bg-black border border-white/5 flex items-center justify-center font-black text-[var(--accent)] text-xs flex-shrink-0">
-                                                                                        {item.quantity}x
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <p className="text-xs font-black text-white leading-tight">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
-                                                                                        <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{formatUsd(item.price_at_order)} / unit</p>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="text-right flex-shrink-0">
-                                                                                    <p className="text-xs font-black text-white">{formatUsd(item.price_at_order * item.quantity)}</p>
-                                                                                </div>
+                                                                <div className="space-y-3">
+                                                                    {g.orders.map((o, index) => (
+                                                                        <div key={o.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3">
+                                                                            <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2 text-[10px] font-black uppercase tracking-widest opacity-60">
+                                                                                <span>{g.table_id ? `Round ${index + 1}` : 'Order Segment'} - #{o.id.split('-')[0].toUpperCase()}</span>
+                                                                                <span>{new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                                             </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex flex-col items-center justify-center py-10 gap-4 opacity-30">
-                                                                        <RefreshCw size={24} className="animate-spin" />
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest">{t('compilingDetails')}</span>
-                                                                    </div>
-                                                                )}
+                                                                            
+                                                                            {orderDetails[o.id] ? (
+                                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                                    {orderDetails[o.id].map(item => (
+                                                                                        <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] px-3 py-2.5 rounded-lg border border-[var(--border)] transition-all">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded bg-black border border-white/5 flex items-center justify-center font-black text-[var(--accent)] text-xs flex-shrink-0">
+                                                                                                    {item.quantity}x
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <p className="text-xs font-black text-white leading-tight">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
+                                                                                                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{formatUsd(item.price_at_order)} / unit</p>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="text-right flex-shrink-0">
+                                                                                                <p className="text-xs font-black text-[var(--foreground)]">{formatUsd(item.price_at_order * item.quantity)}</p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="flex items-center justify-center p-4">
+                                                                                    <RefreshCw size={14} className="animate-spin opacity-30" />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -412,13 +492,15 @@ export default function HistoryPage() {
                     </div>
                 ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
-                    {filtered.map(o => {
-                        const style = STATUS_STYLES[o.status] ?? STATUS_STYLES['void'];
-                        const items = orderDetails[o.id];
-                        const dt = new Date(o.created_at + 'Z');
+                    {filtered.map(g => {
+                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['void'];
+                        const items = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
+                        const isLoaded = g.orders.every(o => orderDetails[o.id] !== undefined);
+                        
+                        const dt = new Date(g.created_at + 'Z');
                         return (
                             <div
-                                key={o.id}
+                                key={g.id}
                                 className="flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)]/40 transition-all shadow-xl"
                             >
                                 {/* Receipt tape top */}
@@ -434,19 +516,19 @@ export default function HistoryPage() {
                                             className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                         >
-                                            {t(o.status as any)}
+                                            {g.status === 'void' ? 'HOLD' : t(g.status as any)}
                                         </span>
-                                        {o.table_id ? (
+                                        {g.table_id ? (
                                             <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
                                                 <TableProperties size={9} />
-                                                {o.table_id}
+                                                {g.table_id}
                                             </span>
                                         ) : (
                                             <span className="text-[9px] font-black opacity-25 uppercase tracking-widest">{t('takeout')}</span>
                                         )}
                                     </div>
                                     <p className="font-mono text-xs font-black text-[var(--accent)] tracking-widest">
-                                        #{o.id.split('-')[0].toUpperCase()}
+                                        {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
                                     </p>
                                     <div className="flex items-center gap-1.5 mt-1 text-[var(--text-secondary)] opacity-50">
                                         <Clock size={10} />
@@ -454,29 +536,43 @@ export default function HistoryPage() {
                                             {dt.toLocaleDateString()} · {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
+                                    <div className="mt-2 text-[9px] font-black opacity-30 uppercase tracking-[0.1em]">
+                                        {g.orders.length} Rounds
+                                    </div>
                                 </div>
 
                                 {/* Items */}
                                 <div className="flex-1 px-4 py-3 space-y-1.5 min-h-[80px]">
-                                    {items ? (
+                                    {isLoaded ? (
                                         items.length === 0 ? (
                                             <p className="text-[10px] opacity-20 font-black uppercase tracking-widest text-center py-2">{t('emptyOrder')}</p>
                                         ) : (
-                                            items.map(item => (
-                                                <div key={item.id} className="flex items-center justify-between text-[11px]">
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <span className="font-mono font-black text-[var(--accent)] w-7 text-right flex-shrink-0">
-                                                            {item.quantity}×
-                                                        </span>
-                                                        <span className="font-medium truncate text-[var(--foreground)] opacity-80">
-                                                            {lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
+                                            items.slice(0, 10).map((item, idx) => (
+                                                <div key={item.product_id} className="flex flex-col mb-2 last:mb-0">
+                                                    <div className="flex items-start justify-between text-[11px]">
+                                                        <div className="flex items-start gap-2 min-w-0">
+                                                            <span className="font-mono font-black text-[var(--accent)] w-7 text-right flex-shrink-0 mt-0.5">
+                                                                {item.quantity}×
+                                                            </span>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="font-medium truncate text-[var(--foreground)] opacity-90">
+                                                                    {lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
+                                                                </span>
+                                                                <span className="text-[9px] font-mono opacity-40 mt-0.5">
+                                                                    {formatUsd(item.price_at_order)} / unit
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <span className="font-mono font-black text-[var(--foreground)] opacity-90 flex-shrink-0 ml-2 mt-0.5">
+                                                            {formatUsd(item.price_at_order * item.quantity)}
                                                         </span>
                                                     </div>
-                                                    <span className="font-mono font-black text-[var(--foreground)] opacity-70 flex-shrink-0 ml-2">
-                                                        {formatUsd(item.price_at_order * item.quantity)}
-                                                    </span>
                                                 </div>
-                                            ))
+                                            )).concat(items.length > 10 ? [
+                                                <div key="more" className="text-center pt-2 text-[9px] font-black uppercase opacity-30">
+                                                    + {items.length - 10} more items
+                                                </div>
+                                            ] : [])
                                         )
                                     ) : (
                                         <div className="flex items-center justify-center py-4 opacity-25">
@@ -491,17 +587,17 @@ export default function HistoryPage() {
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('total')}</span>
                                         <span
                                             className="font-mono font-black text-sm"
-                                            style={{ color: o.status === 'void' ? undefined : 'var(--accent)' }}
+                                            style={{ color: g.status === 'void' ? undefined : 'var(--accent)' }}
                                         >
-                                            <span className={o.status === 'void' ? 'line-through opacity-30' : ''}>
-                                                {formatUsd(o.total_usd)}
+                                            <span className={g.status === 'void' ? 'line-through opacity-30' : ''}>
+                                                {formatUsd(g.total_usd)}
                                             </span>
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-25">{t('khr')}</span>
-                                        <span className={`font-mono text-[10px] font-bold opacity-40 ${o.status === 'void' ? 'line-through' : ''}`}>
-                                            {formatKhr(o.total_khr)}
+                                        <span className={`font-mono text-[10px] font-bold opacity-40 ${g.status === 'void' ? 'line-through' : ''}`}>
+                                            {formatKhr(g.total_khr)}
                                         </span>
                                     </div>
                                 </div>
@@ -510,26 +606,26 @@ export default function HistoryPage() {
                                 <div className="px-3 pb-3">
                                     <button
                                         onClick={() => {
-                                            if (restaurant && items) {
+                                            if (restaurant && isLoaded) {
                                                 printReceipt({
                                                     restaurant,
-                                                    orderId: o.id,
-                                                    tableId: o.table_id || undefined,
-                                                    customerName: o.customer_name,
-                                                    customerPhone: o.customer_phone,
+                                                    orderId: g.id,
+                                                    tableId: g.table_id || undefined,
+                                                    customerName: undefined,
+                                                    customerPhone: undefined,
                                                     items,
                                                     payments: [],
                                                     totals: {
-                                                        subtotalCents: o.total_usd,
+                                                        subtotalCents: g.total_usd,
                                                         vatCents: 0,
                                                         pltCents: 0,
-                                                        totalUsdCents: o.total_usd,
-                                                        totalKhr: o.total_khr
+                                                        totalUsdCents: g.total_usd,
+                                                        totalKhr: g.total_khr
                                                     }
                                                 });
                                             }
                                         }}
-                                        disabled={!items || !restaurant}
+                                        disabled={!isLoaded || !restaurant}
                                         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         <Printer size={11} strokeWidth={2.5} />

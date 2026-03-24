@@ -71,17 +71,19 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
   <title>Receipt</title>
   <style>
     @page {
-      size: 72mm auto;
-      margin: 4mm 3mm;
+      size: 58mm auto;
+      margin: 0;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; }
     body {
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       color: #000;
       background: #fff;
-      width: 66mm;
-      margin: 0 auto;
+      width: 58mm;
+      margin: 0;
+      padding: 2mm 1mm;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -141,7 +143,8 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     .footer .brand { font-size: 8px; color: #aaa; letter-spacing: 0.15em; text-transform: uppercase; margin-top: 6px; }
 
     @media screen {
-      body { width: 300px; padding: 12px; box-shadow: 0 2px 20px rgba(0,0,0,.15); border: 1px solid #e5e5e5; }
+      body { max-width: 250px; padding: 12px 10px; }
+      html { background: #fff; }
     }
   </style>
 </head>
