@@ -10,13 +10,14 @@ use std::sync::Arc;
 #[tauri::command]
 async fn trigger_sync(
     restaurant_id: String,
+    app_handle: tauri::AppHandle,
     local: tauri::State<'_, Arc<libsql::Connection>>,
     remote: tauri::State<'_, RemoteDb>,
 ) -> Result<(), String> {
     if let Some(remote_conn) = &remote.0 {
         let local_arc  = Arc::clone(&*local);
         let remote_arc = Arc::clone(remote_conn);
-        db::start_sync_daemon(local_arc, remote_arc, restaurant_id);
+        db::start_sync_daemon(app_handle, local_arc, remote_arc, restaurant_id);
         Ok(())
     } else {
         // No remote — silently succeed (offline mode)

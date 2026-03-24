@@ -11,6 +11,7 @@
 
 use libsql::{Connection, params};
 use std::sync::Arc;
+use tauri::Emitter;
 
 /// Epoch start — used on first-ever sync to download everything
 const EPOCH: &str = "1970-01-01 00:00:00";
@@ -129,6 +130,7 @@ pub async fn pull_table(
         ),
     };
 
+    println!("[Sync] Pulling table={} since={}", table, since);
     let mut rows = match mode {
         SyncMode::NoFilter => remote.query(&sql, [since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?,
         _ => remote.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?,
@@ -220,6 +222,9 @@ pub async fn push_table(
         }
     }
 
+    if count > 0 {
+        println!("[Sync] Table={} Pushed {} rows", table, count);
+    }
     Ok(count)
 }
 
@@ -240,15 +245,18 @@ async fn get_columns(conn: &Connection, table: &str) -> Vec<String> {
 }
 
 /// Run a full sync cycle (push then pull) for a restaurant.
-/// Returns total rows synced.
 pub async fn sync_restaurant(
-    local: &Arc<Connection>,
-    remote: &Arc<Connection>,
+    handle: &tauri::AppHandle,
+    local: &Connection,
+    remote: &Connection,
     restaurant_id: &str,
 ) -> usize {
+    let _ = handle.emit("dineos:sync-start", ());
+    
     // 1. Connectivity Check
     if let Err(_) = remote.execute("SELECT 1", ()).await {
         println!("[Sync] Offline mode: restaurant={} (remote unreachable)", restaurant_id);
+        let _ = handle.emit("dineos:sync-end", ());
         return 0;
     }
 
@@ -258,6 +266,12 @@ pub async fn sync_restaurant(
     let mut total = 0;
 
     for (table, pk, mode) in RESTAURANT_TABLES {
+        println!("[Sync] Scanning table={} since={} restaurant={}", table, since, restaurant_id);
+        // The user's provided snippet for `let mut rows = match local.query(` was incomplete.
+        // Assuming it was meant to be a placeholder for a query related to scanning.
+        // For now, I'm just inserting the `println!` as requested by "Add scan log before the query."
+        // and keeping the original `push_table` call.
+        // If the user intended a specific query here, they would need to provide the full query.
         // Push local → remote
         match push_table(local, remote, table, pk, *mode, restaurant_id, &since).await {
             Ok(n) => total += n,
@@ -291,6 +305,7 @@ pub async fn sync_restaurant(
         println!("[Sync] Heartbeat: restaurant={} is up to date.", restaurant_id);
     }
     set_last_sync_at(local, restaurant_id, &now).await;
+    let _ = handle.emit("dineos:sync-end", ());
     total
 }
 

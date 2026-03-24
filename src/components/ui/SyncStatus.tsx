@@ -73,19 +73,25 @@ export function SyncStatus() {
         window.addEventListener('offline', goOffline);
         window.addEventListener('online',  goOnline);
 
-        // Custom events dispatched by write operations
+        // Custom events dispatched by write operations (local)
         const startSync = () => {
             if (syncingTimerRef.current) clearTimeout(syncingTimerRef.current);
             setState('syncing');
         };
         const endSync = () => {
-            // Show syncing for at least 1.5 s so user can see it
-            syncingTimerRef.current = setTimeout(() => {
-                checkStatus();
-            }, 1500);
+            syncingTimerRef.current = setTimeout(() => checkStatus(), 1500);
         };
         window.addEventListener('dineos:sync-start', startSync);
         window.addEventListener('dineos:sync-end',   endSync);
+
+        // --- Tauri Backend Listeners ---
+        let unlistenStart: (() => void) | null = null;
+        let unlistenEnd: (() => void) | null = null;
+
+        import('@tauri-apps/api/event').then(({ listen }) => {
+            listen('dineos:sync-start', startSync).then(u => unlistenStart = u);
+            listen('dineos:sync-end',   endSync).then(u => unlistenEnd = u);
+        });
 
         return () => {
             if (pollRef.current)   clearInterval(pollRef.current);
@@ -94,6 +100,8 @@ export function SyncStatus() {
             window.removeEventListener('online',  goOnline);
             window.removeEventListener('dineos:sync-start', startSync);
             window.removeEventListener('dineos:sync-end',   endSync);
+            if (unlistenStart) unlistenStart();
+            if (unlistenEnd)   unlistenEnd();
         };
     }, []);
 

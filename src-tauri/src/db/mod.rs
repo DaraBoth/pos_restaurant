@@ -209,6 +209,7 @@ pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<(Arc<Connec
 /// Start the background per-restaurant sync daemon.
 /// Called from lib.rs after login sets the restaurant_id.
 pub fn start_sync_daemon(
+    handle: tauri::AppHandle,
     local: Arc<Connection>,
     remote: Arc<Connection>,
     restaurant_id: String,
@@ -216,20 +217,15 @@ pub fn start_sync_daemon(
     spawn(async move {
         println!("[Sync] Daemon started for restaurant={}", restaurant_id);
 
-        // Apply migrations to remote DB safely on this tokio worker thread (avoids 1MB main stack overflow)
-        if let Err(e) = apply_migrations(&remote).await {
-            eprintln!("[DB] Remote Migration error: {}", e);
-        }
+        // Apply migrations to remote
+        let _ = apply_migrations(&remote).await;
         ensure_critical_columns(&remote).await;
         sync::ensure_sync_table(&remote).await;
 
-        // Initial sync immediately
-        sync::sync_restaurant(&local, &remote, &restaurant_id).await;
-
-        // Then every 5 seconds
         loop {
-            sleep(Duration::from_secs(5)).await;
-            sync::sync_restaurant(&local, &remote, &restaurant_id).await;
+            // Use the handle to emit events or just pass to sync_restaurant
+            sync::sync_restaurant(&handle, &local, &remote, &restaurant_id).await;
+            sleep(Duration::from_secs(30)).await;
         }
     });
 }
