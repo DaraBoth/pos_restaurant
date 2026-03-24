@@ -53,6 +53,7 @@ pub async fn create_user(
     role: String,
     full_name: Option<String>,
     khmer_name: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let salt = SaltString::generate(&mut OsRng);
@@ -60,13 +61,14 @@ pub async fn create_user(
         .hash_password(password.as_bytes(), &salt)
         .map_err(|e| format!("Hash error: {}", e))?
         .to_string();
-
+ 
     let id = uuid::Uuid::new_v4().to_string();
     pool.execute(
         "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name)
-         VALUES (?, 'rest-00000000-0000-0000-0000-000000000001', ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
         params![
             id.clone(),
+            restaurant_id,
             username,
             hash,
             role,
@@ -76,16 +78,16 @@ pub async fn create_user(
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
-
+ 
     Ok(id)
 }
 
 #[tauri::command]
-pub async fn get_users(pool: State<'_, Arc<Connection>>) -> Result<Vec<User>, String> {
+pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<Vec<User>, String> {
     let mut rows = pool.query(
         "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at
-         FROM users WHERE is_deleted = 0 ORDER BY role, username",
-        ()
+         FROM users WHERE is_deleted = 0 AND restaurant_id = ? ORDER BY role, username",
+        params![restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -109,10 +111,10 @@ pub async fn get_users(pool: State<'_, Arc<Connection>>) -> Result<Vec<User>, St
 }
 
 #[tauri::command]
-pub async fn delete_user(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_user(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
     pool.execute(
-        "UPDATE users SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?",
-        params![id]
+        "UPDATE users SET is_deleted = 1, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
+        params![id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -126,6 +128,7 @@ pub async fn update_user(
     role: String,
     full_name: Option<String>,
     khmer_name: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     if let Some(pwd) = password {
@@ -136,25 +139,27 @@ pub async fn update_user(
             .to_string();
 
         pool.execute(
-            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
             params![
                 hash,
                 role,
                 full_name.unwrap_or_default(),
                 khmer_name.unwrap_or_default(),
-                id
+                id,
+                restaurant_id
             ]
         )
         .await
         .map_err(|e| format!("Database error: {}", e))?;
     } else {
         pool.execute(
-            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
             params![
                 role,
                 full_name.unwrap_or_default(),
                 khmer_name.unwrap_or_default(),
-                id
+                id,
+                restaurant_id
             ]
         )
         .await
@@ -399,4 +404,20 @@ pub async fn superadmin_get_all_users(
     }
     
     Ok(list)
+}
+
+#[tauri::command]
+pub async fn superadmin_move_user(
+    user_id: String,
+    new_restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE users SET restaurant_id = ?, updated_at = datetime('now') WHERE id = ?",
+        params![new_restaurant_id, user_id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(())
 }

@@ -11,17 +11,24 @@ export const triggerSync = (restaurantId: string) =>
 
 export const createUser = (
     username: string, password: string, role: string,
-    full_name?: string, khmer_name?: string
-) => call<string>('create_user', { username, password, role, fullName: full_name, khmerName: khmer_name });
+    restaurantId: string, full_name?: string, khmer_name?: string
+) => call<string>('create_user', { 
+    username, password, role, restaurantId, 
+    fullName: full_name, khmerName: khmer_name 
+});
 
-export const getUsers = () => call<UserSession[]>('get_users');
+export const getUsers = (restaurantId: string) => call<UserSession[]>('get_users', { restaurantId });
 
 export const updateUser = (
     id: string, password: string | undefined, role: string,
-    full_name?: string, khmer_name?: string
-) => call<void>('update_user', { id, password, role, fullName: full_name, khmerName: khmer_name });
+    restaurantId: string, full_name?: string, khmer_name?: string
+) => call<void>('update_user', { 
+    id, password, role, restaurantId, 
+    fullName: full_name, khmerName: khmer_name 
+});
 
-export const deleteUser = (id: string) => call<void>('delete_user', { id });
+export const deleteUser = (id: string, restaurantId: string) => 
+    call<void>('delete_user', { id, restaurantId });
 
 export const listAllRestaurants = () =>
     call<RestaurantSummary[]>('list_all_restaurants');
@@ -78,3 +85,6 @@ export interface SuperadminUserView {
 
 export const superadminGetAllUsers = () =>
     call<SuperadminUserView[]>('superadmin_get_all_users');
+
+export const superadminMoveUser = (params: { userId: string; newRestaurantId: string }) =>
+    call<void>('superadmin_move_user', { userId: params.userId, newRestaurantId: params.newRestaurantId });

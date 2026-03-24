@@ -58,9 +58,10 @@ CREATE TABLE IF NOT EXISTS products (
     name        TEXT NOT NULL,
     khmer_name  TEXT,
     price_cents INTEGER NOT NULL,
-    image_url   TEXT,
+    image_path   TEXT,
     is_available INTEGER NOT NULL DEFAULT 1,
     is_deleted  INTEGER NOT NULL DEFAULT 0,
+    stock_quantity INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT DEFAULT (datetime('now')),
     restaurant_id TEXT REFERENCES restaurants(id)
@@ -160,13 +161,17 @@ CREATE TABLE IF NOT EXISTS product_ingredients (
 CREATE TABLE IF NOT EXISTS inventory_logs (
     id TEXT PRIMARY KEY,
     inventory_item_id TEXT REFERENCES inventory_items(id) ON DELETE CASCADE,
-    change_type TEXT NOT NULL,  -- 'add', 'deduct', 'set', 'correction'
-    quantity_change INTEGER NOT NULL,
-    current_stock INTEGER NOT NULL,
-    note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT,
-    restaurant_id TEXT REFERENCES restaurants(id)
+    product_id        TEXT REFERENCES products(id) ON DELETE CASCADE,
+    user_id           TEXT REFERENCES users(id) ON DELETE CASCADE,
+    change_type       TEXT NOT NULL,  -- 'add', 'deduct', 'set', 'correction'
+    quantity_change   INTEGER NOT NULL,
+    change_amount     INTEGER NOT NULL DEFAULT 0, -- Matches products.rs
+    reason            TEXT,                       -- Matches products.rs
+    current_stock     INTEGER NOT NULL DEFAULT 0,
+    note              TEXT,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT,
+    restaurant_id     TEXT REFERENCES restaurants(id)
 );
 
 -- Indexes for performance

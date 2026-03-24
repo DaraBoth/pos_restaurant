@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight } from 'lucide-react';
-import { getRestaurant, RestaurantInput, updateRestaurant } from '@/lib/tauri-commands';
+import { getRestaurant, updateRestaurant } from '@/lib/api/restaurant';
+import type { RestaurantInput } from '@/types';
+import { useAuth } from '@/providers/AuthProvider';
 
 const DEFAULT: RestaurantInput = {
     name: '',
@@ -72,6 +74,8 @@ function FormField({ label, value, placeholder, icon: Icon, multiline, onChange 
 }
 
 export default function RestaurantSettingsForm({ mode, onSaved, onNext }: RestaurantSettingsFormProps) {
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [info, setInfo] = useState<RestaurantInput>(DEFAULT);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -82,7 +86,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
 
         async function loadRestaurant() {
             try {
-                const restaurant = await getRestaurant();
+                const restaurant = await getRestaurant(restaurantId || undefined);
                 if (!cancelled) {
                     const loadedInfo = {
                         name: restaurant.name || '',
@@ -152,7 +156,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
 
         setSaving(true);
         try {
-            await updateRestaurant(info);
+            await updateRestaurant(info, restaurantId || undefined);
             setSaved(true);
             onSaved?.();
             setTimeout(() => setSaved(false), 2500);

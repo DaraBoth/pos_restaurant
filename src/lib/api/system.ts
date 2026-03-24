@@ -1,9 +1,10 @@
 import { call } from './client';
 import type { ExchangeRate, DbStatus } from '@/types';
 
-export const getExchangeRate = () => call<ExchangeRate>('get_exchange_rate');
+export const getExchangeRate = (restaurant_id?: string) => 
+    call<ExchangeRate>('get_exchange_rate', { restaurantId: restaurant_id });
 
-export const setExchangeRate = (rate: number) =>
-    call<ExchangeRate>('set_exchange_rate', { rate });
+export const setExchangeRate = (rate: number, restaurant_id?: string) =>
+    call<ExchangeRate>('set_exchange_rate', { rate, restaurantId: restaurant_id });
 
 export const getDbStatus = () => call<DbStatus>('get_db_status');

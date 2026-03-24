@@ -1,6 +1,9 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getOrders, Order, getOrderItems, OrderItem, getRestaurant, Restaurant } from '@/lib/tauri-commands';
+import { getOrders, getOrderItems } from '@/lib/api/orders';
+import { getRestaurant } from '@/lib/api/restaurant';
+import { Order, OrderItem, Restaurant } from '@/types';
+import { useAuth } from '@/providers/AuthProvider';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { printReceipt } from '@/lib/receipt';
 import { 
@@ -51,6 +54,8 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
 
 export default function HistoryPage() {
     const { t, lang } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
@@ -81,8 +86,7 @@ export default function HistoryPage() {
     async function loadOrders() {
         setLoading(true);
         try {
-            // Using the backend filtering if available, else filter locally for now
-            const data = await getOrders(undefined, startDate, endDate);
+            const data = await getOrders(undefined, startDate, endDate, restaurantId || '');
             setOrders(data.sort((a, b) =>
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             ));
@@ -144,7 +148,7 @@ export default function HistoryPage() {
         toLoad.forEach(o => loadingItemsRef.current.add(o.id));
         Promise.all(
             toLoad.map(o =>
-                getOrderItems(o.id)
+                getOrderItems(o.id, restaurantId || '')
                     .then(items => ({ id: o.id, items }))
                     .catch(() => ({ id: o.id, items: [] as OrderItem[] }))
             )
@@ -171,7 +175,7 @@ export default function HistoryPage() {
         group.orders.forEach(async (order) => {
             if (!orderDetails[order.id]) {
                 try {
-                    const items = await getOrderItems(order.id);
+                    const items = await getOrderItems(order.id, restaurantId || '');
                     setOrderDetails(prev => ({ ...prev, [order.id]: items }));
                 } catch (e) {
                     console.error('Failed to load items', e);

@@ -70,6 +70,7 @@ pub fn run() {
             commands::auth::superadmin_update_admin,
             commands::auth::update_superadmin_profile,
             commands::auth::superadmin_get_all_users,
+            commands::auth::superadmin_move_user,
             commands::restaurant::get_restaurant,
             commands::restaurant::get_setup_status,
             commands::restaurant::update_restaurant,

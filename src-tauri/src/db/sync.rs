@@ -96,8 +96,11 @@ pub async fn pull_table(
     restaurant_id: &str,
     since: &str,
 ) -> anyhow::Result<usize> {
-    // Get column list for this table from local PRAGMA
-    let cols = get_columns(local, table).await;
+    // Get common column list (exists in both local and remote)
+    let local_cols  = get_columns(local, table).await;
+    let remote_cols = get_columns(remote, table).await;
+    let cols: Vec<String> = local_cols.into_iter().filter(|c| remote_cols.contains(c)).collect();
+
     if cols.is_empty() {
         return Ok(0);
     }
@@ -121,14 +124,14 @@ pub async fn pull_table(
             prefixed_cols, table, table, table
         ),
         SyncMode::NoFilter => format!(
-            "SELECT {} FROM {} WHERE updated_at > 'EPOCH_PLACEHOLDER'",
+            "SELECT {} FROM {} WHERE updated_at > ?",
             col_list, table
-        ).replace("EPOCH_PLACEHOLDER", since),
+        ),
     };
 
     let mut rows = match mode {
-        SyncMode::NoFilter => remote.query(&sql, ()).await?,
-        _ => remote.query(&sql, params![restaurant_id, since]).await?,
+        SyncMode::NoFilter => remote.query(&sql, [since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?,
+        _ => remote.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?,
     };
 
     let upsert = format!(
@@ -163,7 +166,11 @@ pub async fn push_table(
     restaurant_id: &str,
     since: &str,
 ) -> anyhow::Result<usize> {
-    let cols = get_columns(local, table).await;
+    // Get common columns
+    let local_cols  = get_columns(local, table).await;
+    let remote_cols = get_columns(remote, table).await;
+    let cols: Vec<String> = local_cols.into_iter().filter(|c| remote_cols.contains(c)).collect();
+
     if cols.is_empty() { return Ok(0); }
 
     let col_list = cols.join(", ");
@@ -191,8 +198,8 @@ pub async fn push_table(
     };
 
     let mut rows = match mode {
-        SyncMode::NoFilter => local.query(&sql, [since]).await?,
-        _ => local.query(&sql, params![restaurant_id, since]).await?,
+        SyncMode::NoFilter => local.query(&sql, [since]).await.map_err(|e| anyhow::anyhow!("Local query failed: {}", e))?,
+        _ => local.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Local query failed: {}", e))?,
     };
 
     let upsert = format!(
@@ -239,6 +246,12 @@ pub async fn sync_restaurant(
     remote: &Arc<Connection>,
     restaurant_id: &str,
 ) -> usize {
+    // 1. Connectivity Check
+    if let Err(_) = remote.execute("SELECT 1", ()).await {
+        println!("[Sync] Offline mode: restaurant={} (remote unreachable)", restaurant_id);
+        return 0;
+    }
+
     let since = get_last_sync_at(local, restaurant_id).await;
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
 
@@ -248,12 +261,26 @@ pub async fn sync_restaurant(
         // Push local → remote
         match push_table(local, remote, table, pk, *mode, restaurant_id, &since).await {
             Ok(n) => total += n,
-            Err(e) => eprintln!("[Sync] Push {} error: {}", table, e),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("Hrana") || msg.contains("stream error") {
+                    println!("[Sync] Connection lost during push on table {}", table);
+                    return total; // Abort cycle
+                }
+                eprintln!("[Sync] Push {} error: {}", table, e);
+            }
         }
         // Pull remote → local
         match pull_table(remote, local, table, pk, *mode, restaurant_id, &since).await {
             Ok(n) => total += n,
-            Err(e) => eprintln!("[Sync] Pull {} error: {}", table, e),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("Hrana") || msg.contains("stream error") {
+                    println!("[Sync] Connection lost during pull on table {}", table);
+                    return total; // Abort cycle
+                }
+                eprintln!("[Sync] Pull {} error: {}", table, e);
+            }
         }
     }
 
@@ -261,7 +288,7 @@ pub async fn sync_restaurant(
         println!("[Sync] restaurant={} synced {} rows (since {})", restaurant_id, total, since);
     } else {
         // Minimal heartbeat to show it's alive
-        println!("[Sync] Heartbeat: restaurant={} is up to date (no new changes).", restaurant_id);
+        println!("[Sync] Heartbeat: restaurant={} is up to date.", restaurant_id);
     }
     set_last_sync_at(local, restaurant_id, &now).await;
     total

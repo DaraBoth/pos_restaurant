@@ -34,13 +34,14 @@ fn round_khr(usd_cents: i64, rate: f64) -> i64 {
 pub async fn create_order(
     user_id: String,
     table_id: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let mut session_id = None;
     let mut round_number = 1;
 
     if let Some(table_name) = &table_id {
-        let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ?", params![table_name.clone()]).await.map_err(|e| e.to_string())?;
+        let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ? AND restaurant_id = ?", params![table_name.clone(), restaurant_id.clone()]).await.map_err(|e| e.to_string())?;
         
         let real_table_id = if let Some(trow) = trows.next().await.map_err(|e| e.to_string())? {
             trow.get::<String>(0).unwrap_or_default()
@@ -49,8 +50,8 @@ pub async fn create_order(
         };
 
         let mut rows = pool.query(
-            "SELECT id FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1",
-            params![table_name.clone()]
+            "SELECT id FROM orders WHERE table_id = ? AND restaurant_id = ? AND status = 'open' AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1",
+            params![table_name.clone(), restaurant_id.clone()]
         ).await.map_err(|e| format!("Query open orders error: {}", e))?;
 
         if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -58,8 +59,8 @@ pub async fn create_order(
         }
 
         let mut session_rows = pool.query(
-            "SELECT id FROM table_sessions WHERE (table_id = ? OR table_id = ?) AND status = 'active'",
-            params![real_table_id.clone(), table_name.clone()]
+            "SELECT id FROM table_sessions WHERE (table_id = ? OR table_id = ?) AND restaurant_id = ? AND status = 'active'",
+            params![real_table_id.clone(), table_name.clone(), restaurant_id.clone()]
         ).await.map_err(|e| format!("Query active sessions error: {}", e))?;
 
         if let Some(s_row) = session_rows.next().await.map_err(|e| e.to_string())? {
@@ -78,7 +79,8 @@ pub async fn create_order(
             }
         } else {
             let sid = uuid::Uuid::new_v4().to_string();
-            pool.execute("INSERT INTO table_sessions (id, table_id, status) VALUES (?, ?, 'active')", params![sid.clone(), real_table_id.clone()]).await.map_err(|e| format!("Insert table_sessions error (sid={}, table_id={}): {}", sid, real_table_id, e))?;
+            pool.execute("INSERT INTO table_sessions (id, table_id, status, restaurant_id) VALUES (?, ?, 'active', ?)", 
+                         params![sid.clone(), real_table_id.clone(), restaurant_id.clone()]).await.map_err(|e| format!("Insert table_sessions error (sid={}, table_id={}): {}", sid, real_table_id, e))?;
             session_id = Some(sid);
         }
     }
@@ -88,15 +90,15 @@ pub async fn create_order(
     let table_id_val = table_id.clone().unwrap_or_default();
     let session_id_val = session_id.unwrap_or_default();
     pool.execute(
-        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 'open')",
-        params![id.clone(), user_id.clone(), table_id_val.clone(), session_id_val.clone(), round_number]
+        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status, restaurant_id) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 'open', ?)",
+        params![id.clone(), user_id.clone(), table_id_val.clone(), session_id_val.clone(), round_number, restaurant_id.clone()]
     ).await.map_err(|e| format!("Insert orders error (id={}, user_id={}, table_id={}, session_id={}): {}", id, user_id, table_id_val, session_id_val, e))?;
 
     if let Some(table_name) = &table_id {
-        let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ?", params![table_name.clone()]).await.map_err(|e| e.to_string())?;
+        let mut trows = pool.query("SELECT id FROM floor_tables WHERE name = ? AND restaurant_id = ?", params![table_name.clone(), restaurant_id.clone()]).await.map_err(|e| e.to_string())?;
         if let Some(trow) = trows.next().await.map_err(|e| e.to_string())? {
             let real_tid = trow.get::<String>(0).unwrap_or_default();
-            set_table_status(&real_tid, "busy", &pool).await?;
+            set_table_status(&real_tid, "busy", &restaurant_id, &pool).await?;
         }
     }
 
@@ -109,11 +111,23 @@ pub async fn add_order_item(
     product_id: String,
     quantity: i64,
     note: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<OrderItem, String> {
+    // 1. Verify order belongs to restaurant
+    let mut ord_rows = pool.query(
+        "SELECT id FROM orders WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![order_id.clone(), restaurant_id.clone()]
+    ).await.map_err(|e| e.to_string())?;
+    
+    if ord_rows.next().await.map_err(|e| e.to_string())?.is_none() {
+        return Err("Order not found or access denied".to_string());
+    }
+
+    // 2. Verify product belongs to restaurant
     let mut prod_rows = pool.query(
-        "SELECT price_cents, name, khmer_name FROM products WHERE id = ? AND is_deleted = 0",
-        params![product_id.clone()]
+        "SELECT price_cents, name, khmer_name FROM products WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![product_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let prod_row = prod_rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Product not found".to_string())?;
@@ -121,9 +135,13 @@ pub async fn add_order_item(
     let p_name = prod_row.get::<String>(1).unwrap_or_default();
     let p_khmer = prod_row.get::<String>(2).ok();
 
+    // 3. Update existing item if pending
     let mut ext_rows = pool.query(
-        "SELECT id, quantity FROM order_items WHERE order_id = ? AND product_id = ? AND is_deleted = 0 AND kitchen_status = 'pending'",
-        params![order_id.clone(), product_id.clone()]
+        "SELECT oi.id, oi.quantity FROM order_items oi 
+         JOIN orders o ON oi.order_id = o.id
+         WHERE oi.order_id = ? AND oi.product_id = ? AND oi.is_deleted = 0 
+           AND oi.kitchen_status = 'pending' AND o.restaurant_id = ?",
+        params![order_id.clone(), product_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     if let Some(ext_row) = ext_rows.next().await.map_err(|e| e.to_string())? {
@@ -131,10 +149,14 @@ pub async fn add_order_item(
         let current_qty = ext_row.get::<i64>(1).unwrap_or(0);
         let new_qty = current_qty + quantity;
         
-        pool.execute("UPDATE order_items SET quantity = ? WHERE id = ?", params![new_qty, existing_id.clone()])
+        pool.execute(
+            "UPDATE order_items SET quantity = ? 
+             WHERE id = ? AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
+            params![new_qty, existing_id.clone(), restaurant_id.clone()]
+        )
             .await.map_err(|e| format!("Database error: {}", e))?;
 
-        recalculate_order_totals(&order_id, &pool).await?;
+        recalculate_order_totals(&order_id, &restaurant_id, &pool).await?;
 
         return Ok(OrderItem {
             id: existing_id,
@@ -149,13 +171,14 @@ pub async fn add_order_item(
         });
     }
 
+    // 4. Create new item
     let id = uuid::Uuid::new_v4().to_string();
     pool.execute(
         "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
         params![id.clone(), order_id.clone(), product_id.clone(), quantity, price_cents, note.clone().unwrap_or_default()]
     ).await.map_err(|e| format!("Insert order_items error (order_id={}, product_id={}): {}", order_id, product_id, e))?;
 
-    recalculate_order_totals(&order_id, &pool).await?;
+    recalculate_order_totals(&order_id, &restaurant_id, &pool).await?;
 
     Ok(OrderItem {
         id,
@@ -174,29 +197,44 @@ pub async fn add_order_item(
 pub async fn update_order_item_quantity(
     item_id: String,
     quantity: i64,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    let mut rows = pool.query("SELECT order_id FROM order_items WHERE id = ?", params![item_id.clone()])
+    let mut rows = pool.query(
+        "SELECT oi.order_id FROM order_items oi 
+         JOIN orders o ON oi.order_id = o.id 
+         WHERE oi.id = ? AND o.restaurant_id = ?", 
+        params![item_id.clone(), restaurant_id.clone()]
+    )
         .await.map_err(|e| format!("Database error: {}", e))?;
 
     let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Item not found".to_string())?;
     let order_id = row.get::<String>(0).unwrap_or_default();
 
     if quantity <= 0 {
-        pool.execute("UPDATE order_items SET is_deleted=1 WHERE id=?", params![item_id])
+        pool.execute(
+            "UPDATE order_items SET is_deleted = 1 
+             WHERE id = ? AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
+            params![item_id, restaurant_id.clone()]
+        )
             .await.map_err(|e| format!("Database error: {}", e))?;
     } else {
-        pool.execute("UPDATE order_items SET quantity=? WHERE id=?", params![quantity, item_id])
+        pool.execute(
+            "UPDATE order_items SET quantity = ? 
+             WHERE id = ? AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
+            params![quantity, item_id, restaurant_id.clone()]
+        )
             .await.map_err(|e| format!("Database error: {}", e))?;
     }
     
-    recalculate_order_totals(&order_id, &pool).await?;
+    recalculate_order_totals(&order_id, &restaurant_id, &pool).await?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_order_items(
     order_id: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<OrderItem>, String> {
     let mut rows = pool.query(
@@ -204,10 +242,11 @@ pub async fn get_order_items(
                 oi.kitchen_status,
                 p.name AS product_name, p.khmer_name AS product_khmer
          FROM order_items oi
+         JOIN orders o ON oi.order_id = o.id
          LEFT JOIN products p ON oi.product_id = p.id
-         WHERE oi.order_id = ? AND oi.is_deleted = 0
+         WHERE oi.order_id = ? AND o.restaurant_id = ? AND oi.is_deleted = 0
          ORDER BY oi.created_at",
-         params![order_id]
+         params![order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut items = Vec::new();
@@ -232,9 +271,15 @@ pub async fn get_order_items(
 pub async fn update_order_item_note(
     item_id: String,
     note: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    pool.execute("UPDATE order_items SET note = ? WHERE id = ? AND is_deleted = 0", params![note.unwrap_or_default(), item_id])
+    pool.execute(
+        "UPDATE order_items SET note = ? 
+         WHERE id = ? AND is_deleted = 0 
+           AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
+        params![note.unwrap_or_default(), item_id, restaurant_id]
+    )
         .await.map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
@@ -244,15 +289,18 @@ pub async fn get_orders(
     status: Option<String>,
     start_date: Option<String>,
     end_date: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Order>, String> {
     let mut query = String::from(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
-         FROM orders WHERE is_deleted = 0"
+         FROM orders WHERE is_deleted = 0 AND restaurant_id = ?"
     );
 
     let mut args = Vec::new();
+    args.push(libsql::Value::Text(restaurant_id));
+
     if let Some(s) = status {
         query.push_str(" AND status = ?");
         args.push(libsql::Value::Text(s));
@@ -300,15 +348,16 @@ pub async fn get_orders(
 #[tauri::command]
 pub async fn get_session_rounds(
     session_id: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Order>, String> {
     let mut rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
-         WHERE session_id = ? AND is_deleted = 0
+         WHERE session_id = ? AND restaurant_id = ? AND is_deleted = 0
          ORDER BY round_number ASC",
-        params![session_id]
+        params![session_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut orders = Vec::new();
@@ -340,16 +389,17 @@ pub async fn get_session_rounds(
 #[tauri::command]
 pub async fn get_active_order_for_table(
     table_id: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Option<Order>, String> {
     let mut rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
-         WHERE table_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0
+         WHERE table_id = ? AND restaurant_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0
          ORDER BY created_at DESC
          LIMIT 1",
-         params![table_id]
+         params![table_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -380,15 +430,16 @@ pub async fn get_active_order_for_table(
 #[tauri::command]
 pub async fn get_orders_for_table(
     table_id: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Order>, String> {
     let mut rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
          FROM orders
-         WHERE table_id = ? AND is_deleted = 0
+         WHERE table_id = ? AND restaurant_id = ? AND is_deleted = 0
          ORDER BY created_at DESC",
-         params![table_id]
+         params![table_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut orders = Vec::new();
@@ -422,9 +473,10 @@ pub async fn checkout_order(
     order_id: String,
     payments: Vec<PaymentInput>,
     discount_cents: Option<i64>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Order, String> {
-    let mut tb_rows = pool.query("SELECT table_id FROM orders WHERE id = ?", params![order_id.clone()])
+    let mut tb_rows = pool.query("SELECT table_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
         .await.map_err(|e| format!("Database error: {}", e))?;
     let mut table_id = None;
     if let Some(row) = tb_rows.next().await.map_err(|e| e.to_string())? {
@@ -443,7 +495,7 @@ pub async fn checkout_order(
 
     let final_total = (done_subtotal - discount_cents.unwrap_or(0)).max(0);
     
-    let mut rate_rows = pool.query("SELECT rate FROM exchange_rates ORDER BY effective_from DESC LIMIT 1", ())
+    let mut rate_rows = pool.query("SELECT rate FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1", params![restaurant_id.clone()])
         .await.map_err(|e| e.to_string())?;
     let exch_rate = if let Some(row) = rate_rows.next().await.map_err(|e| e.to_string())? {
         row.get::<f64>(0).unwrap_or(4100.0)
@@ -454,13 +506,15 @@ pub async fn checkout_order(
     pool.execute(
         "UPDATE orders SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0,
                 status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
-         WHERE id = ?",
-         params![final_total, final_khr, order_id.clone()]
+         WHERE id = ? AND restaurant_id = ?",
+         params![final_total, final_khr, order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut item_rows = pool.query(
-        "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0",
-        params![order_id.clone()]
+        "SELECT product_id, quantity FROM order_items 
+         WHERE order_id = ? AND is_deleted = 0
+           AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)",
+        params![order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
     
     let mut sold_items = Vec::new();
@@ -469,7 +523,7 @@ pub async fn checkout_order(
     }
 
     for (p_id, qty) in sold_items {
-        deduct_inventory(&p_id, qty, &pool).await?;
+        deduct_inventory(&p_id, qty, &restaurant_id, &pool).await?;
     }
 
     for p in &payments {
@@ -482,14 +536,14 @@ pub async fn checkout_order(
     }
 
     if let Some(table_name) = table_id {
-        release_table_if_no_open_orders(&table_name, &pool).await?;
+        release_table_if_no_open_orders(&table_name, &restaurant_id, &pool).await?;
     }
 
     let mut order_rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
-         FROM orders WHERE id=?",
-         params![order_id]
+         FROM orders WHERE id=? AND restaurant_id = ?",
+         params![order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let row = order_rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Order missing".to_string())?;
@@ -519,11 +573,12 @@ pub async fn checkout_order(
 pub async fn add_round(
     user_id: String,
     session_id: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let mut rows = pool.query(
-        "SELECT table_id, COALESCE(MAX(round_number), 0) FROM orders WHERE session_id = ? AND is_deleted = 0",
-        params![session_id.clone()]
+        "SELECT table_id, COALESCE(MAX(round_number), 0) FROM orders WHERE session_id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![session_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Failed to fetch round".to_string())?;
@@ -532,8 +587,8 @@ pub async fn add_round(
 
     let id = uuid::Uuid::new_v4().to_string();
     pool.execute(
-        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status) VALUES (?, ?, ?, ?, ?, 'open')",
-        params![id.clone(), user_id, table_id.unwrap_or_default(), session_id, max_round + 1]
+        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status, restaurant_id) VALUES (?, ?, ?, ?, ?, 'open', ?)",
+        params![id.clone(), user_id, table_id.unwrap_or_default(), session_id, max_round + 1, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     Ok(id)
@@ -544,9 +599,10 @@ pub async fn checkout_session(
     session_id: String,
     payments: Vec<PaymentInput>,
     discount_cents: Option<i64>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    let mut tb_rows = pool.query("SELECT table_id FROM table_sessions WHERE id = ?", params![session_id.clone()])
+    let mut tb_rows = pool.query("SELECT table_id FROM table_sessions WHERE id = ? AND restaurant_id = ?", params![session_id.clone(), restaurant_id.clone()])
         .await.map_err(|e| format!("Database error: {}", e))?;
     let table_id = if let Some(row) = tb_rows.next().await.map_err(|e| e.to_string())? {
         row.get::<String>(0).ok()
@@ -554,19 +610,19 @@ pub async fn checkout_session(
 
     let mut session_orders = Vec::new();
     let mut so_rows = pool.query(
-        "SELECT id FROM orders WHERE session_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0",
-        params![session_id.clone()]
+        "SELECT id FROM orders WHERE session_id = ? AND restaurant_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0",
+        params![session_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
     while let Some(row) = so_rows.next().await.map_err(|e| e.to_string())? {
         session_orders.push(row.get::<String>(0).unwrap_or_default());
     }
 
     let mut sub_rows = pool.query(
-        "SELECT COALESCE(SUM(price_at_order * quantity), 0)
+        "SELECT COALESCE(SUM(oi.price_at_order * oi.quantity), 0)
          FROM order_items oi
          JOIN orders o ON oi.order_id = o.id
-         WHERE o.session_id = ? AND oi.is_deleted = 0 AND o.is_deleted = 0 AND o.status IN ('open', 'pending_payment')",
-         params![session_id.clone()]
+         WHERE o.session_id = ? AND o.restaurant_id = ? AND oi.is_deleted = 0 AND o.is_deleted = 0 AND o.status IN ('open', 'pending_payment')",
+         params![session_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Subtotal error: {}", e))?;
     
     let done_subtotal = if let Some(row) = sub_rows.next().await.map_err(|e| e.to_string())? {
@@ -575,7 +631,7 @@ pub async fn checkout_session(
 
     let final_total = (done_subtotal - discount_cents.unwrap_or(0)).max(0);
     
-    let mut rate_rows = pool.query("SELECT rate FROM exchange_rates ORDER BY effective_from DESC LIMIT 1", ())
+    let mut rate_rows = pool.query("SELECT rate FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1", params![restaurant_id.clone()])
         .await.map_err(|e| e.to_string())?;
     let exch_rate = if let Some(row) = rate_rows.next().await.map_err(|e| e.to_string())? {
         row.get::<f64>(0).unwrap_or(4100.0)
@@ -583,31 +639,37 @@ pub async fn checkout_session(
     let _final_khr = round_khr(final_total, exch_rate);
 
     for o_id in &session_orders {
-        recalculate_order_totals(o_id, &pool).await?;
+        recalculate_order_totals(o_id, &restaurant_id, &pool).await?;
         
         pool.execute(
             "UPDATE orders SET status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
-             WHERE id = ?",
-             params![o_id.clone()]
+             WHERE id = ? AND restaurant_id = ?",
+             params![o_id.clone(), restaurant_id.clone()]
         ).await.map_err(|e| format!("Database error: {}", e))?;
 
         let mut sold_items = Vec::new();
         let mut sim_rows = pool.query(
-            "SELECT product_id, quantity FROM order_items WHERE order_id = ? AND is_deleted = 0",
-            params![o_id.clone()]
+            "SELECT product_id, quantity FROM order_items 
+             WHERE order_id = ? AND is_deleted = 0
+               AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)",
+            params![o_id.clone(), restaurant_id.clone()]
         ).await.map_err(|e| format!("Database error: {}", e))?;
         while let Some(row) = sim_rows.next().await.map_err(|e| e.to_string())? {
             sold_items.push((row.get::<String>(0).unwrap_or_default(), row.get::<i64>(1).unwrap_or(0)));
         }
 
         for (p_id, qty) in sold_items {
-            deduct_inventory(&p_id, qty, &pool).await?;
+            deduct_inventory(&p_id, qty, &restaurant_id, &pool).await?;
         }
     }
 
     if let Some(first_order_id) = session_orders.first() {
         if discount_cents.unwrap_or(0) > 0 {
-            pool.execute("UPDATE orders SET total_usd = MAX(0, total_usd - ?) WHERE id = ?", params![discount_cents.unwrap_or(0), first_order_id.clone()])
+            pool.execute(
+                "UPDATE orders SET total_usd = MAX(0, total_usd - ?) 
+                 WHERE id = ? AND restaurant_id = ?", 
+                params![discount_cents.unwrap_or(0), first_order_id.clone(), restaurant_id.clone()]
+            )
                 .await.map_err(|e| format!("DB error: {}", e))?;
         }
 
@@ -621,11 +683,15 @@ pub async fn checkout_session(
         }
     }
 
-    pool.execute("UPDATE table_sessions SET status = 'completed', completed_at = datetime('now') WHERE id = ?", params![session_id])
+    pool.execute(
+        "UPDATE table_sessions SET status = 'completed', completed_at = datetime('now') 
+         WHERE id = ? AND restaurant_id = ?", 
+        params![session_id, restaurant_id.clone()]
+    )
         .await.map_err(|e| format!("Session close error: {}", e))?;
 
     if let Some(table_name) = table_id {
-        release_table_if_no_open_orders(&table_name, &pool).await?;
+        release_table_if_no_open_orders(&table_name, &restaurant_id, &pool).await?;
     }
 
     Ok(())
@@ -636,46 +702,51 @@ pub async fn hold_order(
     order_id: String,
     customer_name: Option<String>,
     customer_phone: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     pool.execute(
         "UPDATE orders SET status = 'pending_payment', customer_name = ?, customer_phone = ?,
-                updated_at = datetime('now') WHERE id = ?",
-        params![customer_name.unwrap_or_default(), customer_phone.unwrap_or_default(), order_id]
+                updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
+        params![customer_name.unwrap_or_default(), customer_phone.unwrap_or_default(), order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn void_order(order_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
-    let mut tb_rows = pool.query("SELECT table_id FROM orders WHERE id = ?", params![order_id.clone()])
+pub async fn void_order(order_id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+    let mut tb_rows = pool.query("SELECT table_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
         .await.map_err(|e| format!("Database error: {}", e))?;
     let table_id = if let Some(row) = tb_rows.next().await.map_err(|e| e.to_string())? {
         row.get::<String>(0).ok()
     } else { None };
 
-    pool.execute("UPDATE orders SET status='void', updated_at=datetime('now') WHERE id=?", params![order_id])
+    pool.execute("UPDATE orders SET status='void', updated_at=datetime('now') WHERE id=? AND restaurant_id = ?", params![order_id, restaurant_id.clone()])
         .await.map_err(|e| format!("Database error: {}", e))?;
 
     if let Some(table_name) = table_id {
-        release_table_if_no_open_orders(&table_name, &pool).await?;
+        release_table_if_no_open_orders(&table_name, &restaurant_id, &pool).await?;
     }
 
     Ok(())
 }
 
-async fn set_table_status(table_name: &str, status: &str, pool: &Arc<Connection>) -> Result<(), String> {
-    pool.execute("UPDATE floor_tables SET status = ?, updated_at = datetime('now') WHERE name = ?", params![status.to_string(), table_name.to_string()])
+async fn set_table_status(table_name: &str, status: &str, restaurant_id: &str, pool: &Arc<Connection>) -> Result<(), String> {
+    pool.execute(
+        "UPDATE floor_tables SET status = ?, updated_at = datetime('now') 
+         WHERE name = ? AND restaurant_id = ?", 
+        params![status.to_string(), table_name.to_string(), restaurant_id.to_string()]
+    )
         .await.map_err(|e| format!("Table status error: {}", e))?;
 
     Ok(())
 }
 
-async fn release_table_if_no_open_orders(table_name: &str, pool: &Arc<Connection>) -> Result<(), String> {
+async fn release_table_if_no_open_orders(table_name: &str, restaurant_id: &str, pool: &Arc<Connection>) -> Result<(), String> {
     let mut rows = pool.query(
-        "SELECT COUNT(*) FROM orders WHERE table_id = ? AND status = 'open' AND is_deleted = 0",
-        params![table_name.to_string()]
+        "SELECT COUNT(*) FROM orders WHERE table_id = ? AND restaurant_id = ? AND status = 'open' AND is_deleted = 0",
+        params![table_name.to_string(), restaurant_id.to_string()]
     ).await.map_err(|e| format!("Table release error: {}", e))?;
 
     let open_count = if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -683,20 +754,18 @@ async fn release_table_if_no_open_orders(table_name: &str, pool: &Arc<Connection
     } else { 0 };
 
     if open_count == 0 {
-        set_table_status(table_name, "free", pool).await?;
+        set_table_status(table_name, "free", restaurant_id, pool).await?;
     }
 
     Ok(())
 }
 
-async fn deduct_inventory(product_id: &str, qty: i64, pool: &Arc<Connection>) -> Result<(), String> {
-    // Do NOT decrement products.stock_quantity here — products are made fresh in a restaurant.
-    // Admins use the is_available flag to mark items unavailable.
-    // Only deduct raw ingredient inventory_items based on recipes.
-
+async fn deduct_inventory(product_id: &str, qty: i64, restaurant_id: &str, pool: &Arc<Connection>) -> Result<(), String> {
+    // 1. Fetch ingredients belonging to the restaurant
     let mut ing_rows = pool.query(
-        "SELECT inventory_item_id, usage_percentage FROM product_ingredients WHERE product_id = ?",
-        params![product_id.to_string()]
+        "SELECT inventory_item_id, usage_percentage FROM product_ingredients 
+         WHERE product_id = ? AND restaurant_id = ?",
+        params![product_id.to_string(), restaurant_id.to_string()]
     ).await.map_err(|e| format!("Recipe fetch error: {}", e))?;
 
     let mut ingredients = Vec::new();
@@ -708,8 +777,8 @@ async fn deduct_inventory(product_id: &str, qty: i64, pool: &Arc<Connection>) ->
         let total_usage = qty as f64 * usage_pct;
         
         let mut inv_rows = pool.query(
-            "SELECT stock_qty, stock_pct FROM inventory_items WHERE id = ?",
-            params![inv_id.clone()]
+            "SELECT stock_qty, stock_pct FROM inventory_items WHERE id = ? AND restaurant_id = ?",
+            params![inv_id.clone(), restaurant_id.to_string()]
         ).await.map_err(|e| format!("Inv fetch error: {}", e))?;
 
         if let Some(inv_row) = inv_rows.next().await.map_err(|e| e.to_string())? {
@@ -720,7 +789,7 @@ async fn deduct_inventory(product_id: &str, qty: i64, pool: &Arc<Connection>) ->
                 sqty -= 1;
                 spct += 100.0;
             }
-            pool.execute("UPDATE inventory_items SET stock_qty = ?, stock_pct = ? WHERE id = ?", params![sqty, spct, inv_id])
+            pool.execute("UPDATE inventory_items SET stock_qty = ?, stock_pct = ? WHERE id = ? AND restaurant_id = ?", params![sqty, spct, inv_id, restaurant_id.to_string()])
                 .await.map_err(|e| format!("Inv update error: {}", e))?;
         }
     }
@@ -728,10 +797,11 @@ async fn deduct_inventory(product_id: &str, qty: i64, pool: &Arc<Connection>) ->
     Ok(())
 }
 
-async fn recalculate_order_totals(order_id: &str, pool: &Arc<Connection>) -> Result<(), String> {
+async fn recalculate_order_totals(order_id: &str, restaurant_id: &str, pool: &Arc<Connection>) -> Result<(), String> {
     let mut sub_rows = pool.query(
-        "SELECT COALESCE(SUM(price_at_order * quantity), 0) FROM order_items WHERE order_id=? AND is_deleted=0",
-        params![order_id.to_string()]
+        "SELECT COALESCE(SUM(price_at_order * quantity), 0) FROM order_items 
+         WHERE order_id=? AND is_deleted=0 AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)",
+        params![order_id.to_string(), restaurant_id.to_string()]
     ).await.map_err(|e| format!("Subtotal error: {}", e))?;
     
     let subtotal = if let Some(row) = sub_rows.next().await.map_err(|e| e.to_string())? {
@@ -742,7 +812,7 @@ async fn recalculate_order_totals(order_id: &str, pool: &Arc<Connection>) -> Res
     let plt = 0;
     let total_usd = subtotal;
 
-    let mut rate_rows = pool.query("SELECT rate FROM exchange_rates ORDER BY effective_from DESC LIMIT 1", ())
+    let mut rate_rows = pool.query("SELECT rate FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1", params![restaurant_id.to_string()])
         .await.map_err(|e| format!("Exchange rate error: {}", e))?;
     
     let rate = if let Some(row) = rate_rows.next().await.map_err(|e| e.to_string())? {
@@ -752,38 +822,45 @@ async fn recalculate_order_totals(order_id: &str, pool: &Arc<Connection>) -> Res
     let total_khr = round_khr(total_usd, rate);
 
     pool.execute(
-        "UPDATE orders SET total_usd=?, total_khr=?, tax_vat=?, tax_plt=?, updated_at=datetime('now') WHERE id=?",
-        params![total_usd, total_khr, vat, plt, order_id.to_string()]
+        "UPDATE orders SET total_usd=?, total_khr=?, tax_vat=?, tax_plt=?, updated_at=datetime('now') WHERE id=? AND restaurant_id = ?",
+        params![total_usd, total_khr, vat, plt, order_id.to_string(), restaurant_id.to_string()]
     ).await.map_err(|e| format!("Update totals error: {}", e))?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_revenue_summary(pool: State<'_, Arc<Connection>>) -> Result<RevenueSummary, String> {
+pub async fn get_revenue_summary(
+    pool: State<'_, Arc<Connection>>,
+    restaurant_id: String,
+) -> Result<RevenueSummary, String> {
     let mut today_rows = pool.query(
-        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND date(created_at)=date('now')", ()
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND date(created_at)=date('now')", 
+        params![restaurant_id.clone()]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let (today_usd, today_orders) = if let Some(r) = today_rows.next().await.unwrap_or(None) {
         (r.get::<i64>(0).unwrap_or(0), r.get::<i64>(1).unwrap_or(0))
     } else { (0, 0) };
 
     let mut month_rows = pool.query(
-        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND strftime('%Y-%m',created_at)=strftime('%Y-%m','now')", ()
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND strftime('%Y-%m',created_at)=strftime('%Y-%m','now')", 
+        params![restaurant_id.clone()]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let (month_usd, month_orders) = if let Some(r) = month_rows.next().await.unwrap_or(None) {
         (r.get::<i64>(0).unwrap_or(0), r.get::<i64>(1).unwrap_or(0))
     } else { (0, 0) };
 
     let mut year_rows = pool.query(
-        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND strftime('%Y',created_at)=strftime('%Y','now')", ()
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND strftime('%Y',created_at)=strftime('%Y','now')", 
+        params![restaurant_id.clone()]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let (year_usd, year_orders) = if let Some(r) = year_rows.next().await.unwrap_or(None) {
         (r.get::<i64>(0).unwrap_or(0), r.get::<i64>(1).unwrap_or(0))
     } else { (0, 0) };
 
     let mut open_rows = pool.query(
-        "SELECT COUNT(*) FROM orders WHERE status='open' AND is_deleted=0", ()
+        "SELECT COUNT(*) FROM orders WHERE status='open' AND is_deleted=0 AND restaurant_id = ?", 
+        params![restaurant_id]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let open_orders = if let Some(r) = open_rows.next().await.unwrap_or(None) {
         r.get::<i64>(0).unwrap_or(0)
@@ -793,7 +870,11 @@ pub async fn get_revenue_summary(pool: State<'_, Arc<Connection>>) -> Result<Rev
 }
 
 #[tauri::command]
-pub async fn get_revenue_by_period(period: String, pool: State<'_, Arc<Connection>>) -> Result<Vec<RevenueByDay>, String> {
+pub async fn get_revenue_by_period(
+    period: String, 
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>
+) -> Result<Vec<RevenueByDay>, String> {
     let date_filter = match period.as_str() {
         "week"    => "created_at >= datetime('now','-7 days')",
         "3months" => "created_at >= datetime('now','-3 months')",
@@ -803,12 +884,12 @@ pub async fn get_revenue_by_period(period: String, pool: State<'_, Arc<Connectio
 
     let query = format!(
         "SELECT date(created_at) as date, COALESCE(SUM(total_usd),0) as total_usd, COUNT(*) as order_count \
-         FROM orders WHERE status='completed' AND is_deleted=0 AND {} \
+         FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND {} \
          GROUP BY date(created_at) ORDER BY date ASC",
         date_filter
     );
 
-    let mut rows = pool.query(query.as_str(), ())
+    let mut rows = pool.query(query.as_str(), params![restaurant_id])
         .await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut results = Vec::new();

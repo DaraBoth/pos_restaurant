@@ -4,10 +4,13 @@ use std::sync::Arc;
 use crate::models::{Category, Product};
 
 #[tauri::command]
-pub async fn get_categories(pool: State<'_, Arc<Connection>>) -> Result<Vec<Category>, String> {
+pub async fn get_categories(
+    pool: State<'_, Arc<Connection>>,
+    restaurant_id: String,
+) -> Result<Vec<Category>, String> {
     let mut rows = pool.query(
-        "SELECT id, name, khmer_name, sort_order FROM categories WHERE is_deleted = 0 ORDER BY sort_order",
-        ()
+        "SELECT id, name, khmer_name, sort_order FROM categories WHERE is_deleted = 0 AND restaurant_id = ? ORDER BY sort_order",
+        params![restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -28,6 +31,7 @@ pub async fn get_categories(pool: State<'_, Arc<Connection>>) -> Result<Vec<Cate
 #[tauri::command]
 pub async fn get_products(
     category_id: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Product>, String> {
     let mut rows = if let Some(cat_id) = category_id {
@@ -35,18 +39,18 @@ pub async fn get_products(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
                     c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
-             WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.category_id = ?
+             WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.category_id = ? AND p.restaurant_id = ?
              ORDER BY p.name",
-             params![cat_id]
+             params![cat_id, restaurant_id]
         ).await
     } else {
         pool.query(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
                     c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
-             WHERE p.is_deleted = 0 AND p.is_available = 1
+             WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.restaurant_id = ?
              ORDER BY c.sort_order, p.name",
-             ()
+             params![restaurant_id]
         ).await
     }.map_err(|e| format!("Database error: {}", e))?;
 
@@ -71,7 +75,10 @@ pub async fn get_products(
 }
 
 #[tauri::command]
-pub async fn get_inventory_logs(pool: State<'_, Arc<Connection>>) -> Result<Vec<serde_json::Value>, String> {
+pub async fn get_inventory_logs(
+    pool: State<'_, Arc<Connection>>,
+    restaurant_id: String,
+) -> Result<Vec<serde_json::Value>, String> {
     let mut rows = pool.query(
         r#"
         SELECT 
@@ -83,10 +90,11 @@ pub async fn get_inventory_logs(pool: State<'_, Arc<Connection>>) -> Result<Vec<
             il.created_at
         FROM inventory_logs il
         JOIN products p ON il.product_id = p.id
+        WHERE p.restaurant_id = ?
         ORDER BY il.created_at DESC
         LIMIT 100
         "#,
-        ()
+        params![restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -114,11 +122,12 @@ pub async fn create_product(
     price_cents: i64,
     stock_quantity: i64,
     image_path: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
     pool.execute(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path, restaurant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             id.clone(),
             category_id,
@@ -126,7 +135,8 @@ pub async fn create_product(
             khmer_name.unwrap_or_default(),
             price_cents,
             stock_quantity,
-            image_path.unwrap_or_default()
+            image_path.unwrap_or_default(),
+            restaurant_id
         ]
     )
     .await
@@ -144,11 +154,12 @@ pub async fn update_product(
     category_id: String,
     is_available: bool,
     image_path: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     pool.execute(
         "UPDATE products SET name=?, khmer_name=?, price_cents=?, stock_quantity=?, category_id=?, is_available=?, image_path=?, updated_at=datetime('now')
-         WHERE id=?",
+         WHERE id=? AND restaurant_id=?",
          params![
              name,
              khmer_name.unwrap_or_default(),
@@ -157,7 +168,8 @@ pub async fn update_product(
              category_id,
              is_available as i64,
              image_path.unwrap_or_default(),
-             id
+             id,
+             restaurant_id
          ]
     )
     .await
@@ -169,11 +181,12 @@ pub async fn update_product(
 pub async fn update_stock(
     id: String,
     delta: i64,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     pool.execute(
-        "UPDATE products SET stock_quantity = stock_quantity + ?, updated_at=datetime('now') WHERE id=?",
-        params![delta, id]
+        "UPDATE products SET stock_quantity = stock_quantity + ?, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![delta, id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -181,10 +194,10 @@ pub async fn update_stock(
 }
 
 #[tauri::command]
-pub async fn delete_product(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_product(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
     pool.execute(
-        "UPDATE products SET is_deleted=1, updated_at=datetime('now') WHERE id=?",
-        params![id]
+        "UPDATE products SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -195,10 +208,11 @@ pub async fn delete_product(id: String, pool: State<'_, Arc<Connection>>) -> Res
 pub async fn create_category(
     name: String,
     khmer_name: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
-    let mut rows = pool.query("SELECT COALESCE(MAX(sort_order), 0) FROM categories WHERE is_deleted=0", ())
+    let mut rows = pool.query("SELECT COALESCE(MAX(sort_order), 0) FROM categories WHERE is_deleted=0 AND restaurant_id = ?", params![restaurant_id.clone()])
         .await
         .map_err(|e| format!("Database error: {}", e))?;
     
@@ -209,8 +223,8 @@ pub async fn create_category(
     };
 
     pool.execute(
-        "INSERT INTO categories (id, name, khmer_name, sort_order) VALUES (?, ?, ?, ?)",
-        params![id.clone(), name, khmer_name.unwrap_or_default(), max_order + 1]
+        "INSERT INTO categories (id, name, khmer_name, sort_order, restaurant_id) VALUES (?, ?, ?, ?, ?)",
+        params![id.clone(), name, khmer_name.unwrap_or_default(), max_order + 1, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -222,11 +236,12 @@ pub async fn update_category(
     id: String,
     name: String,
     khmer_name: Option<String>,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     pool.execute(
-        "UPDATE categories SET name=?, khmer_name=?, updated_at=datetime('now') WHERE id=?",
-        params![name, khmer_name.unwrap_or_default(), id]
+        "UPDATE categories SET name=?, khmer_name=?, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![name, khmer_name.unwrap_or_default(), id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -234,10 +249,10 @@ pub async fn update_category(
 }
 
 #[tauri::command]
-pub async fn delete_category(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_category(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
     pool.execute(
-        "UPDATE categories SET is_deleted=1, updated_at=datetime('now') WHERE id=?",
-        params![id]
+        "UPDATE categories SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;

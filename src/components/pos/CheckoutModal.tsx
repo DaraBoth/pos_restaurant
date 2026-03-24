@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useOrder } from '@/providers/OrderProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { checkoutOrder, checkoutSession, getOrderItems, getRestaurant, PaymentInput, OrderItem } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
@@ -16,6 +17,7 @@ export default function CheckoutModal({
     onComplete: (payload: ReceiptPrintPayload) => void;
 }) {
     const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds } = useOrder();
+    const { user } = useAuth();
     const { t } = useLanguage();
 
     const [usdInput, setUsdInput] = useState<string>('');
@@ -29,7 +31,7 @@ export default function CheckoutModal({
     // Combine all rounds for receipt view
     useEffect(() => {
         if (sessionId && rounds.length > 0) {
-            Promise.all(rounds.map(r => getOrderItems(r.id))).then(results => {
+            Promise.all(rounds.map(r => getOrderItems(r.id, user?.restaurant_id || ''))).then(results => {
                 const allItems = results.flat();
                 const combined: Record<string, OrderItem> = {};
                 let sumCents = 0;
@@ -114,18 +116,18 @@ export default function CheckoutModal({
 
             let customerName, customerPhone;
             if (sessionId) {
-                await checkoutSession(sessionId, payments, discountCents);
+                await checkoutSession(sessionId, payments, user?.restaurant_id || '', discountCents);
                 // get details from arbitrary round, usually the active order has customer details
                 const currentOrder = rounds.find(r => r.id === orderId);
                 customerName = currentOrder?.customer_name;
                 customerPhone = currentOrder?.customer_phone;
             } else {
-                const completedOrder = await checkoutOrder(orderId, payments, discountCents);
+                const completedOrder = await checkoutOrder(orderId, payments, user?.restaurant_id || '', discountCents);
                 customerName = completedOrder.customer_name;
                 customerPhone = completedOrder.customer_phone;
             }
 
-            const restaurant = await getRestaurant();
+            const restaurant = await getRestaurant(user?.restaurant_id || '');
             const payload: ReceiptPrintPayload = {
                 restaurant,
                 orderId,

@@ -3,15 +3,15 @@ use libsql::{Connection, params};
 use std::sync::Arc;
 use crate::models::{Restaurant, RestaurantUpsertInput, SetupStatus};
 
-const DEFAULT_RESTAURANT_ID: &str = "rest-00000000-0000-0000-0000-000000000001";
+
 
 #[tauri::command]
-pub async fn get_restaurant(pool: State<'_, Arc<Connection>>) -> Result<Restaurant, String> {
+pub async fn get_restaurant(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<Restaurant, String> {
     let mut rows = pool.query(
         "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, is_deleted, created_at, updated_at
          FROM restaurants
          WHERE id = ? AND is_deleted = 0",
-         params![DEFAULT_RESTAURANT_ID]
+         params![restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -38,8 +38,8 @@ pub async fn get_restaurant(pool: State<'_, Arc<Connection>>) -> Result<Restaura
 }
 
 #[tauri::command]
-pub async fn get_setup_status(pool: State<'_, Arc<Connection>>) -> Result<SetupStatus, String> {
-    let restaurant = get_restaurant(pool).await?;
+pub async fn get_setup_status(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<SetupStatus, String> {
+    let restaurant = get_restaurant(restaurant_id, pool).await?;
 
     Ok(SetupStatus {
         needs_restaurant_setup: restaurant.name.trim() == "My Restaurant"
@@ -51,6 +51,7 @@ pub async fn get_setup_status(pool: State<'_, Arc<Connection>>) -> Result<SetupS
 #[tauri::command]
 pub async fn update_restaurant(
     input: RestaurantUpsertInput,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Restaurant, String> {
     pool.execute(
@@ -78,13 +79,13 @@ pub async fn update_restaurant(
              input.vat_number.unwrap_or_default(),
              input.receipt_footer.unwrap_or_default(),
              input.logo_path.unwrap_or_default(),
-             DEFAULT_RESTAURANT_ID
+             restaurant_id.clone()
          ]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    get_restaurant(pool).await
+    get_restaurant(restaurant_id, pool).await
 }
 
 #[tauri::command]

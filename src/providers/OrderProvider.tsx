@@ -1,6 +1,9 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { OrderItem, Order, Product, getExchangeRate, getActiveOrderForTable, getSessionRounds, getOrderItems, createOrder as apiCreateOrder, addOrderItem as apiAddOrderItem } from '@/lib/tauri-commands';
+import { OrderItem, Order, Product } from '@/types';
+import { getActiveOrderForTable, getSessionRounds, getOrderItems, createOrder as apiCreateOrder, addOrderItem as apiAddOrderItem } from '@/lib/api/orders';
+import { getExchangeRate } from '@/lib/api/system';
+import { useAuth } from '@/providers/AuthProvider';
 import { calculateTotals, OrderTotals } from '@/lib/currency';
 
 export interface LocalCartItem {
@@ -60,6 +63,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [rounds, setRounds] = useState<Order[]>([]);
     const [isTakeout, setTakeout] = useState(false);
     const [localCart, setLocalCart] = useState<LocalCartItem[]>([]);
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
 
     const subtotalCents = items.reduce(
         (sum, item) => sum + item.price_at_order * item.quantity, 0
@@ -72,12 +77,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     const refreshRate = useCallback(async () => {
         try {
-            const rate = await getExchangeRate();
+            const rate = await getExchangeRate(restaurantId || undefined);
             setExchangeRate(rate.rate);
         } catch {
             // Keep default rate if Tauri not available
         }
-    }, []);
+    }, [restaurantId]);
 
     const clearOrder = useCallback(() => {
         setOrderId(null);
@@ -92,17 +97,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const loadTableSession = useCallback(async (tId: string) => {
         setTableId(tId);
         try {
-            const order = await getActiveOrderForTable(tId);
+            const order = await getActiveOrderForTable(tId, restaurantId || undefined);
             if (order) {
                 setOrderId(order.id);
                 setSessionId(order.session_id || null);
                 if (order.session_id) {
-                    const rs = await getSessionRounds(order.session_id);
+                    const rs = await getSessionRounds(order.session_id, restaurantId || '');
                     setRounds(rs);
                 } else {
                     setRounds([order]);
                 }
-                const currentItems = await getOrderItems(order.id);
+                const currentItems = await getOrderItems(order.id, restaurantId || '');
                 setItemsState(currentItems);
             } else {
                 setOrderId(null);
@@ -113,23 +118,23 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
             console.error('Failed to load table session', e);
         }
-    }, []);
+    }, [restaurantId]);
 
     const switchRound = useCallback(async (oId: string) => {
         setOrderId(oId);
         try {
-            const currentItems = await getOrderItems(oId);
+            const currentItems = await getOrderItems(oId, restaurantId || '');
             setItemsState(currentItems);
         } catch (e) {
             console.error('Failed to switch round', e);
         }
-    }, []);
+    }, [restaurantId]);
 
     const addToLocalCart = useCallback(async (product: Product) => {
         if (orderId) {
             try {
-                await apiAddOrderItem(orderId, product.id, 1);
-                const currentItems = await getOrderItems(orderId);
+                await apiAddOrderItem(orderId, product.id, 1, restaurantId || '');
+                const currentItems = await getOrderItems(orderId, restaurantId || '');
                 setItemsState(currentItems);
             } catch (e) {
                 console.error('Failed to add live item:', e);
@@ -162,15 +167,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     const commitLocalCart = useCallback(async (userId: string) => {
         if (localCart.length === 0) return;
-        const newOrderId = await apiCreateOrder(userId, tableId || undefined);
+        const newOrderId = await apiCreateOrder(userId, tableId || undefined, restaurantId || '');
         for (const item of localCart) {
-            await apiAddOrderItem(newOrderId, item.productId, item.qty);
+            await apiAddOrderItem(newOrderId, item.productId, item.qty, restaurantId || '');
         }
         if (tableId) {
             await loadTableSession(tableId);
         } else {
             setOrderId(newOrderId);
-            const updatedItems = await getOrderItems(newOrderId);
+            const updatedItems = await getOrderItems(newOrderId, restaurantId || '');
             setItemsState(updatedItems);
         }
         setLocalCart([]);

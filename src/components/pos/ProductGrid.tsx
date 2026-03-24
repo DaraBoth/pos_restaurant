@@ -1,16 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
-import {
-    getProducts, getCategories, Product, Category,
-    getOrderItems
-} from '@/lib/tauri-commands';
+import { getProducts, getCategories } from '@/lib/api/products';
+import { getOrderItems } from '@/lib/api/orders';
 import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { getImageSrc } from '@/lib/image';
 import { getTopProducts } from '@/lib/api/analytics';
-import type { TopProduct } from '@/types';
+import type { Product, Category, TopProduct } from '@/types';
 import { Search, ShoppingBag, UtensilsCrossed, Flame, Star, Sparkles } from 'lucide-react';
 
 // Palette for products without images
@@ -35,9 +33,9 @@ export default function ProductGrid() {
         async function load() {
             try {
                 const [cats, prods, tops] = await Promise.all([
-                    getCategories(),
-                    getProducts(selectedCategory || undefined),
-                    getTopProducts('month')
+                    getCategories(user?.restaurant_id || undefined),
+                    getProducts(selectedCategory || undefined, user?.restaurant_id || undefined),
+                    getTopProducts('month', user?.restaurant_id || undefined)
                 ]);
                 setCategories(cats);
                 setProducts(prods);
@@ -51,8 +49,8 @@ export default function ProductGrid() {
 
     useEffect(() => {
         if (!orderId) return;
-        getOrderItems(orderId).then(items => setItems(items)).catch(console.error);
-    }, [orderId, setItems]);
+        getOrderItems(orderId, user?.restaurant_id || '').then(items => setItems(items)).catch(console.error);
+    }, [orderId, setItems, user?.restaurant_id]);
 
     async function handleProductClick(product: Product) {
         if (product.is_available === 0 || product.stock_quantity <= 0) return;

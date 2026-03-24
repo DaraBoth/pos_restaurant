@@ -62,7 +62,8 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
             }
 
             try {
-                const status = await getSetupStatus();
+                // restaurant_id is now mandatory in the backend commands
+                const status = await getSetupStatus(user?.restaurant_id || '');
                 if (cancelled) return;
 
                 if (status.needs_restaurant_setup && pathname !== SETUP_PATH) {

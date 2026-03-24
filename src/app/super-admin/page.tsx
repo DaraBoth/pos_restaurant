@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import {
     listAllRestaurants, createRestaurantWithAdmin, superadminUpdateAdmin,
-    updateSuperadminProfile, superadminGetAllUsers, SuperadminUserView
+    updateSuperadminProfile, superadminGetAllUsers, superadminMoveUser, SuperadminUserView
 } from '@/lib/api/auth';
 import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
@@ -355,6 +355,7 @@ export default function SuperAdminPage() {
     const [editAdmin, setEditAdmin] = useState<RestaurantSummary | null>(null);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [showGlobalUsers, setShowGlobalUsers] = useState(false);
+    const [movingUser, setMovingUser] = useState<SuperadminUserView | null>(null);
 
     useEffect(() => {
         if (user?.role !== 'super_admin') {
@@ -518,6 +519,16 @@ export default function SuperAdminPage() {
             {showGlobalUsers && (
                 <GlobalUsersModal
                     onClose={() => setShowGlobalUsers(false)}
+                    restaurants={restaurants}
+                    onMoveUser={(u) => setMovingUser(u)}
+                />
+            )}
+            {movingUser && (
+                <MoveUserModal
+                    user={movingUser}
+                    restaurants={restaurants}
+                    onClose={() => setMovingUser(null)}
+                    onMoved={() => { setMovingUser(null); /* Refresh global users if needed, but local state update is better */ }}
                 />
             )}
         </div>
@@ -734,8 +745,12 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
 }
 
 // ─── Global Users Directory Modal ────────────────────────────────────────────
-function GlobalUsersModal({ onClose }: { onClose: () => void }) {
-    const [users, setUsers] = useState<any[]>([]);
+function GlobalUsersModal({ onClose, restaurants, onMoveUser }: { 
+    onClose: () => void; 
+    restaurants: RestaurantSummary[];
+    onMoveUser: (u: SuperadminUserView) => void;
+}) {
+    const [users, setUsers] = useState<SuperadminUserView[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
@@ -817,6 +832,7 @@ function GlobalUsersModal({ onClose }: { onClose: () => void }) {
                                     <th className="px-6 py-4 font-black">Role</th>
                                     <th className="px-6 py-4 font-black">Restaurant Origin</th>
                                     <th className="px-6 py-4 font-black text-right">Created</th>
+                                    <th className="px-6 py-4 font-black text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
@@ -848,11 +864,92 @@ function GlobalUsersModal({ onClose }: { onClose: () => void }) {
                                         <td className="px-6 py-3 text-right text-[11px] text-[var(--text-secondary)] opacity-60 font-mono">
                                             {new Date(u.created_at + 'Z').toLocaleDateString()}
                                         </td>
+                                        <td className="px-6 py-3 text-right">
+                                            <button 
+                                                onClick={() => onMoveUser(u)}
+                                                className="px-2 py-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-[9px] font-black uppercase tracking-widest border border-blue-500/20 transition-all"
+                                            >
+                                                Move
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Move User Modal ────────────────────────────────────────────────────────
+function MoveUserModal({ user, restaurants, onClose, onMoved }: {
+    user: SuperadminUserView;
+    restaurants: RestaurantSummary[];
+    onClose: () => void;
+    onMoved: () => void;
+}) {
+    const [selectedId, setSelectedId] = useState(user.restaurant_id || '');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    async function handleMove() {
+        if (!selectedId) return;
+        setLoading(true);
+        setError('');
+        try {
+            await superadminMoveUser({ userId: user.id, newRestaurantId: selectedId });
+            onMoved();
+            // Optional: alert success
+        } catch (err: any) {
+            setError(err.toString());
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex justify-between items-center">
+                    <h3 className="font-black text-xs uppercase tracking-widest">Reassign User</h3>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]"> <X size={14} /> </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Moving User</p>
+                        <p className="text-sm font-bold text-white">{user.username}</p>
+                        <p className="text-[10px] text-[var(--text-secondary)] opacity-60">Currently in: {user.restaurant_name || 'System'}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Target Restaurant</label>
+                        <select 
+                            value={selectedId}
+                            onChange={(e) => setSelectedId(e.target.value)}
+                            className="w-full bg-black/40 border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[var(--accent)] appearance-none"
+                        >
+                            <option value="" disabled>Select a restaurant...</option>
+                            {restaurants.map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {error && <p className="text-[10px] text-red-400 font-bold">{error}</p>}
+
+                    <div className="flex gap-3 pt-2">
+                        <button onClick={onClose} className="flex-1 py-2 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-[10px] font-black uppercase tracking-widest border border-[var(--border)]">Cancel</button>
+                        <button 
+                            onClick={handleMove}
+                            disabled={loading || selectedId === user.restaurant_id}
+                            className="flex-1 py-2 rounded-xl bg-[var(--accent)] text-black text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                        >
+                            {loading ? 'Moving...' : 'Confirm Move'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

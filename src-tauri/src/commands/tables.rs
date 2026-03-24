@@ -16,11 +16,11 @@ pub async fn get_tables(
             CASE
                 WHEN EXISTS (
                     SELECT 1 FROM orders o
-                    WHERE o.table_id = ft.name AND o.status = 'pending_payment' AND o.is_deleted = 0
+                    WHERE o.table_id = ft.name AND o.status = 'pending_payment' AND o.is_deleted = 0 AND o.restaurant_id = ft.restaurant_id
                 ) THEN 'waiting'
                 WHEN EXISTS (
                     SELECT 1 FROM orders o
-                    WHERE o.table_id = ft.name AND o.status = 'open' AND o.is_deleted = 0
+                    WHERE o.table_id = ft.name AND o.status = 'open' AND o.is_deleted = 0 AND o.restaurant_id = ft.restaurant_id
                 ) THEN 'busy'
                 ELSE 'available'
             END AS status
@@ -72,10 +72,10 @@ pub async fn create_table(
 }
 
 #[tauri::command]
-pub async fn delete_table(id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_table(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
     pool.execute(
-        "UPDATE floor_tables SET is_deleted=1 WHERE id=?",
-        params![id]
+        "UPDATE floor_tables SET is_deleted=1 WHERE id=? AND restaurant_id=?",
+        params![id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;

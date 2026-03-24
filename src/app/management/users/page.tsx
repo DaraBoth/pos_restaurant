@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getUsers, deleteUser, UserSession } from '@/lib/tauri-commands';
+import { getUsers, deleteUser } from '@/lib/api/auth';
+import { useAuth } from '@/providers/AuthProvider';
+import type { UserSession } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { Users as UsersIcon, Plus, Search, Edit3, Trash2, Shield } from 'lucide-react';
 import UserModal from '@/components/management/UserModal';
@@ -11,14 +13,17 @@ export default function UsersManagement() {
     const [editingUser, setEditingUser] = useState<UserSession | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const { t } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
 
     useEffect(() => {
         loadUsers();
     }, []);
 
     async function loadUsers() {
+        if (!restaurantId) return;
         try {
-            const data = await getUsers();
+            const data = await getUsers(restaurantId);
             setUsers(data);
         } catch (e) {
             console.error(e);
@@ -28,7 +33,7 @@ export default function UsersManagement() {
     async function handleDelete(id: string) {
         if (!confirm(t('confirm'))) return;
         try {
-            await deleteUser(id);
+            await deleteUser(id, restaurantId || '');
             loadUsers();
         } catch (e) {
             console.error(e);

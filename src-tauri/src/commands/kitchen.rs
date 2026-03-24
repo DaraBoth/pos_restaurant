@@ -8,16 +8,17 @@ use crate::models::{KitchenOrder, KitchenOrderItem};
 #[tauri::command]
 pub async fn get_kitchen_orders(
     pool: State<'_, Arc<Connection>>,
+    restaurant_id: String,
 ) -> Result<Vec<KitchenOrder>, String> {
     // Find open orders that have active (non-done) items
     let mut rows = pool.query(
         "SELECT DISTINCT o.id, o.table_id, o.created_at
          FROM orders o
          JOIN order_items oi ON oi.order_id = o.id
-         WHERE o.status = 'open' AND o.is_deleted = 0
+         WHERE o.status = 'open' AND o.is_deleted = 0 AND o.restaurant_id = ?
            AND oi.is_deleted = 0 AND oi.kitchen_status IN ('pending', 'cooking')
          ORDER BY o.created_at ASC",
-         ()
+         params![restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -82,6 +83,7 @@ pub async fn get_kitchen_orders(
 pub async fn update_kitchen_item_status(
     item_id: String,
     status: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     match status.as_str() {
@@ -90,8 +92,10 @@ pub async fn update_kitchen_item_status(
     }
 
     pool.execute(
-        "UPDATE order_items SET kitchen_status = ? WHERE id = ? AND is_deleted = 0",
-        params![status, item_id]
+        "UPDATE order_items SET kitchen_status = ? 
+         WHERE id = ? AND is_deleted = 0 
+           AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)",
+        params![status, item_id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;

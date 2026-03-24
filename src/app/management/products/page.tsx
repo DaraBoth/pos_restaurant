@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { 
     getProducts, getCategories, deleteProduct, updateStock, 
-    Product, Category, deleteCategory 
-} from '@/lib/tauri-commands';
+    deleteCategory 
+} from '@/lib/api/products';
+import { useAuth } from '@/providers/AuthProvider';
+import type { Product, Category } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { 
@@ -23,14 +25,20 @@ export default function ProductsManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
     const { t, lang } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
 
     useEffect(() => {
         loadData();
     }, []);
 
     async function loadData() {
+        if (!restaurantId) return;
         try {
-            const [cats, prods] = await Promise.all([getCategories(), getProducts()]);
+            const [cats, prods] = await Promise.all([
+                getCategories(restaurantId), 
+                getProducts(undefined, restaurantId)
+            ]);
             setCategories(cats);
             setProducts(prods);
         } catch (e) {
@@ -41,7 +49,7 @@ export default function ProductsManagement() {
     async function handleDeleteProduct(id: string) {
         if (!confirm('Are you sure you want to delete this product?')) return;
         try {
-            await deleteProduct(id);
+            await deleteProduct(id, restaurantId || '');
             loadData();
         } catch (e) {
             console.error(e);
@@ -59,7 +67,7 @@ export default function ProductsManagement() {
 
         if (!confirm('Are you sure you want to delete this category?')) return;
         try {
-            await deleteCategory(id);
+            await deleteCategory(id, restaurantId || '');
             loadData();
         } catch (e) {
             console.error(e);
@@ -69,7 +77,7 @@ export default function ProductsManagement() {
 
     async function handleStockChange(id: string, currentStock: number, delta: number) {
         try {
-            await updateStock(id, delta);
+            await updateStock(id, delta, restaurantId || '');
             const newStock = Math.max(0, currentStock + delta);
             setProducts(products.map(p => p.id === id ? { ...p, stock_quantity: newStock } : p));
         } catch (e) {

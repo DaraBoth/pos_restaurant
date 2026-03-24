@@ -35,7 +35,7 @@ fn get_modifier(period: &str) -> &'static str {
 }
 
 #[tauri::command]
-pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
+pub async fn get_top_products(period: String, restaurant_id: String, db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
     let modifier = get_modifier(&period);
     
     let query = if period == "today" {
@@ -44,7 +44,7 @@ pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) ->
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
-        WHERE o.status = 'paid' AND o.is_deleted = 0 AND date(o.created_at, 'localtime') = date('now', 'localtime')
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND date(o.created_at, 'localtime') = date('now', 'localtime')
         GROUP BY p.id
         ORDER BY order_count DESC
         "#
@@ -54,16 +54,16 @@ pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) ->
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
-        WHERE o.status = 'paid' AND o.is_deleted = 0 AND o.created_at >= datetime('now', 'localtime', ?)
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', ?)
         GROUP BY p.id
         ORDER BY order_count DESC
         "#
     };
 
     let mut rows = if period == "today" {
-        db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?
+        db.query(query, params![restaurant_id]).await.map_err(|e| format!("Database error: {}", e))?
     } else {
-        db.query(query, params![modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
+        db.query(query, params![restaurant_id, modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
     };
 
     let mut results = Vec::new();
@@ -80,7 +80,7 @@ pub async fn get_top_products(period: String, db: State<'_, Arc<Connection>>) ->
 }
 
 #[tauri::command]
-pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connection>>) -> Result<Vec<CategoryRevenue>, String> {
+pub async fn get_revenue_by_category(period: String, restaurant_id: String, db: State<'_, Arc<Connection>>) -> Result<Vec<CategoryRevenue>, String> {
     let modifier = get_modifier(&period);
     
     let query = if period == "today" {
@@ -90,7 +90,7 @@ pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connectio
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
         JOIN categories c ON c.id = p.category_id
-        WHERE o.status = 'paid' AND o.is_deleted = 0 AND date(o.created_at, 'localtime') = date('now', 'localtime')
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND date(o.created_at, 'localtime') = date('now', 'localtime')
         GROUP BY c.id
         ORDER BY total_revenue DESC
         "#
@@ -101,16 +101,16 @@ pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connectio
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
         JOIN categories c ON c.id = p.category_id
-        WHERE o.status = 'paid' AND o.is_deleted = 0 AND o.created_at >= datetime('now', 'localtime', ?)
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', ?)
         GROUP BY c.id
         ORDER BY total_revenue DESC
         "#
     };
 
     let mut rows = if period == "today" {
-        db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?
+        db.query(query, params![restaurant_id]).await.map_err(|e| format!("Database error: {}", e))?
     } else {
-        db.query(query, params![modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
+        db.query(query, params![restaurant_id, modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
     };
 
     let mut results = Vec::new();
@@ -126,14 +126,14 @@ pub async fn get_revenue_by_category(period: String, db: State<'_, Arc<Connectio
 }
 
 #[tauri::command]
-pub async fn get_peak_hours(period: String, db: State<'_, Arc<Connection>>) -> Result<Vec<PeakHour>, String> {
+pub async fn get_peak_hours(period: String, restaurant_id: String, db: State<'_, Arc<Connection>>) -> Result<Vec<PeakHour>, String> {
     let modifier = get_modifier(&period);
     
     let query = if period == "today" {
         r#"
         SELECT strftime('%H:00', o.created_at, 'localtime') as hour, COUNT(DISTINCT o.id) as order_count
         FROM orders o
-        WHERE o.status = 'paid' AND o.is_deleted = 0 AND date(o.created_at, 'localtime') = date('now', 'localtime')
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND date(o.created_at, 'localtime') = date('now', 'localtime')
         GROUP BY hour
         ORDER BY hour ASC
         "#
@@ -141,16 +141,16 @@ pub async fn get_peak_hours(period: String, db: State<'_, Arc<Connection>>) -> R
         r#"
         SELECT strftime('%H:00', o.created_at, 'localtime') as hour, COUNT(DISTINCT o.id) as order_count
         FROM orders o
-        WHERE o.status = 'paid' AND o.is_deleted = 0 AND o.created_at >= datetime('now', 'localtime', ?)
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', ?)
         GROUP BY hour
         ORDER BY hour ASC
         "#
     };
 
     let mut rows = if period == "today" {
-        db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?
+        db.query(query, params![restaurant_id]).await.map_err(|e| format!("Database error: {}", e))?
     } else {
-        db.query(query, params![modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
+        db.query(query, params![restaurant_id, modifier.to_string()]).await.map_err(|e| format!("Database error: {}", e))?
     };
 
     let mut results = Vec::new();
@@ -165,19 +165,19 @@ pub async fn get_peak_hours(period: String, db: State<'_, Arc<Connection>>) -> R
 }
 
 #[tauri::command]
-pub async fn get_slow_movers(db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
+pub async fn get_slow_movers(restaurant_id: String, db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
     let query = r#"
         SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM products p
         LEFT JOIN order_items oi ON oi.product_id = p.id
-        LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'paid' AND o.is_deleted = 0 AND o.created_at >= datetime('now', 'localtime', '-30 days')
-        WHERE p.is_available = 1
+        LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', '-30 days')
+        WHERE p.is_available = 1 AND p.restaurant_id = ?
         GROUP BY p.id
         HAVING order_count < 3
         ORDER BY order_count ASC
     "#;
 
-    let mut rows = db.query(query, ()).await.map_err(|e| format!("Database error: {}", e))?;
+    let mut rows = db.query(query, params![restaurant_id.clone(), restaurant_id]).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut results = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {

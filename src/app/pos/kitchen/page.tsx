@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getKitchenOrders, updateKitchenItemStatus } from '@/lib/tauri-commands';
+import { getKitchenOrders, updateKitchenItemStatus } from '@/lib/api/kitchen';
 import type { KitchenOrder, KitchenOrderItem } from '@/types';
+import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { ChefHat, UtensilsCrossed, CheckCircle2, Clock, RefreshCw, Flame, LayoutList, Layers } from 'lucide-react';
 
@@ -34,6 +35,8 @@ const STATUS_CONFIG = {
 
 export default function KitchenPage() {
     const { lang, t } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [countdown, setCountdown] = useState(POLL_INTERVAL);
@@ -42,7 +45,7 @@ export default function KitchenPage() {
 
     const refresh = useCallback(async () => {
         try {
-            const data = await getKitchenOrders();
+            const data = await getKitchenOrders(restaurantId || undefined);
             setOrders(data);
         } catch (e) {
             console.error(e);

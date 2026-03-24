@@ -6,6 +6,7 @@ import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 import { getSessionRounds, Order } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface TableOrderHistoryModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
     const { t } = useLanguage();
+    const { user } = useAuth();
 
     useOverlayBehavior(isOpen, onClose);
 
@@ -31,7 +33,7 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
         async function loadOrders() {
             setLoading(true);
             try {
-                const data = await getSessionRounds(sessionId as string);
+                const data = await getSessionRounds(sessionId as string, user?.restaurant_id || '');
                 if (!cancelled) setOrders(data);
             } catch (error) {
                 console.error(error);

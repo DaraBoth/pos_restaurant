@@ -29,9 +29,9 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
 
     async function handleNoteSave(id: string) {
         try {
-            await updateOrderItemNote(id, noteInput.trim() || undefined);
+            await updateOrderItemNote(id, noteInput.trim() || undefined, user?.restaurant_id || '');
             if (orderId) {
-                const updated = await getOrderItems(orderId);
+                const updated = await getOrderItems(orderId, user?.restaurant_id || '');
                 setItems(updated);
             }
         } catch (e) {
@@ -46,8 +46,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         const nextQty = current + delta;
         if (nextQty < 0) return;
         try {
-            await updateOrderItemQuantity(id, nextQty);
-            const updated = await getOrderItems(orderId);
+            await updateOrderItemQuantity(id, nextQty, user?.restaurant_id || '');
+            const updated = await getOrderItems(orderId, user?.restaurant_id || '');
             setItems(updated);
         } catch (e) {
             console.error(e);
@@ -57,7 +57,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     async function handleVoid() {
         if (!orderId) return;
         try {
-            await voidOrder(orderId);
+            await voidOrder(orderId, user?.restaurant_id || '');
             clearOrder();
         } catch (e) {
             console.error(e);
@@ -67,8 +67,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     async function handleAddRound() {
         if (!user || !sessionId) return;
         try {
-            const newOrderId = await addRound(user.id, sessionId);
-            const newRounds = await getSessionRounds(sessionId);
+            const newOrderId = await addRound(user.id, sessionId, user.restaurant_id);
+            const newRounds = await getSessionRounds(sessionId, user.restaurant_id);
             setRounds(newRounds);
             await switchRound(newOrderId);
         } catch (e) {

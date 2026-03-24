@@ -4,10 +4,10 @@ use std::sync::Arc;
 use crate::models::{ExchangeRate, DbStatus, Payment};
 
 #[tauri::command]
-pub async fn get_exchange_rate(pool: State<'_, Arc<Connection>>) -> Result<ExchangeRate, String> {
+pub async fn get_exchange_rate(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<ExchangeRate, String> {
     let mut rows = pool.query(
-        "SELECT id, rate, effective_from FROM exchange_rates ORDER BY effective_from DESC LIMIT 1",
-        ()
+        "SELECT id, rate, effective_from FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1",
+        params![restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     if let Some(row) = rows.next().await.map_err(|e| format!("Row error: {}", e))? {
@@ -17,19 +17,25 @@ pub async fn get_exchange_rate(pool: State<'_, Arc<Connection>>) -> Result<Excha
             effective_from: row.get::<String>(2).unwrap_or_default(),
         })
     } else {
-        Err("No exchange rate found".into())
+        // Fallback to a default if no rate set for this restaurant yet
+        Ok(ExchangeRate {
+            id: "default".to_string(),
+            rate: 4100.0,
+            effective_from: "".to_string(),
+        })
     }
 }
 
 #[tauri::command]
 pub async fn set_exchange_rate(
     rate: f64,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<ExchangeRate, String> {
     let id = uuid::Uuid::new_v4().to_string();
     pool.execute(
-        "INSERT INTO exchange_rates (id, rate, effective_from) VALUES (?, ?, datetime('now'))",
-        params![id.clone(), rate]
+        "INSERT INTO exchange_rates (id, rate, effective_from, restaurant_id) VALUES (?, ?, datetime('now'), ?)",
+        params![id.clone(), rate, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -78,12 +84,15 @@ pub async fn get_db_status(
 #[tauri::command]
 pub async fn get_payments_for_order(
     order_id: String,
+    restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Payment>, String> {
     let mut rows = pool.query(
-        "SELECT id, order_id, method, currency, amount, bakong_transaction_hash, created_at
-         FROM payments WHERE order_id=? ORDER BY created_at",
-        params![order_id]
+        "SELECT p.id, p.order_id, p.method, p.currency, p.amount, p.bakong_transaction_hash, p.created_at
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+         WHERE p.order_id=? AND o.restaurant_id=? ORDER BY p.created_at",
+        params![order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut payments = Vec::new();

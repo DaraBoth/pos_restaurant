@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getRevenueSummary, getRevenueByPeriod, RevenueSummary, RevenueByDay } from '@/lib/tauri-commands';
-import { getTopProducts, getRevenueByCategory, getPeakHours, getSlowMovers } from '@/lib/api/analytics';
-import type { TopProduct, CategoryRevenue, PeakHour } from '@/types';
+import { getRevenueSummary, getRevenueByPeriod, getTopProducts, getRevenueByCategory, getPeakHours, getSlowMovers } from '@/lib/api/analytics';
+import { useAuth } from '@/providers/AuthProvider';
+import { RevenueSummary, RevenueByDay, TopProduct, CategoryRevenue, PeakHour } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
 import { TrendingUp, ShoppingBag, DollarSign, Clock, AlertTriangle, Flame, PieChart } from 'lucide-react';
@@ -19,6 +19,8 @@ const PERIOD_LABELS: Record<Period, TranslationKey> = {
 
 export default function AnalyticsPage() {
     const { t, lang } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [summary, setSummary] = useState<RevenueSummary | null>(null);
     const [chartData, setChartData] = useState<RevenueByDay[]>([]);
     
@@ -38,12 +40,12 @@ export default function AnalyticsPage() {
             setError('');
             try {
                 const [s, d, tp, cr, ph, sm] = await Promise.all([
-                    getRevenueSummary(),
-                    getRevenueByPeriod(period),
-                    getTopProducts(period),
-                    getRevenueByCategory(period),
-                    getPeakHours(period),
-                    getSlowMovers()
+                    getRevenueSummary(restaurantId || undefined),
+                    getRevenueByPeriod(period, restaurantId || undefined),
+                    getTopProducts(period, restaurantId || undefined),
+                    getRevenueByCategory(period, restaurantId || undefined),
+                    getPeakHours(period, restaurantId || undefined),
+                    getSlowMovers(restaurantId || undefined)
                 ]);
                 setSummary(s);
                 setChartData(d);

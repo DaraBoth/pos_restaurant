@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { History, Search, ArrowUpRight, ArrowDownLeft, Package, Plus, Edit2, Trash2 } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 import { call } from '@/lib/tauri-commands';
 import { InventoryItem } from '@/types';
-import { getInventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem } from '@/lib/api/inventory';
+import { getInventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem, getInventoryLogs } from '@/lib/api/inventory';
 import { formatUsd } from '@/lib/currency';
 
 interface InventoryLog {
@@ -17,6 +18,8 @@ interface InventoryLog {
 }
 
 export default function InventoryManagement() {
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [activeTab, setActiveTab] = useState<'materials' | 'audit'>('materials');
     
     // Materials State
@@ -45,7 +48,7 @@ export default function InventoryManagement() {
     async function loadMaterials() {
         setMaterialsLoading(true);
         try {
-            const data = await getInventoryItems();
+            const data = await getInventoryItems(restaurantId || undefined);
             setMaterials(data);
         } catch (e) {
             console.error(e);
@@ -57,7 +60,7 @@ export default function InventoryManagement() {
     async function loadLogs() {
         setLogsLoading(true);
         try {
-            const data = await call<InventoryLog[]>('get_inventory_logs');
+            const data = await getInventoryLogs(restaurantId || undefined);
             setLogs(data);
         } catch (e) {
             console.error(e);
@@ -73,9 +76,9 @@ export default function InventoryManagement() {
         e.preventDefault();
         try {
             if (editingMaterial) {
-                await updateInventoryItem({ id: editingMaterial.id, khmer_name: '', ...formData });
+                await updateInventoryItem({ id: editingMaterial.id, khmer_name: '', ...formData, restaurantId: restaurantId || '' });
             } else {
-                await createInventoryItem({ khmer_name: '', ...formData });
+                await createInventoryItem({ khmer_name: '', ...formData, restaurant_id: restaurantId || '' });
             }
             setShowMaterialModal(false);
             setEditingMaterial(null);
@@ -89,7 +92,7 @@ export default function InventoryManagement() {
     const handleDeleteMaterial = async (id: string) => {
         if (confirm("Are you sure you want to delete this material? It cannot be undone and will break existing recipes.")) {
             try {
-                await deleteInventoryItem(id);
+                await deleteInventoryItem(id, restaurantId || '');
                 loadMaterials();
             } catch (err) {
                 console.error(err);

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { getExchangeRate, setExchangeRate, ExchangeRate } from '@/lib/tauri-commands';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { formatKhr } from '@/lib/currency';
 import { RefreshCw, Save, ArrowRightLeft } from 'lucide-react';
 
@@ -10,6 +11,8 @@ export default function ExchangeRateManagement() {
     const [newRateInput, setNewRateInput] = useState('');
     const [loading, setLoading] = useState(false);
     const { t } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
 
     useEffect(() => {
         loadRate();
@@ -31,7 +34,7 @@ export default function ExchangeRateManagement() {
 
         setLoading(true);
         try {
-            await setExchangeRate(val);
+            await setExchangeRate(val, restaurantId || undefined);
             await loadRate();
         } catch (e) {
             console.error(e);

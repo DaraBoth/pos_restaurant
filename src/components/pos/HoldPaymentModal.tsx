@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useOrder } from '@/providers/OrderProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { holdOrder } from '@/lib/tauri-commands';
 import { PauseCircle, User, Phone, X } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface Props {
 
 export default function HoldPaymentModal({ onClose, onComplete }: Props) {
     const { orderId, tableId } = useOrder();
+    const { user } = useAuth();
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
         if (!orderId) return;
         setLoading(true);
         try {
-            await holdOrder(orderId, customerName.trim() || undefined, customerPhone.trim() || undefined);
+            await holdOrder(orderId, user?.restaurant_id || '', customerName.trim() || undefined, customerPhone.trim() || undefined);
             onComplete();
         } catch (e) {
             console.error(e);

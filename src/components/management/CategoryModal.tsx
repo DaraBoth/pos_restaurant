@@ -1,6 +1,8 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
-import { Category, createCategory, updateCategory } from '@/lib/tauri-commands';
+import { createCategory, updateCategory } from '@/lib/api/products';
+import type { Category } from '@/types';
+import { useAuth } from '@/providers/AuthProvider';
 import { Save } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 
@@ -15,6 +17,8 @@ export default function CategoryModal({ isOpen, onClose, onSave, category }: Cat
     const [name, setName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
 
     useEffect(() => {
         if (category) {
@@ -31,9 +35,9 @@ export default function CategoryModal({ isOpen, onClose, onSave, category }: Cat
         setLoading(true);
         try {
             if (category) {
-                await updateCategory(category.id, name, khmerName);
+                await updateCategory(category.id, name, khmerName, restaurantId || '');
             } else {
-                await createCategory(name, khmerName);
+                await createCategory(name, khmerName, restaurantId || undefined);
             }
             onSave();
             onClose();

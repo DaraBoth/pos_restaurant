@@ -1,29 +1,31 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { UserSession, createUser, updateUser } from '@/lib/tauri-commands';
 import { Save, Key, Shield } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 import SidebarDrawer from './SidebarDrawer';
-
+ 
 interface UserModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: () => void;
     user?: UserSession | null;
 }
-
+ 
 export default function UserModal({ isOpen, onClose, onSave, user }: UserModalProps) {
+    const { user: currentUser } = useAuth();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<'super_admin' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef'>('cashier');
     const [fullName, setFullName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [loading, setLoading] = useState(false);
-
+ 
     useEffect(() => {
         if (user) {
             setUsername(user.username);
             setPassword('');
-            setRole(user.role);
+            setRole(user.role as any);
             setFullName(user.full_name || '');
             setKhmerName(user.khmer_name || '');
         } else {
@@ -34,7 +36,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
             setKhmerName('');
         }
     }, [user, isOpen]);
-
+ 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
@@ -44,15 +46,19 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                     user.id, 
                     password || undefined, 
                     role, 
+                    currentUser?.restaurant_id || '',
                     fullName || undefined, 
                     khmerName || undefined
                 );
             } else {
                 if (!password) throw new Error('Password required for new users');
+                if (!currentUser?.restaurant_id) throw new Error('No restaurant context found');
+
                 await createUser(
                     username, 
                     password, 
                     role, 
+                    currentUser.restaurant_id,
                     fullName || undefined, 
                     khmerName || undefined
                 );

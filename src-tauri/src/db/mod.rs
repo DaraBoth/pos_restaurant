@@ -18,18 +18,46 @@ const MIGRATIONS: &[(&str, &str)] = &[
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 async fn exec_statements(conn: &Connection, sql: &str) {
-    for raw in sql.split(';') {
-        let stripped: String = raw
-            .lines()
-            .skip_while(|l| { let t = l.trim(); t.is_empty() || t.starts_with("--") })
-            .collect::<Vec<_>>()
-            .join("\n");
-        let stmt = stripped.trim();
-        if stmt.is_empty() { continue; }
-        if let Err(e) = conn.execute(stmt, ()).await {
-            let msg = e.to_string().to_lowercase();
-            if msg.contains("duplicate column") || msg.contains("already exists") { continue; }
-            eprintln!("[DB Migration] warning: {} — SQL: {}", msg, &stmt[..stmt.len().min(120)]);
+    let mut current = String::new();
+    let mut in_trigger = false;
+
+    for line in sql.lines() {
+        let trimmed = line.trim();
+        // Skip comments and empty lines
+        if trimmed.is_empty() || trimmed.starts_with("--") { continue; }
+
+        current.push_str(line);
+        current.push('\n');
+
+        let upper = trimmed.to_uppercase();
+        if upper.contains("CREATE TRIGGER") {
+            in_trigger = true;
+        }
+
+        // Triggers in SQLite end with "END;"
+        // We only execute when we hit a semicolon that isn't trapped inside a trigger
+        // OR when we hit the "END;" of a trigger.
+        let is_statement_end = if in_trigger {
+            upper.ends_with("END;") || upper == "END"
+        } else {
+            trimmed.ends_with(';')
+        };
+
+        if is_statement_end {
+            let stmt = current.trim();
+            if !stmt.is_empty() {
+                if let Err(e) = conn.execute(stmt, ()).await {
+                    let msg = e.to_string().to_lowercase();
+                    // Non-fatal errors common during incremental development
+                    if msg.contains("duplicate column") || msg.contains("already exists") { 
+                        // Ignored
+                    } else {
+                        eprintln!("[DB Migration] warning: {} — SQL: {}", msg, &stmt[..stmt.len().min(120)]);
+                    }
+                }
+            }
+            current.clear();
+            in_trigger = false;
         }
     }
 }
@@ -79,9 +107,14 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("orders",      "round_number",    "round_number INTEGER NOT NULL DEFAULT 1");
     add_col!("orders",      "customer_name",   "customer_name TEXT");
     add_col!("orders",      "customer_phone",  "customer_phone TEXT");
-    add_col!("order_items", "kitchen_status",  "kitchen_status TEXT NOT NULL DEFAULT 'pending'");
     add_col!("floor_tables","seat_count",      "seat_count INTEGER NOT NULL DEFAULT 4");
     add_col!("floor_tables","restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("products",     "stock_quantity",  "stock_quantity INTEGER NOT NULL DEFAULT 0");
+    add_col!("products",     "image_path",      "image_path TEXT");
+    add_col!("inventory_logs", "product_id",     "product_id TEXT REFERENCES products(id) ON DELETE CASCADE");
+    add_col!("inventory_logs", "user_id",        "user_id TEXT REFERENCES users(id) ON DELETE CASCADE");
+    add_col!("inventory_logs", "change_amount",   "change_amount INTEGER NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "reason",          "reason TEXT");
 
     let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS table_sessions (

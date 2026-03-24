@@ -1,7 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Product, Category, createProduct, updateProduct } from '@/lib/tauri-commands';
+import { createProduct, updateProduct } from '@/lib/api/products';
+import type { Product, Category } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { Save, ImagePlus, X, Box, Plus, Trash2 } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 import { getImageSrc } from '@/lib/image';
@@ -18,6 +20,8 @@ interface ProductModalProps {
 
 export default function ProductModal({ isOpen, onClose, onSave, categories, product }: ProductModalProps) {
     const { t } = useLanguage();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurant_id;
     const [name, setName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [priceUsd, setPriceUsd] = useState('0.00');
@@ -57,7 +61,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setActiveTab('general');
         }
         // Load materials always
-        getInventoryItems().then(setMaterials).catch(console.error);
+        getInventoryItems(restaurantId || undefined).then(setMaterials).catch(console.error);
         
         if (product && isOpen) {
             loadIngredients(product.id);
@@ -72,7 +76,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     async function loadIngredients(productId: string) {
         setIngredientsLoading(true);
         try {
-            const data = await getProductIngredients(productId);
+            const data = await getProductIngredients(productId, restaurantId || '');
             setIngredients(data);
         } catch (e) {
             console.error(e);
@@ -85,7 +89,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         if (!product || !newIngredientId) return;
         setIngredientsLoading(true);
         try {
-            await setProductIngredient(product.id, newIngredientId, newIngredientUsage);
+            await setProductIngredient(product.id, newIngredientId, newIngredientUsage, restaurantId || '');
             await loadIngredients(product.id);
             setNewIngredientId('');
             setNewIngredientUsage(1);
@@ -100,7 +104,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     async function handleRemoveIngredient(invId: string) {
         if (!product) return;
         try {
-            await removeProductIngredient(product.id, invId);
+            await removeProductIngredient(product.id, invId, restaurantId || '');
             await loadIngredients(product.id);
         } catch (e) {
             console.error(e);
@@ -145,11 +149,12 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             if (product) {
                 await updateProduct(
                     product.id, name, khmerName, priceCents,
-                    stockQuantity, categoryId, isAvailable, imagePath
+                    stockQuantity, categoryId, isAvailable, imagePath || undefined,
+                    restaurantId || ''
                 );
             } else {
                 await createProduct(
-                    categoryId, name, khmerName, priceCents, stockQuantity, imagePath
+                    categoryId, name, khmerName, priceCents, stockQuantity, imagePath, restaurantId || undefined
                 );
             }
             onSave();

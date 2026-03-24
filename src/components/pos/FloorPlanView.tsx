@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { getTables, getActiveOrderForTable, getOrderItems } from '@/lib/tauri-commands';
+import { getTables } from '@/lib/api/tables';
+import { getActiveOrderForTable, getOrderItems } from '@/lib/api/orders';
 import type { FloorTable } from '@/types';
 import { LayoutGrid, Users2, CheckCircle2, Settings2, UtensilsCrossed, Clock, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
@@ -22,7 +23,11 @@ export default function FloorPlanView() {
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { 
+        if (user?.restaurant_id) {
+            load(); 
+        }
+    }, [user?.restaurant_id]);
 
     async function load() {
         setLoading(true);
