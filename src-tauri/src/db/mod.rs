@@ -88,9 +88,32 @@ async fn ensure_critical_columns(conn: &Connection) {
             id TEXT PRIMARY KEY, table_id TEXT,
             status TEXT NOT NULL DEFAULT 'active',
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            completed_at TEXT
+            completed_at TEXT,
+            restaurant_id TEXT,
+            updated_at TEXT
         )", (),
     ).await;
+
+    // ── Emergency Triggers (Ensure sync works for existing installs) ────────────────
+    // Since we're updating the baseline.sql after the first install, we need to manually
+    // inject these once for existing DBs that already marked 001_baseline as "done".
+    let tables = vec![
+        "restaurants", "users", "categories", "products", "floor_tables", 
+        "exchange_rates", "inventory_items", "orders", "order_items", 
+        "payments", "table_sessions", "inventory_logs", "product_ingredients"
+    ];
+    for t in tables {
+        let trigger_sql = format!(
+            "CREATE TRIGGER IF NOT EXISTS trg_{}_upd AFTER UPDATE ON {} 
+             BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+            t, t, t
+        );
+        let _ = conn.execute(&trigger_sql, ()).await;
+        
+        // Backfill NULL updated_at so they sync on next cycle
+        let update_sql = format!("UPDATE {} SET updated_at = datetime('now') WHERE updated_at IS NULL", t);
+        let _ = conn.execute(&update_sql, ()).await;
+    }
 }
 
 // ─── Public structs exposed to lib.rs ───────────────────────────────────────

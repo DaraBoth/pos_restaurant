@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS restaurants (
     logo_path   TEXT,
     is_deleted  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT
+    updated_at  TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS categories (
     sort_order  INTEGER NOT NULL DEFAULT 0,
     is_deleted  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT,
+    updated_at  TEXT DEFAULT (datetime('now')),
     restaurant_id TEXT REFERENCES restaurants(id)
 );
 
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS products (
     is_available INTEGER NOT NULL DEFAULT 1,
     is_deleted  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT,
+    updated_at  TEXT DEFAULT (datetime('now')),
     restaurant_id TEXT REFERENCES restaurants(id)
 );
 
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS floor_tables (
     status TEXT NOT NULL DEFAULT 'free',
     is_deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT,
+    updated_at  TEXT DEFAULT (datetime('now')),
     seat_count    INTEGER NOT NULL DEFAULT 4,
     UNIQUE(restaurant_id, name)
 );
@@ -170,11 +170,26 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
-CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+
+-- ==========================================
+-- AUTOMATIC TIMESTAMPS (SYNC TRIGGERS)
+-- ==========================================
+
+-- Trigger helper: Update updated_at on every modification
+CREATE TRIGGER IF NOT EXISTS trg_restaurants_upd      AFTER UPDATE ON restaurants    BEGIN UPDATE restaurants    SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_users_upd            AFTER UPDATE ON users          BEGIN UPDATE users          SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_exchange_rates_upd   AFTER UPDATE ON exchange_rates BEGIN UPDATE exchange_rates SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_categories_upd       AFTER UPDATE ON categories     BEGIN UPDATE categories     SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_products_upd         AFTER UPDATE ON products       BEGIN UPDATE products       SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_floor_tables_upd     AFTER UPDATE ON floor_tables   BEGIN UPDATE floor_tables   SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_table_sessions_upd   AFTER UPDATE ON table_sessions BEGIN UPDATE table_sessions SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_orders_upd           AFTER UPDATE ON orders         BEGIN UPDATE orders         SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_order_items_upd      AFTER UPDATE ON order_items    BEGIN UPDATE order_items    SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_payments_upd         AFTER UPDATE ON payments       BEGIN UPDATE payments       SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_inventory_items_upd  AFTER UPDATE ON inventory_items BEGIN UPDATE inventory_items SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_inventory_logs_upd   AFTER UPDATE ON inventory_logs  BEGIN UPDATE inventory_logs  SET updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_ingredients_upd      AFTER UPDATE ON product_ingredients BEGIN UPDATE product_ingredients SET updated_at = datetime('now') WHERE id = NEW.id; END;
 
 
 -- ==========================================

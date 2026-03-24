@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
-import { getSetupStatus } from '@/lib/tauri-commands';
+import { getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 
 const PUBLIC_PATHS = ['/login'];
 const SUPER_ADMIN_PATH = '/super-admin';
@@ -18,6 +18,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     // Once initialised, subsequent tab/route changes never block rendering.
     const [checking, setChecking] = useState(true);
     const initialCheckDone = useRef(false);
+    const syncTriggered = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -88,6 +89,12 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
             if (!cancelled) {
                 setChecking(false);
                 initialCheckDone.current = true;
+
+                // Ensure sync daemon starts for currently logged in restaurant
+                if (user?.restaurant_id && !syncTriggered.current) {
+                    syncTriggered.current = true;
+                    triggerSync(user.restaurant_id).catch(() => { /* offline or no remote */ });
+                }
             }
         }
 
