@@ -22,8 +22,14 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
     useEffect(() => {
         let cancelled = false;
+        
+        // Reset check state on auth transition to ensure new users go through setup flow
+        if (isAuthenticated) {
+            initialCheckDone.current = false;
+        }
 
         async function checkAccess() {
+            // console.log(`[RouteGuard] Checking access for ${pathname}, auth=${isAuthenticated}`);
             if (!isAuthenticated) {
                 if (!PUBLIC_PATHS.includes(pathname)) {
                     router.replace('/login');
@@ -77,10 +83,13 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                 }
 
                 if (pathname === '/login' && user) {
-                    router.replace(status.needs_restaurant_setup ? SETUP_PATH : '/pos');
+                    const dest = status.needs_restaurant_setup ? SETUP_PATH : '/pos/tables';
+                    // console.log(`[RouteGuard] Auth success at login, redirecting to ${dest}`);
+                    router.replace(dest);
                     return;
                 }
-            } catch {
+            } catch (err) {
+                // console.error(`[RouteGuard] Setup check failed:`, err);
                 if (!cancelled && pathname !== SETUP_PATH && pathname !== '/login') {
                     router.replace(SETUP_PATH);
                     return;

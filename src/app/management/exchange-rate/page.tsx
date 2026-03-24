@@ -20,7 +20,7 @@ export default function ExchangeRateManagement() {
 
     async function loadRate() {
         try {
-            const current = await getExchangeRate();
+            const current = await getExchangeRate(restaurantId || undefined);
             setRate(current);
             if (current) setNewRateInput(current.rate.toString());
         } catch (e) {

@@ -4,9 +4,11 @@ import { getCategories, deleteCategory, Category } from '@/lib/tauri-commands';
 import { Layers, Plus, Trash2, Edit3, Search } from 'lucide-react';
 import CategoryModal from '@/components/management/CategoryModal';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function CategoriesManagement() {
     const { t } = useLanguage();
+    const { user } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -18,7 +20,7 @@ export default function CategoriesManagement() {
 
     async function loadData() {
         try {
-            const cats = await getCategories();
+            const cats = await getCategories(user?.restaurant_id || undefined);
             setCategories(cats);
         } catch (e) {
             console.error(e);
@@ -28,7 +30,7 @@ export default function CategoriesManagement() {
     async function handleDelete(id: string) {
         if (!confirm('Are you sure you want to delete this category? All products in this category will become unassigned.')) return;
         try {
-            await deleteCategory(id);
+            await deleteCategory(id, user?.restaurant_id || '');
             loadData();
         } catch (e) {
             console.error(e);

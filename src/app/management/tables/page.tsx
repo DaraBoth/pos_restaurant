@@ -57,7 +57,7 @@ export default function TablesManagementPage() {
             return;
         }
         try {
-            await deleteTable(table.id);
+            await deleteTable(table.id, user?.restaurant_id || '');
             await load();
         } catch (e) {
             setError(t('failedDeleteTable'));
