@@ -38,8 +38,11 @@ export default function SidebarNav() {
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
 
     useEffect(() => {
-        getRestaurant().then(setRestaurant).catch(console.error);
-    }, []);
+        // Re-run whenever user changes to ensure logo/name syncs with active tenant
+        getRestaurant(user?.restaurant_id || undefined)
+            .then(setRestaurant)
+            .catch(console.error);
+    }, [user?.restaurant_id]);
 
     function handleLogout() {
         setUser(null);

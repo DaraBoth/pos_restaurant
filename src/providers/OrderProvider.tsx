@@ -118,7 +118,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
             console.error('Failed to load table session', e);
         }
-    }, [restaurantId]);
+    }, [restaurantId, tableId]); // Added tableId to prevent stale on mount
 
     const switchRound = useCallback(async (oId: string) => {
         setOrderId(oId);
@@ -128,7 +128,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
             console.error('Failed to switch round', e);
         }
-    }, [restaurantId]);
+    }, [restaurantId, sessionId]);
 
     const addToLocalCart = useCallback(async (product: Product) => {
         if (orderId) {
@@ -137,7 +137,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
                 const currentItems = await getOrderItems(orderId, restaurantId || '');
                 setItemsState(currentItems);
             } catch (e) {
-                console.error('Failed to add live item:', e);
+                console.error('Failed to add live item:', e, { orderId, productId: product.id, restaurantId });
             }
             return;
         }
@@ -155,7 +155,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
                 qty: 1,
             }];
         });
-    }, [orderId]);
+    }, [orderId, restaurantId]); // Add restaurantId dependency
 
     const updateLocalCartQty = useCallback((productId: string, qty: number) => {
         if (qty <= 0) {
@@ -179,7 +179,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             setItemsState(updatedItems);
         }
         setLocalCart([]);
-    }, [localCart, tableId, loadTableSession]);
+    }, [localCart, tableId, loadTableSession, restaurantId]);
 
     useEffect(() => {
         refreshRate();

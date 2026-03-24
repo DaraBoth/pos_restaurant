@@ -13,7 +13,7 @@ use libsql::{Connection, params};
 use std::sync::Arc;
 
 /// Epoch start — used on first-ever sync to download everything
-const EPOCH: &str = "1970-01-01T00:00:00";
+const EPOCH: &str = "1970-01-01 00:00:00";
 
 // ─── Tables that need per-restaurant sync ────────────────────────────────────
 // Each entry: (table_name, primary_key_col, restaurant_id_col)
@@ -253,7 +253,7 @@ pub async fn sync_restaurant(
     }
 
     let since = get_last_sync_at(local, restaurant_id).await;
-    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     let mut total = 0;
 
@@ -292,4 +292,21 @@ pub async fn sync_restaurant(
     }
     set_last_sync_at(local, restaurant_id, &now).await;
     total
+}
+
+/// Reset the sync state for a restaurant, causing the NEXT sync cycle 
+/// to be a full re-upload/download (push/pull from EPOCH).
+#[tauri::command]
+pub async fn trigger_sync_reset(
+    restaurant_id: String,
+    local: tauri::State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    println!("[Sync] Reset triggered for restaurant={}. Next cycle will be a full sync.", restaurant_id);
+
+    local.execute(
+        "DELETE FROM _sync_state WHERE restaurant_id = ?",
+        [restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    
+    Ok(())
 }

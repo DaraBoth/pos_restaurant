@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     khmer_name      TEXT,
     is_deleted      INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT
+    updated_at      TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS exchange_rates (
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
     rate            REAL NOT NULL,
     effective_from  TEXT NOT NULL DEFAULT (datetime('now')),
     created_by      TEXT REFERENCES users(id),
-    updated_at      TEXT,
+    updated_at      TEXT DEFAULT (datetime('now')),
     restaurant_id   TEXT REFERENCES restaurants(id)
 );
 
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS table_sessions (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     completed_at TEXT,
     restaurant_id TEXT REFERENCES restaurants(id),
-    updated_at TEXT
+    updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_phone  TEXT,
     is_deleted      INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT,
+    updated_at      TEXT DEFAULT (datetime('now')),
     completed_at    TEXT,
     restaurant_id   TEXT REFERENCES restaurants(id)
 );
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     kitchen_status  TEXT NOT NULL DEFAULT 'pending',
     is_deleted      INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT
+    updated_at      TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS payments (
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS payments (
     amount                  INTEGER NOT NULL,
     bakong_transaction_hash TEXT,
     created_at              TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at              TEXT
+    updated_at              TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS inventory_items (
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     min_stock_qty INTEGER NOT NULL DEFAULT 1,
     cost_per_unit INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
     restaurant_id TEXT REFERENCES restaurants(id)
 );
 
@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS product_ingredients (
     product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     inventory_item_id TEXT NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
     usage_percentage REAL NOT NULL DEFAULT 100,
-    updated_at TEXT
+    updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS inventory_logs (
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
     current_stock     INTEGER NOT NULL DEFAULT 0,
     note              TEXT,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT,
+    updated_at        TEXT DEFAULT (datetime('now')),
     restaurant_id     TEXT REFERENCES restaurants(id)
 );
 
@@ -214,14 +214,7 @@ VALUES (
 );
 
 -- Default exchange rate: 1 USD = 4100 KHR (created by superadmin)
-INSERT OR IGNORE INTO exchange_rates (id, rate, effective_from, created_by, restaurant_id)
-VALUES (
-    'rate-00000000-0000-0000-0000-000000000001',
-    4100.0,
-    datetime('now'),
-    'user-super-admin-0000-0000-000000000001',
-    'rest-00000000-0000-0000-0000-000000000001'
-);
+-- Default exchange rate moved to Rust seeding (auth.rs) due to FK constraints on cold boot
 
 -- Default categories
 INSERT OR IGNORE INTO categories (id, restaurant_id, name, khmer_name, sort_order)

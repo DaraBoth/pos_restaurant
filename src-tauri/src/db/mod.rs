@@ -75,7 +75,7 @@ async fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
         if rows.next().await?.is_some() { continue; }
         println!("[DB] Applying migration {}…", id);
         exec_statements(conn, sql).await;
-        if let Err(e) = conn.execute("INSERT INTO _migrations (id) VALUES (?)", [*id]).await {
+        if let Err(e) = conn.execute("INSERT OR IGNORE INTO _migrations (id) VALUES (?)", [*id]).await {
             eprintln!("[DB] Could not record migration {}: {}", id, e);
         } else {
             println!("[DB] Migration {} done.", id);
@@ -138,7 +138,7 @@ async fn ensure_critical_columns(conn: &Connection) {
     for t in tables {
         let trigger_sql = format!(
             "CREATE TRIGGER IF NOT EXISTS trg_{}_upd AFTER UPDATE ON {} 
-             BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+             BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id AND (updated_at IS NULL OR updated_at <= OLD.updated_at); END;",
             t, t, t
         );
         let _ = conn.execute(&trigger_sql, ()).await;

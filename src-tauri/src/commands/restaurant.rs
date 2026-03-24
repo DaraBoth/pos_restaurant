@@ -6,12 +6,26 @@ use crate::models::{Restaurant, RestaurantUpsertInput, SetupStatus};
 
 
 #[tauri::command]
-pub async fn get_restaurant(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<Restaurant, String> {
+pub async fn get_restaurant(restaurant_id: Option<String>, pool: State<'_, Arc<Connection>>) -> Result<Restaurant, String> {
+    let id_to_use = match restaurant_id {
+        Some(id) if !id.is_empty() => id,
+        _ => {
+            // Fallback: fetch the first restaurant if no specific ID provided (bootstrapping / global UI)
+            let mut rows = pool.query("SELECT id FROM restaurants WHERE is_deleted = 0 LIMIT 1", ()).await
+                .map_err(|e| format!("Database error: {}", e))?;
+            if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+                row.get::<String>(0).unwrap_or_default()
+            } else {
+                return Err("No restaurants found in database".to_string());
+            }
+        }
+    };
+
     let mut rows = pool.query(
         "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, is_deleted, created_at, updated_at
          FROM restaurants
          WHERE id = ? AND is_deleted = 0",
-         params![restaurant_id]
+         params![id_to_use]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -38,7 +52,7 @@ pub async fn get_restaurant(restaurant_id: String, pool: State<'_, Arc<Connectio
 }
 
 #[tauri::command]
-pub async fn get_setup_status(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<SetupStatus, String> {
+pub async fn get_setup_status(restaurant_id: Option<String>, pool: State<'_, Arc<Connection>>) -> Result<SetupStatus, String> {
     let restaurant = get_restaurant(restaurant_id, pool).await?;
 
     Ok(SetupStatus {
@@ -85,7 +99,7 @@ pub async fn update_restaurant(
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    get_restaurant(restaurant_id, pool).await
+    get_restaurant(Some(restaurant_id), pool).await
 }
 
 #[tauri::command]

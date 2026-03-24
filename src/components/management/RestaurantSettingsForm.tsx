@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight } from 'lucide-react';
-import { getRestaurant, updateRestaurant } from '@/lib/api/restaurant';
+import { getRestaurant, updateRestaurant, triggerSyncReset } from '@/lib/api/restaurant';
 import type { RestaurantInput } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
+import { CloudResetDialog } from './CloudResetDialog'; // I'll create this or just inline it
 
 const DEFAULT: RestaurantInput = {
     name: '',
@@ -324,6 +325,11 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                             multiline
                         />
                     </section>
+                    
+                    {/* Cloud Repair Utility */}
+                    {mode === 'manage' && restaurantId && (
+                        <CloudResetDialog restaurantId={restaurantId} />
+                    )}
                 </div>
 
                 <div className="lg:col-span-1">

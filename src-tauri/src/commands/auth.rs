@@ -273,7 +273,15 @@ pub async fn seed_super_admin(conn: &Arc<Connection>) {
          VALUES ('user-super-admin-0000-0000-000000000001', 'superadmin', ?, 'super_admin', 'Super Administrator')",
         params![hash]
     ).await;
-    println!("[Auth] Super admin seeded — username: superadmin  password: superadmin123");
+
+    // Seed default exchange rate here (after user exists)
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO exchange_rates (id, rate, effective_from, created_by, restaurant_id)
+         VALUES ('rate-00000000-0000-0000-0000-000000000001', 4100.0, datetime('now'), 'user-super-admin-0000-0000-000000000001', 'rest-00000000-0000-0000-0000-000000000001')",
+        ()
+    ).await;
+
+    println!("[Auth] Super admin and default exchange rate seeded.");
 }
 
 /// Allows Superadmin to manually override restaurant admin details without entering the restaurant
