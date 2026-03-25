@@ -90,6 +90,45 @@ fn is_remote_auth_error(message: &str) -> bool {
         || lower.contains("database error")
 }
 
+async fn ensure_remote_superadmin(remote: &Connection) -> Result<(), String> {
+    let mut rows = remote.query(
+        "SELECT id, role, is_deleted FROM users WHERE username = 'superadmin' LIMIT 1",
+        ()
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        let id = row.get::<String>(0).unwrap_or_else(|_| "user-super-admin-0000-0000-000000000001".to_string());
+        let role = row.get::<String>(1).unwrap_or_else(|_| "super_admin".to_string());
+        let is_deleted = row.get::<i64>(2).unwrap_or(0);
+
+        if role != "super_admin" || is_deleted != 0 {
+            remote.execute(
+                "UPDATE users
+                 SET role = 'super_admin', is_deleted = 0, updated_at = datetime('now')
+                 WHERE id = ?",
+                params![id]
+            ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+            println!("[Auth] Cloud superadmin account normalized.");
+        }
+        return Ok(());
+    }
+
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(b"superadmin123", &salt)
+        .map_err(|e| format!("Hash error: {}", e))?
+        .to_string();
+
+    remote.execute(
+        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, is_deleted, created_at, updated_at)
+         VALUES ('user-super-admin-0000-0000-000000000001', NULL, 'superadmin', ?, 'super_admin', 'Super Administrator', 0, datetime('now'), datetime('now'))",
+        params![hash]
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    println!("[Auth] Cloud superadmin account created (default password: superadmin123).");
+    Ok(())
+}
+
 async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) -> Result<(), String> {
     local.execute(
         "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at, updated_at)
@@ -576,15 +615,21 @@ pub async fn create_restaurant_with_admin(
 /// Seeds the default super_admin account at startup if it does not exist.
 /// Default credentials: superadmin / superadmin123
 /// This is NOT a Tauri command — called from lib.rs setup.
-pub async fn seed_super_admin(conn: &Arc<Connection>) {
+pub async fn seed_super_admin(local: &Arc<Connection>, remote: Option<&Arc<Connection>>) {
     // Enforce cloud-only superadmin: remove any local cached superadmin account.
-    let _ = conn.execute(
+    let _ = local.execute(
         "DELETE FROM users WHERE username = 'superadmin'",
         ()
     ).await;
 
+    if let Some(remote_conn) = remote {
+        if let Err(e) = ensure_remote_superadmin(remote_conn).await {
+            eprintln!("[Auth] Could not ensure cloud superadmin account: {}", e);
+        }
+    }
+
     // Seed default exchange rate locally (without requiring a local superadmin user).
-    let _ = conn.execute(
+    let _ = local.execute(
         "INSERT OR IGNORE INTO exchange_rates (id, rate, effective_from, created_by, restaurant_id)
          VALUES ('rate-00000000-0000-0000-0000-000000000001', 4100.0, datetime('now'), NULL, 'rest-00000000-0000-0000-0000-000000000001')",
         ()
