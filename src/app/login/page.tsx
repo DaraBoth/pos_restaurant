@@ -107,6 +107,9 @@ export default function LoginPage() {
                     <div className="mb-12">
                         <h2 className="text-4xl font-black text-white tracking-tight mb-3">Sign In</h2>
                         <p className="text-white/40 font-medium tracking-tight">Access the POS terminal with your credentials.</p>
+                        <p className="text-white/25 text-sm font-medium tracking-tight mt-3 max-w-md">
+                            First login on a new device requires internet access and a working cloud database connection.
+                        </p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-8">

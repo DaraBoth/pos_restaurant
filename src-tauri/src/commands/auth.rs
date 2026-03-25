@@ -6,6 +6,154 @@ use crate::models::{User, UserSession, RestaurantSummary};
 use argon2::{Argon2, PasswordHash, PasswordVerifier, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
 
+struct AuthRecord {
+    id: String,
+    restaurant_id: Option<String>,
+    username: String,
+    password_hash: String,
+    role: String,
+    full_name: Option<String>,
+    khmer_name: Option<String>,
+    created_at: String,
+    updated_at: Option<String>,
+}
+
+async fn fetch_auth_record(conn: &Connection, username: &str) -> Result<Option<AuthRecord>, String> {
+    let mut rows = conn.query(
+        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, created_at, updated_at
+         FROM users WHERE username = ? AND is_deleted = 0",
+        params![username.to_string()]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    let Some(row) = rows.next().await.map_err(|e| e.to_string())? else {
+        return Ok(None);
+    };
+
+    Ok(Some(AuthRecord {
+        id: row.get::<String>(0).unwrap_or_default(),
+        restaurant_id: row.get::<String>(1).ok(),
+        username: row.get::<String>(2).unwrap_or_default(),
+        password_hash: row.get::<String>(3).unwrap_or_default(),
+        role: row.get::<String>(4).unwrap_or_default(),
+        full_name: row.get::<String>(5).ok(),
+        khmer_name: row.get::<String>(6).ok(),
+        created_at: row.get::<String>(7).unwrap_or_default(),
+        updated_at: row.get::<String>(8).ok(),
+    }))
+}
+
+fn verify_login_password(password: &str, password_hash: &str) -> Result<(), String> {
+    let parsed_hash = PasswordHash::new(password_hash)
+        .map_err(|_| "Invalid password hash".to_string())?;
+
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .map_err(|_| "Invalid username or password".to_string())
+}
+
+fn to_user_session(record: &AuthRecord) -> UserSession {
+    UserSession {
+        id: record.id.clone(),
+        username: record.username.clone(),
+        role: record.role.clone(),
+        full_name: record.full_name.clone(),
+        khmer_name: record.khmer_name.clone(),
+        restaurant_id: record.restaurant_id.clone(),
+    }
+}
+
+fn first_device_login_message() -> String {
+    "Cloud login is unavailable right now. If this is your first login on a new device, connect to the internet and verify DATABASE_URL and AUTH_TOKEN for the cloud database before trying again.".to_string()
+}
+
+fn namespace_not_found_message() -> String {
+    "Cloud database namespace was not found. Please verify DATABASE_URL and AUTH_TOKEN in your app configuration (or contact service team).".to_string()
+}
+
+fn is_remote_auth_error(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    lower.contains("hrana")
+        || lower.contains("namespace")
+        || lower.contains("remote")
+        || lower.contains("auth token")
+        || lower.contains("cloud sync error")
+        || lower.contains("database error")
+}
+
+async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) -> Result<(), String> {
+    local.execute(
+        "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
+        params![
+            record.id.clone(),
+            record.restaurant_id.clone().unwrap_or_default(),
+            record.username.clone(),
+            record.password_hash.clone(),
+            record.role.clone(),
+            record.full_name.clone().unwrap_or_default(),
+            record.khmer_name.clone().unwrap_or_default(),
+            record.created_at.clone(),
+            record.updated_at.clone().unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())
+        ]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(())
+}
+
+async fn seed_local_restaurant_from_remote(
+    local: &Connection,
+    remote: &Connection,
+    restaurant_id: &str,
+) -> Result<(), String> {
+    let mut rows = remote.query(
+        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at
+         FROM restaurants WHERE id = ? AND is_deleted = 0",
+        params![restaurant_id.to_string()]
+    )
+    .await
+    .map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    let Some(row) = rows.next().await.map_err(|e| e.to_string())? else {
+        return Ok(());
+    };
+
+    local.execute(
+        "INSERT OR REPLACE INTO restaurants (id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        params![
+            row.get::<String>(0).unwrap_or_default(),
+            row.get::<String>(1).unwrap_or_default(),
+            row.get::<String>(2).unwrap_or_default(),
+            row.get::<String>(3).unwrap_or_default(),
+            row.get::<String>(4).unwrap_or_default(),
+            row.get::<String>(5).unwrap_or_default(),
+            row.get::<String>(6).unwrap_or_default(),
+            row.get::<String>(7).unwrap_or_default(),
+            row.get::<String>(8).unwrap_or_default(),
+            row.get::<String>(9).unwrap_or_default(),
+            row.get::<String>(10).unwrap_or_default(),
+            row.get::<String>(11).unwrap_or_default(),
+            row.get::<String>(12).unwrap_or_default(),
+            row.get::<i64>(13).unwrap_or(0),
+            row.get::<String>(14).unwrap_or_default(),
+            row.get::<String>(15).unwrap_or_default()
+        ]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    local.execute(
+        "DELETE FROM _sync_state WHERE restaurant_id = ?",
+        params![restaurant_id.to_string()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    Ok(())
+}
+
 async fn mirror_restaurant_with_admin_to_remote(
     remote: Option<&Arc<Connection>>,
     restaurant_id: &str,
@@ -125,40 +273,54 @@ pub async fn login(
     username: String,
     password: String,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<UserSession, String> {
-    let mut rows = pool.query(
-        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at
-         FROM users WHERE username = ? AND is_deleted = 0",
-        params![username]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+    if let Some(local_record) = fetch_auth_record(&pool, &username).await? {
+        if verify_login_password(&password, &local_record.password_hash).is_ok() {
+            return Ok(to_user_session(&local_record));
+        }
+    }
 
-    let row = rows.next().await.map_err(|e| e.to_string())?
-        .ok_or_else(|| "Invalid username or password".to_string())?;
+    let Some(remote_conn) = remote.0.as_ref() else {
+        return Err("Invalid username or password. If this is your first login on a new device, connect to the internet and try again.".to_string());
+    };
 
-    let user_id = row.get::<String>(0).unwrap_or_default();
-    let user_name = row.get::<String>(2).unwrap_or_default();
-    let password_hash = row.get::<String>(3).unwrap_or_default();
-    let role = row.get::<String>(4).unwrap_or_default();
-    let full_name = row.get::<String>(5).ok();
-    let khmer_name = row.get::<String>(6).ok();
+    let remote_record = match fetch_auth_record(remote_conn, &username).await {
+        Ok(record) => record,
+        Err(error) if error.to_lowercase().contains("namespace") => {
+            eprintln!("[Auth] Remote login failed (namespace): {}", error);
+            return Err(namespace_not_found_message());
+        }
+        Err(error) if is_remote_auth_error(&error) => {
+            eprintln!("[Auth] Remote login failed: {}", error);
+            return Err(first_device_login_message());
+        }
+        Err(error) => return Err(error),
+    };
 
-    let parsed_hash = PasswordHash::new(&password_hash)
-        .map_err(|_| "Invalid password hash".to_string())?;
+    let Some(remote_record) = remote_record else {
+        return Err("Invalid username or password".to_string());
+    };
 
-    Argon2::default()
-        .verify_password(password.as_bytes(), &parsed_hash)
-        .map_err(|_| "Invalid username or password".to_string())?;
+    verify_login_password(&password, &remote_record.password_hash)?;
+    seed_local_user_from_remote(&pool, &remote_record).await?;
 
-    Ok(UserSession {
-        id: user_id,
-        username: user_name,
-        role,
-        full_name,
-        khmer_name,
-        restaurant_id: row.get::<String>(1).ok(),
-    })
+    if let Some(restaurant_id) = remote_record.restaurant_id.as_deref() {
+        match seed_local_restaurant_from_remote(&pool, remote_conn, restaurant_id).await {
+            Ok(()) => {}
+            Err(error) if error.to_lowercase().contains("namespace") => {
+                eprintln!("[Auth] Remote restaurant seed failed (namespace): {}", error);
+                return Err(namespace_not_found_message());
+            }
+            Err(error) if is_remote_auth_error(&error) => {
+                eprintln!("[Auth] Remote restaurant seed failed: {}", error);
+                return Err(first_device_login_message());
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    Ok(to_user_session(&remote_record))
 }
 
 #[tauri::command]

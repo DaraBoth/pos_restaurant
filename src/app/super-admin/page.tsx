@@ -208,6 +208,7 @@ function Field({ label, value, onChange, placeholder, type }: {
 function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () => void }) {
     const dt = new Date(r.created_at + 'Z');
     const licenseExpired = isLicenseExpired(r.license_expires_at);
+    const licenseLabel = getLicenseStatusLabel(r.license_expires_at);
     return (
         <div className="group flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)]/40 transition-all shadow-xl">
             {/* Top stripe */}
@@ -231,7 +232,7 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
                 <div className="space-y-1.5">
                     <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${licenseExpired ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'}`}>
                         {licenseExpired ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
-                        {r.license_expires_at ? (licenseExpired ? 'Expired' : `Until ${r.license_expires_at}`) : 'Perpetual'}
+                        {licenseLabel}
                     </div>
                     {r.address && (
                         <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] opacity-60">
@@ -298,6 +299,12 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
     const [message, setMessage] = useState('');
     const [deleting, setDeleting] = useState(false);
     const licenseExpired = isLicenseExpired(licenseExpiresAt);
+
+    function applyLicenseDuration(unit: 'days' | 'months' | 'years', amount: number) {
+        const nextDate = extendLicenseDate(licenseExpiresAt, unit, amount);
+        setLicenseExpiresAt(nextDate);
+        setMessage(`License extended to ${nextDate}. Click Save License to apply.`);
+    }
 
     async function handleSaveLicense() {
         setSaving(true);
@@ -394,6 +401,56 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-1.5">
                                 <ShieldCheck size={10} /> License Control
                             </p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Renew Period</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => applyLicenseDuration('days', 7)}
+                                    className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                                >
+                                    +7 Days
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyLicenseDuration('months', 1)}
+                                    className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                                >
+                                    +1 Month
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyLicenseDuration('months', 3)}
+                                    className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                                >
+                                    +3 Months
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyLicenseDuration('months', 6)}
+                                    className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                                >
+                                    +6 Months
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyLicenseDuration('years', 1)}
+                                    className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                                >
+                                    +1 Year
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setLicenseExpiresAt('');
+                                        setMessage('License set to perpetual. Click Save License to apply.');
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all"
+                                >
+                                    No Expiry
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Expiry Date</label>
@@ -672,6 +729,54 @@ function isLicenseExpired(value?: string) {
     const now = new Date();
     const expiry = new Date(`${value}T23:59:59`);
     return Number.isFinite(expiry.getTime()) && now > expiry;
+}
+
+function getLicenseStatusLabel(value?: string) {
+    if (!value) {
+        return 'Perpetual';
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(`${value}T00:00:00`);
+    if (!Number.isFinite(expiry.getTime())) {
+        return `Until ${value}`;
+    }
+
+    const diffMs = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+        return `Expired ${Math.abs(diffDays)}d ago`;
+    }
+    if (diffDays === 0) {
+        return 'Expires today';
+    }
+    if (diffDays <= 30) {
+        return `Expires in ${diffDays}d`;
+    }
+
+    return `Until ${value}`;
+}
+
+function extendLicenseDate(currentValue: string | undefined, unit: 'days' | 'months' | 'years', amount: number) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const current = currentValue ? new Date(`${currentValue}T00:00:00`) : null;
+    const baseDate = current && Number.isFinite(current.getTime()) && current > today ? current : today;
+    const next = new Date(baseDate);
+
+    if (unit === 'days') {
+        next.setDate(next.getDate() + amount);
+    } else if (unit === 'months') {
+        next.setMonth(next.getMonth() + amount);
+    } else {
+        next.setFullYear(next.getFullYear() + amount);
+    }
+
+    return next.toISOString().slice(0, 10);
 }
 
 function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
