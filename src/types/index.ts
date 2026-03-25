@@ -18,6 +18,8 @@ export interface RestaurantSummary {
     khmer_name?: string;
     address?: string;
     phone?: string;
+    license_expires_at?: string;
+    license_support_contact?: string;
     created_at: string;
     admin_id?: string;
     admin_username?: string;
@@ -37,6 +39,18 @@ export interface Restaurant {
     vat_number?: string;
     receipt_footer?: string;
     logo_path?: string;
+    license_expires_at?: string;
+    license_support_contact?: string;
+}
+
+export interface RestaurantLicenseStatus {
+    restaurant_id: string;
+    restaurant_name?: string;
+    license_expires_at?: string;
+    license_support_contact?: string;
+    checked_online: boolean;
+    is_expired: boolean;
+    status: 'offline' | 'active' | 'expired';
 }
 
 export interface RestaurantInput {
@@ -50,6 +64,8 @@ export interface RestaurantInput {
     vat_number?: string;
     receipt_footer?: string;
     logo_path?: string;
+    license_expires_at?: string;
+    license_support_contact?: string;
 }
 
 export interface SetupStatus {

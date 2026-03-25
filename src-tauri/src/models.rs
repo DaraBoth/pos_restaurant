@@ -30,6 +30,8 @@ pub struct RestaurantSummary {
     pub khmer_name: Option<String>,
     pub address: Option<String>,
     pub phone: Option<String>,
+    pub license_expires_at: Option<String>,
+    pub license_support_contact: Option<String>,
     pub created_at: String,
     pub admin_id: Option<String>,
     pub admin_username: Option<String>,
@@ -82,9 +84,22 @@ pub struct Restaurant {
     pub vat_number: Option<String>,
     pub receipt_footer: Option<String>,
     pub logo_path: Option<String>,
+    pub license_expires_at: Option<String>,
+    pub license_support_contact: Option<String>,
     pub is_deleted: i64,
     pub created_at: String,
     pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestaurantLicenseStatus {
+    pub restaurant_id: String,
+    pub restaurant_name: Option<String>,
+    pub license_expires_at: Option<String>,
+    pub license_support_contact: Option<String>,
+    pub checked_online: bool,
+    pub is_expired: bool,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

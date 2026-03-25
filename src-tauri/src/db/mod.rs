@@ -121,6 +121,8 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("inventory_logs", "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("inventory_logs", "reason",          "reason TEXT");
     add_col!("product_ingredients", "restaurant_id", "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("restaurants", "license_expires_at", "license_expires_at TEXT");
+    add_col!("restaurants", "license_support_contact", "license_support_contact TEXT");
 
     let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS inventory_logs (

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { getSetupStatus, triggerSync } from '@/lib/tauri-commands';
+import { verifyRestaurantLicense } from '@/lib/api/restaurant';
+import type { RestaurantLicenseStatus } from '@/types';
+import { AlertTriangle, WifiOff } from 'lucide-react';
 
 const PUBLIC_PATHS = ['/login'];
 const SUPER_ADMIN_PATH = '/super-admin';
@@ -17,6 +20,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     // `checking` is only true during the very first auth check (login → session).
     // Once initialised, subsequent tab/route changes never block rendering.
     const [checking, setChecking] = useState(true);
+    const [licenseStatus, setLicenseStatus] = useState<RestaurantLicenseStatus | null>(null);
     const initialCheckDone = useRef(false);
     const syncTriggered = useRef(false);
 
@@ -31,6 +35,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         async function checkAccess() {
             // console.log(`[RouteGuard] Checking access for ${pathname}, auth=${isAuthenticated}`);
             if (!isAuthenticated) {
+                setLicenseStatus(null);
                 if (!PUBLIC_PATHS.includes(pathname)) {
                     router.replace('/login');
                 }
@@ -43,6 +48,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
             // Super admin bypasses all restaurant checks
             if (user?.role === 'super_admin') {
+                setLicenseStatus(null);
                 if (!pathname.startsWith(SUPER_ADMIN_PATH)) {
                     router.replace(SUPER_ADMIN_PATH);
                     return;
@@ -119,6 +125,48 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         };
     }, [isAuthenticated, pathname, router, user]);
 
+    useEffect(() => {
+        if (!isAuthenticated || user?.role === 'super_admin' || !user?.restaurant_id) {
+            setLicenseStatus(null);
+            return;
+        }
+
+        const restaurantId = user.restaurant_id;
+
+        let cancelled = false;
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+
+        async function checkLicense() {
+            if (typeof window !== 'undefined' && !navigator.onLine) {
+                return;
+            }
+
+            try {
+                const status = await verifyRestaurantLicense(restaurantId);
+                if (!cancelled) {
+                    setLicenseStatus(status);
+                }
+            } catch {
+                if (!cancelled) {
+                    setLicenseStatus(prev => prev?.status === 'expired' ? prev : null);
+                }
+            }
+        }
+
+        checkLicense();
+        const onOnline = () => checkLicense();
+        window.addEventListener('online', onOnline);
+        intervalId = setInterval(checkLicense, 60_000);
+
+        return () => {
+            cancelled = true;
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+            window.removeEventListener('online', onOnline);
+        };
+    }, [isAuthenticated, user?.restaurant_id, user?.role]);
+
     if (checking) {
         return (
             <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-dark)' }}>
@@ -133,5 +181,44 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         );
     }
 
+    if (licenseStatus?.status === 'expired') {
+        return <LicenseExpiredScreen status={licenseStatus} />;
+    }
+
     return <>{children}</>;
+}
+
+function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
+    return (
+        <div className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--bg-dark)' }}>
+            <div className="w-full max-w-lg rounded-3xl border border-red-500/25 bg-[#10151d] shadow-2xl p-8 space-y-6 text-center">
+                <div className="mx-auto w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                    <AlertTriangle size={28} />
+                </div>
+                <div className="space-y-2">
+                    <h1 className="text-2xl font-black text-white uppercase tracking-wider">License Expired</h1>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                        {status.restaurant_name || 'This restaurant'} needs a renewed subscription before it can continue while online.
+                    </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2 text-left">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-300">
+                        <AlertTriangle size={14} /> Expiry Details
+                    </div>
+                    <p className="text-sm text-white">
+                        Expiry date: <span className="font-bold">{status.license_expires_at || 'Not set'}</span>
+                    </p>
+                    <p className="text-sm text-white">
+                        Contact service team: <span className="font-bold">{status.license_support_contact || 'Please contact our service team to renew your subscription.'}</span>
+                    </p>
+                </div>
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-left text-sm text-amber-200 flex gap-3">
+                    <WifiOff size={18} className="mt-0.5 flex-shrink-0" />
+                    <p>
+                        Offline use is still tolerated when no internet is available. Once the app comes online and confirms the license is expired, access is locked until renewal.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
 }

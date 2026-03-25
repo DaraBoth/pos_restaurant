@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS restaurants (
     vat_number  TEXT,
     receipt_footer TEXT,
     logo_path   TEXT,
+    license_expires_at TEXT,
+    license_support_contact TEXT,
     is_deleted  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT DEFAULT (datetime('now'))

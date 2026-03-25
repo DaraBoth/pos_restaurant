@@ -1,9 +1,124 @@
 use tauri::State;
 use libsql::{Connection, params};
 use std::sync::Arc;
+use crate::db::RemoteDb;
 use crate::models::{User, UserSession, RestaurantSummary};
 use argon2::{Argon2, PasswordHash, PasswordVerifier, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
+
+async fn mirror_restaurant_with_admin_to_remote(
+    remote: Option<&Arc<Connection>>,
+    restaurant_id: &str,
+    restaurant_name: &str,
+    restaurant_address: &str,
+    restaurant_phone: &str,
+    license_expires_at: &str,
+    license_support_contact: &str,
+    admin_id: &str,
+    admin_username: &str,
+    admin_password_hash: &str,
+    admin_full_name: &str,
+) -> Result<(), String> {
+    let Some(remote) = remote else {
+        return Ok(());
+    };
+
+    remote.execute(
+        "INSERT OR REPLACE INTO restaurants (id, name, address, phone, receipt_footer, license_expires_at, license_support_contact, updated_at)
+         VALUES (?, ?, ?, ?, 'Thank you for your visit!', ?, ?, datetime('now'))",
+        params![
+            restaurant_id.to_string(),
+            restaurant_name.to_string(),
+            restaurant_address.to_string(),
+            restaurant_phone.to_string(),
+            license_expires_at.to_string(),
+            license_support_contact.to_string()
+        ]
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    remote.execute(
+        "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, updated_at)
+         VALUES (?, ?, ?, ?, 'admin', ?, datetime('now'))",
+        params![
+            admin_id.to_string(),
+            restaurant_id.to_string(),
+            admin_username.to_string(),
+            admin_password_hash.to_string(),
+            admin_full_name.to_string()
+        ]
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    Ok(())
+}
+
+async fn mirror_user_update_to_remote(
+    remote: Option<&Arc<Connection>>,
+    user_id: &str,
+    restaurant_id: Option<&str>,
+    username: &str,
+    password_hash: &str,
+    role: &str,
+    full_name: &str,
+) -> Result<(), String> {
+    let Some(remote) = remote else {
+        return Ok(());
+    };
+
+    remote.execute(
+        "INSERT OR IGNORE INTO users (id, restaurant_id, username, password_hash, role, full_name, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+        params![
+            user_id.to_string(),
+            restaurant_id.unwrap_or_default().to_string(),
+            username.to_string(),
+            password_hash.to_string(),
+            role.to_string(),
+            full_name.to_string()
+        ]
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    remote.execute(
+        "UPDATE users
+         SET restaurant_id = ?, username = ?, password_hash = ?, role = ?, full_name = ?, updated_at = datetime('now')
+         WHERE id = ?",
+        params![
+            restaurant_id.unwrap_or_default().to_string(),
+            username.to_string(),
+            password_hash.to_string(),
+            role.to_string(),
+            full_name.to_string(),
+            user_id.to_string()
+        ]
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    Ok(())
+}
+
+async fn purge_restaurant_data(conn: &Connection, restaurant_id: &str) -> Result<(), String> {
+    let statements = [
+        "DELETE FROM payments WHERE order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)",
+        "DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)",
+        "DELETE FROM inventory_logs WHERE restaurant_id = ?",
+        "DELETE FROM table_sessions WHERE restaurant_id = ?",
+        "DELETE FROM orders WHERE restaurant_id = ?",
+        "DELETE FROM inventory_items WHERE restaurant_id = ?",
+        "DELETE FROM products WHERE restaurant_id = ?",
+        "DELETE FROM categories WHERE restaurant_id = ?",
+        "DELETE FROM floor_tables WHERE restaurant_id = ?",
+        "DELETE FROM exchange_rates WHERE restaurant_id = ?",
+        "DELETE FROM users WHERE restaurant_id = ?",
+        "DELETE FROM _sync_state WHERE restaurant_id = ?",
+        "DELETE FROM restaurants WHERE id = ?",
+    ];
+
+    for sql in statements {
+        conn.execute(sql, params![restaurant_id.to_string()])
+            .await
+            .map_err(|e| format!("Database error: {}", e))?;
+    }
+
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn login(
@@ -175,7 +290,7 @@ pub async fn list_all_restaurants(
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<RestaurantSummary>, String> {
     let mut rows = pool.query(
-        "SELECT r.id, r.name, r.khmer_name, r.address, r.phone, r.created_at,
+        "SELECT r.id, r.name, r.khmer_name, r.address, r.phone, r.license_expires_at, r.license_support_contact, r.created_at,
                 u.id, u.username, u.full_name
          FROM restaurants r
          LEFT JOIN users u ON u.restaurant_id = r.id AND u.role = 'admin' AND u.is_deleted = 0
@@ -192,10 +307,12 @@ pub async fn list_all_restaurants(
             khmer_name: row.get::<String>(2).ok(),
             address: row.get::<String>(3).ok(),
             phone: row.get::<String>(4).ok(),
-            created_at: row.get::<String>(5).unwrap_or_default(),
-            admin_id: row.get::<String>(6).ok(),
-            admin_username: row.get::<String>(7).ok(),
-            admin_full_name: row.get::<String>(8).ok(),
+            license_expires_at: row.get::<String>(5).ok(),
+            license_support_contact: row.get::<String>(6).ok(),
+            created_at: row.get::<String>(7).unwrap_or_default(),
+            admin_id: row.get::<String>(8).ok(),
+            admin_username: row.get::<String>(9).ok(),
+            admin_full_name: row.get::<String>(10).ok(),
         });
     }
     Ok(list)
@@ -207,10 +324,13 @@ pub async fn create_restaurant_with_admin(
     restaurant_name: String,
     restaurant_address: Option<String>,
     restaurant_phone: Option<String>,
+    license_expires_at: Option<String>,
+    license_support_contact: Option<String>,
     admin_username: String,
     admin_password: String,
     admin_full_name: Option<String>,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<String, String> {
     let restaurant_id = uuid::Uuid::new_v4().to_string();
     let admin_id = uuid::Uuid::new_v4().to_string();
@@ -221,14 +341,22 @@ pub async fn create_restaurant_with_admin(
         .map_err(|e| format!("Hash error: {}", e))?
         .to_string();
 
+    let address = restaurant_address.unwrap_or_default();
+    let phone = restaurant_phone.unwrap_or_default();
+    let expires_at = license_expires_at.unwrap_or_default();
+    let support_contact = license_support_contact.unwrap_or_default();
+    let full_name = admin_full_name.unwrap_or_default();
+
     pool.execute(
-        "INSERT INTO restaurants (id, name, address, phone, receipt_footer)
-         VALUES (?, ?, ?, ?, 'Thank you for your visit!')",
+        "INSERT INTO restaurants (id, name, address, phone, receipt_footer, license_expires_at, license_support_contact)
+         VALUES (?, ?, ?, ?, 'Thank you for your visit!', ?, ?)",
         params![
             restaurant_id.clone(),
-            restaurant_name,
-            restaurant_address.unwrap_or_default(),
-            restaurant_phone.unwrap_or_default()
+            restaurant_name.clone(),
+            address.clone(),
+            phone.clone(),
+            expires_at.clone(),
+            support_contact.clone()
         ]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
@@ -236,13 +364,27 @@ pub async fn create_restaurant_with_admin(
         "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name)
          VALUES (?, ?, ?, ?, 'admin', ?)",
         params![
-            admin_id,
+            admin_id.clone(),
             restaurant_id.clone(),
-            admin_username,
-            hash,
-            admin_full_name.unwrap_or_default()
+            admin_username.clone(),
+            hash.clone(),
+            full_name.clone()
         ]
     ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    mirror_restaurant_with_admin_to_remote(
+        remote.0.as_ref(),
+        &restaurant_id,
+        &restaurant_name,
+        &address,
+        &phone,
+        &expires_at,
+        &support_contact,
+        &admin_id,
+        &admin_username,
+        &hash,
+        &full_name,
+    ).await?;
 
     Ok(restaurant_id)
 }
@@ -292,20 +434,22 @@ pub async fn superadmin_update_admin(
     new_password: Option<String>,
     new_full_name: Option<String>,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
     
     // First, fetch the existing data so we can reuse it if fields are omitted
     let mut rows = pool.query(
-        "SELECT username, password_hash, full_name FROM users WHERE id = ? AND role = 'admin'",
+        "SELECT restaurant_id, username, password_hash, full_name FROM users WHERE id = ? AND role = 'admin'",
         params![admin_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let row = rows.next().await.map_err(|e| e.to_string())?
         .ok_or_else(|| "Admin account not found".to_string())?;
 
-    let existing_username: String = row.get(0).unwrap_or_default();
-    let existing_hash: String = row.get(1).unwrap_or_default();
-    let existing_fullname: Option<String> = row.get(2).ok();
+    let restaurant_id: Option<String> = row.get(0).ok();
+    let existing_username: String = row.get(1).unwrap_or_default();
+    let existing_hash: String = row.get(2).unwrap_or_default();
+    let existing_fullname: Option<String> = row.get(3).ok();
 
     // Determine target values
     let final_username = new_username.unwrap_or(existing_username);
@@ -323,10 +467,20 @@ pub async fn superadmin_update_admin(
 
     pool.execute(
         "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ?",
-        params![final_username, final_hash, final_fullname, admin_id]
+        params![final_username.clone(), final_hash.clone(), final_fullname.clone(), admin_id.clone()]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    mirror_user_update_to_remote(
+        remote.0.as_ref(),
+        &admin_id,
+        restaurant_id.as_deref(),
+        &final_username,
+        &final_hash,
+        "admin",
+        &final_fullname,
+    ).await?;
 
     Ok(())
 }
@@ -338,6 +492,7 @@ pub async fn update_superadmin_profile(
     new_password: Option<String>,
     new_full_name: Option<String>,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
     let mut rows = pool.query(
         "SELECT username, password_hash, full_name FROM users WHERE id = ? AND role = 'super_admin'",
@@ -366,10 +521,20 @@ pub async fn update_superadmin_profile(
 
     pool.execute(
         "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ? AND role = 'super_admin'",
-        params![final_username, final_hash, final_fullname, superadmin_id]
+        params![final_username.clone(), final_hash.clone(), final_fullname.clone(), superadmin_id.clone()]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    mirror_user_update_to_remote(
+        remote.0.as_ref(),
+        &superadmin_id,
+        None,
+        &final_username,
+        &final_hash,
+        "super_admin",
+        &final_fullname,
+    ).await?;
 
     Ok(())
 }
@@ -419,13 +584,110 @@ pub async fn superadmin_move_user(
     user_id: String,
     new_restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
+    let mut rows = pool.query(
+        "SELECT username, password_hash, role, full_name FROM users WHERE id = ? AND is_deleted = 0",
+        params![user_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "User not found".to_string())?;
+
+    let username: String = row.get(0).unwrap_or_default();
+    let password_hash: String = row.get(1).unwrap_or_default();
+    let role: String = row.get(2).unwrap_or_default();
+    let full_name: String = row.get::<String>(3).unwrap_or_default();
+
     pool.execute(
         "UPDATE users SET restaurant_id = ?, updated_at = datetime('now') WHERE id = ?",
-        params![new_restaurant_id, user_id]
+        params![new_restaurant_id.clone(), user_id.clone()]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    mirror_user_update_to_remote(
+        remote.0.as_ref(),
+        &user_id,
+        Some(&new_restaurant_id),
+        &username,
+        &password_hash,
+        &role,
+        &full_name,
+    ).await?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn superadmin_create_restaurant_user(
+    restaurant_id: String,
+    username: String,
+    password: String,
+    role: String,
+    full_name: Option<String>,
+    khmer_name: Option<String>,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
+) -> Result<String, String> {
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| format!("Hash error: {}", e))?
+        .to_string();
+
+    let user_id = uuid::Uuid::new_v4().to_string();
+    let final_full_name = full_name.unwrap_or_default();
+    let final_khmer_name = khmer_name.unwrap_or_default();
+
+    pool.execute(
+        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        params![
+            user_id.clone(),
+            restaurant_id.clone(),
+            username.clone(),
+            hash.clone(),
+            role.clone(),
+            final_full_name.clone(),
+            final_khmer_name.clone()
+        ]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    let Some(remote_conn) = remote.0.as_ref() else {
+        return Ok(user_id);
+    };
+
+    remote_conn.execute(
+        "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        params![
+            user_id.clone(),
+            restaurant_id,
+            username,
+            hash,
+            role,
+            final_full_name,
+            final_khmer_name
+        ]
+    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+
+    Ok(user_id)
+}
+
+#[tauri::command]
+pub async fn delete_restaurant(
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
+) -> Result<(), String> {
+    purge_restaurant_data(&pool, &restaurant_id).await?;
+
+    if let Some(remote_conn) = remote.0.as_ref() {
+        purge_restaurant_data(remote_conn, &restaurant_id).await?;
+    }
 
     Ok(())
 }

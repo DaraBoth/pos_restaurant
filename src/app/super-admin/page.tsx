@@ -4,21 +4,25 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import {
     listAllRestaurants, createRestaurantWithAdmin, superadminUpdateAdmin,
-    updateSuperadminProfile, superadminGetAllUsers, superadminMoveUser, SuperadminUserView
+    updateSuperadminProfile, superadminGetAllUsers, superadminMoveUser, SuperadminUserView,
+    superadminCreateRestaurantUser, deleteRestaurant
 } from '@/lib/api/auth';
 import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import {
     ShieldCheck, LogOut, Plus, RefreshCw, Store,
     User, Phone, MapPin, Calendar, ChevronRight,
-    X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search
+    X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus
 } from 'lucide-react';
+import { updateRestaurantLicense } from '@/lib/api/restaurant';
 
 // ─── Create Restaurant Modal ────────────────────────────────────────────
 type CreateForm = {
     restaurantName: string;
     restaurantAddress: string;
     restaurantPhone: string;
+    licenseExpiresAt: string;
+    licenseSupportContact: string;
     adminUsername: string;
     adminPassword: string;
     adminFullName: string;
@@ -30,6 +34,7 @@ function CreateRestaurantModal({ onClose, onCreated }: {
 }) {
     const [form, setForm] = useState<CreateForm>({
         restaurantName: '', restaurantAddress: '', restaurantPhone: '',
+        licenseExpiresAt: '', licenseSupportContact: 'Contact our service team to renew your subscription.',
         adminUsername: '', adminPassword: '', adminFullName: '',
     });
     const [showPw, setShowPw] = useState(false);
@@ -56,6 +61,8 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                 restaurantName: form.restaurantName,
                 restaurantAddress: form.restaurantAddress || undefined,
                 restaurantPhone: form.restaurantPhone || undefined,
+                licenseExpiresAt: form.licenseExpiresAt || undefined,
+                licenseSupportContact: form.licenseSupportContact || undefined,
                 adminUsername: form.adminUsername,
                 adminPassword: form.adminPassword,
                 adminFullName: form.adminFullName || undefined,
@@ -111,6 +118,8 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                             <Field label="Restaurant Name *" value={form.restaurantName} onChange={update('restaurantName')} placeholder="Summer Café" />
                             <Field label="Address" value={form.restaurantAddress} onChange={update('restaurantAddress')} placeholder="Phnom Penh, Cambodia" />
                             <Field label="Phone" value={form.restaurantPhone} onChange={update('restaurantPhone')} placeholder="+855 12 345 678" />
+                            <Field label="License Expiry" type="date" value={form.licenseExpiresAt} onChange={update('licenseExpiresAt')} />
+                            <Field label="Support Contact" value={form.licenseSupportContact} onChange={update('licenseSupportContact')} placeholder="Phone, Telegram, or office contact" />
                         </div>
                     </div>
 
@@ -175,16 +184,17 @@ function CreateRestaurantModal({ onClose, onCreated }: {
     );
 }
 
-function Field({ label, value, onChange, placeholder }: {
+function Field({ label, value, onChange, placeholder, type }: {
     label: string; value: string;
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     placeholder?: string;
+    type?: string;
 }) {
     return (
         <div className="space-y-1">
             <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-70">{label}</label>
             <input
-                type="text"
+                type={type || 'text'}
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
@@ -197,6 +207,7 @@ function Field({ label, value, onChange, placeholder }: {
 // ─── Restaurant Card ─────────────────────────────────────────────────────
 function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () => void }) {
     const dt = new Date(r.created_at + 'Z');
+    const licenseExpired = isLicenseExpired(r.license_expires_at);
     return (
         <div className="group flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)]/40 transition-all shadow-xl">
             {/* Top stripe */}
@@ -218,6 +229,10 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 
                 {/* Details */}
                 <div className="space-y-1.5">
+                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${licenseExpired ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'}`}>
+                        {licenseExpired ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
+                        {r.license_expires_at ? (licenseExpired ? 'Expired' : `Until ${r.license_expires_at}`) : 'Perpetual'}
+                    </div>
                     {r.address && (
                         <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] opacity-60">
                             <MapPin size={11} className="flex-shrink-0" />
@@ -270,7 +285,53 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 }
 
 // ─── Restaurant Detail Drawer ────────────────────────────────────────────
-function RestaurantDrawer({ r, onClose, onEditAdmin }: { r: RestaurantSummary; onClose: () => void; onEditAdmin: (r: RestaurantSummary) => void }) {
+function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: {
+    r: RestaurantSummary;
+    onClose: () => void;
+    onEditAdmin: (r: RestaurantSummary) => void;
+    onCreateUser: (r: RestaurantSummary) => void;
+    onUpdated: () => void;
+}) {
+    const [licenseExpiresAt, setLicenseExpiresAt] = useState(r.license_expires_at || '');
+    const [supportContact, setSupportContact] = useState(r.license_support_contact || '');
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const licenseExpired = isLicenseExpired(licenseExpiresAt);
+
+    async function handleSaveLicense() {
+        setSaving(true);
+        setMessage('');
+        try {
+            await updateRestaurantLicense(r.id, licenseExpiresAt || undefined, supportContact || undefined);
+            setMessage('License updated.');
+            onUpdated();
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : String(error));
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleDeleteRestaurant() {
+        const confirmed = window.confirm(`Delete ${r.name} and all related restaurant data? This will remove users, orders, products, tables, inventory, and sync records.`);
+        if (!confirmed) {
+            return;
+        }
+
+        setDeleting(true);
+        setMessage('');
+        try {
+            await deleteRestaurant(r.id);
+            onUpdated();
+            onClose();
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : String(error));
+        } finally {
+            setDeleting(false);
+        }
+    }
+
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -295,23 +356,72 @@ function RestaurantDrawer({ r, onClose, onEditAdmin }: { r: RestaurantSummary; o
                     {r.address && <Row icon={MapPin} label="Address" value={r.address} />}
                     {r.phone && <Row icon={Phone} label="Phone" value={r.phone} />}
                     <Row icon={Calendar} label="Created" value={new Date(r.created_at + 'Z').toLocaleDateString()} />
+                    <Row icon={licenseExpired ? ShieldAlert : ShieldCheck} label="License" value={licenseExpiresAt || 'Perpetual'} />
 
                     <div className="border-t border-white/5 pt-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-1.5">
                                 <User size={10} /> Admin Account
                             </p>
-                            {r.admin_id && (
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => onEditAdmin(r)}
-                                    className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
+                                    onClick={() => onCreateUser(r)}
+                                    className="p-1.5 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
                                 >
-                                    <Pen size={10} /> Edit
+                                    <UserPlus size={10} /> {r.admin_id ? 'Add User' : 'Create Admin'}
                                 </button>
-                            )}
+                                {r.admin_id && (
+                                    <button
+                                        onClick={() => onEditAdmin(r)}
+                                        className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
+                                    >
+                                        <Pen size={10} /> Edit
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <Row icon={User} label="Username" value={r.admin_username ?? '—'} mono />
                         {r.admin_full_name && <Row icon={User} label="Full Name" value={r.admin_full_name} />}
+                        {!r.admin_id && (
+                            <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
+                                This restaurant has no admin account yet. Use Create Admin to set up the first account.
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-white/5 pt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-1.5">
+                                <ShieldCheck size={10} /> License Control
+                            </p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Expiry Date</label>
+                            <input
+                                type="date"
+                                value={licenseExpiresAt}
+                                onChange={(event) => setLicenseExpiresAt(event.target.value)}
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Support Contact</label>
+                            <input
+                                type="text"
+                                value={supportContact}
+                                onChange={(event) => setSupportContact(event.target.value)}
+                                placeholder="Phone, Telegram, office contact"
+                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                            />
+                        </div>
+                        {message && <p className="text-[11px] text-[var(--text-secondary)]">{message}</p>}
+                        <button
+                            onClick={handleSaveLicense}
+                            disabled={saving}
+                            className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-widest hover:brightness-110 disabled:opacity-60 transition-all"
+                        >
+                            {saving ? 'Saving...' : 'Save License'}
+                        </button>
                     </div>
 
                     <div className="px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20 text-amber-400 text-xs font-medium flex items-center gap-2">
@@ -321,10 +431,19 @@ function RestaurantDrawer({ r, onClose, onEditAdmin }: { r: RestaurantSummary; o
                 </div>
 
                 <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-elevated)]">
-                    <button onClick={onClose}
-                        className="w-full py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
-                        Close
-                    </button>
+                    <div className="space-y-2">
+                        <button
+                            onClick={handleDeleteRestaurant}
+                            disabled={deleting}
+                            className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm font-black text-red-300 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                            <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Restaurant'}
+                        </button>
+                        <button onClick={onClose}
+                            className="w-full py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -353,6 +472,7 @@ export default function SuperAdminPage() {
     const [showCreate, setShowCreate] = useState(false);
     const [selected, setSelected] = useState<RestaurantSummary | null>(null);
     const [editAdmin, setEditAdmin] = useState<RestaurantSummary | null>(null);
+    const [createUserFor, setCreateUserFor] = useState<RestaurantSummary | null>(null);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [showGlobalUsers, setShowGlobalUsers] = useState(false);
     const [movingUser, setMovingUser] = useState<SuperadminUserView | null>(null);
@@ -502,6 +622,8 @@ export default function SuperAdminPage() {
                     r={selected} 
                     onClose={() => setSelected(null)} 
                     onEditAdmin={(r) => setEditAdmin(r)} 
+                    onCreateUser={(r) => setCreateUserFor(r)}
+                    onUpdated={load}
                 />
             )}
             {editAdmin && (
@@ -509,6 +631,13 @@ export default function SuperAdminPage() {
                     r={editAdmin}
                     onClose={() => setEditAdmin(null)}
                     onUpdated={() => { setEditAdmin(null); load(); }}
+                />
+            )}
+            {createUserFor && (
+                <CreateRestaurantUserModal
+                    restaurant={createUserFor}
+                    onClose={() => setCreateUserFor(null)}
+                    onCreated={() => { setCreateUserFor(null); load(); }}
                 />
             )}
             {showEditProfile && (
@@ -531,6 +660,134 @@ export default function SuperAdminPage() {
                     onMoved={() => { setMovingUser(null); /* Refresh global users if needed, but local state update is better */ }}
                 />
             )}
+        </div>
+    );
+}
+
+function isLicenseExpired(value?: string) {
+    if (!value) {
+        return false;
+    }
+
+    const now = new Date();
+    const expiry = new Date(`${value}T23:59:59`);
+    return Number.isFinite(expiry.getTime()) && now > expiry;
+}
+
+function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
+    restaurant: RestaurantSummary;
+    onClose: () => void;
+    onCreated: () => void;
+}) {
+    const defaultRole = restaurant.admin_id ? 'cashier' : 'admin';
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [role, setRole] = useState(defaultRole);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        if (!username.trim() || !password.trim()) {
+            setError('Username and password are required.');
+            return;
+        }
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await superadminCreateRestaurantUser({
+                restaurantId: restaurant.id,
+                username,
+                password,
+                role,
+                fullName: fullName || undefined,
+            });
+            onCreated();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex justify-between items-center">
+                    <div>
+                        <h3 className="font-black text-sm">{restaurant.admin_id ? 'Add Restaurant User' : 'Create Restaurant Admin'}</h3>
+                        <p className="text-[11px] text-[var(--text-secondary)]">{restaurant.name}</p>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]">
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Role</label>
+                        <select
+                            value={role}
+                            onChange={(event) => setRole(event.target.value)}
+                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                        >
+                            <option value="admin">Admin</option>
+                            <option value="manager">Manager</option>
+                            <option value="cashier">Cashier</option>
+                            <option value="waiter">Waiter</option>
+                            <option value="chef">Chef</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name</label>
+                        <input
+                            type="text"
+                            value={fullName}
+                            onChange={(event) => setFullName(event.target.value)}
+                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
+                        <input
+                            type="text"
+                            value={username}
+                            onChange={(event) => setUsername(event.target.value)}
+                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Password</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-300">
+                            {error}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all"
+                    >
+                        {loading ? 'Saving...' : 'Create User'}
+                    </button>
+                </form>
+            </div>
         </div>
     );
 }

@@ -99,6 +99,8 @@ pub fn run() {
             commands::auth::delete_user,
             commands::auth::list_all_restaurants,
             commands::auth::create_restaurant_with_admin,
+            commands::auth::superadmin_create_restaurant_user,
+            commands::auth::delete_restaurant,
             commands::auth::superadmin_update_admin,
             commands::auth::update_superadmin_profile,
             commands::auth::superadmin_get_all_users,
@@ -106,6 +108,8 @@ pub fn run() {
             commands::restaurant::get_restaurant,
             commands::restaurant::get_setup_status,
             commands::restaurant::update_restaurant,
+            commands::restaurant::update_restaurant_license,
+            commands::restaurant::verify_restaurant_license,
             commands::restaurant::save_logo,
             // Products & Categories
             commands::products::get_categories,

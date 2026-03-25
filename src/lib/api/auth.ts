@@ -37,6 +37,8 @@ export const createRestaurantWithAdmin = (params: {
     restaurantName: string;
     restaurantAddress?: string;
     restaurantPhone?: string;
+    licenseExpiresAt?: string;
+    licenseSupportContact?: string;
     adminUsername: string;
     adminPassword: string;
     adminFullName?: string;
@@ -44,10 +46,31 @@ export const createRestaurantWithAdmin = (params: {
     restaurantName: params.restaurantName,
     restaurantAddress: params.restaurantAddress,
     restaurantPhone: params.restaurantPhone,
+    licenseExpiresAt: params.licenseExpiresAt,
+    licenseSupportContact: params.licenseSupportContact,
     adminUsername: params.adminUsername,
     adminPassword: params.adminPassword,
     adminFullName: params.adminFullName,
 });
+
+export const superadminCreateRestaurantUser = (params: {
+    restaurantId: string;
+    username: string;
+    password: string;
+    role: string;
+    fullName?: string;
+    khmerName?: string;
+}) => call<string>('superadmin_create_restaurant_user', {
+    restaurantId: params.restaurantId,
+    username: params.username,
+    password: params.password,
+    role: params.role,
+    fullName: params.fullName,
+    khmerName: params.khmerName,
+});
+
+export const deleteRestaurant = (restaurantId: string) =>
+    call<void>('delete_restaurant', { restaurantId });
 
 export const superadminUpdateAdmin = (params: {
     adminId: string;

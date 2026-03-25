@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight } from 'lucide-react';
+import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, ArrowRight, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { getRestaurant, updateRestaurant, triggerSyncReset } from '@/lib/api/restaurant';
 import type { RestaurantInput } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
@@ -17,6 +17,8 @@ const DEFAULT: RestaurantInput = {
     vat_number: '',
     website: '',
     receipt_footer: 'Thank you for dining with us!',
+    license_expires_at: '',
+    license_support_contact: '',
 };
 
 const SAMPLE_SETUP_INFO: RestaurantInput = {
@@ -99,6 +101,8 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         vat_number: restaurant.vat_number || '',
                         website: restaurant.website || '',
                         receipt_footer: restaurant.receipt_footer || DEFAULT.receipt_footer,
+                        license_expires_at: restaurant.license_expires_at || '',
+                        license_support_contact: restaurant.license_support_contact || '',
                     };
 
                     const isSetupTemplate =
@@ -197,6 +201,16 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
+                    {info.license_expires_at && (
+                        <div className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-widest flex items-center gap-2 ${new Date(info.license_expires_at) < new Date()
+                            ? 'bg-red-500/10 border-red-500/25 text-red-300'
+                            : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                        }`}>
+                            {new Date(info.license_expires_at) < new Date() ? <ShieldAlert size={14} /> : <ShieldCheck size={14} />}
+                            License {new Date(info.license_expires_at) < new Date() ? 'Expired' : `Until ${info.license_expires_at}`}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleSave}
                         disabled={saving}
@@ -236,6 +250,20 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         </button>
                     )}
                 </div>
+            </div>
+
+            <div className="pos-card p-5 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[var(--text-secondary)]">
+                    <ShieldCheck size={14} className="text-[var(--accent-blue)]" /> License Status
+                </div>
+                <p className="text-sm text-[var(--foreground)]">
+                    {info.license_expires_at
+                        ? `This restaurant license is set to expire on ${info.license_expires_at}.`
+                        : 'This restaurant currently has no expiry date and will be treated as a perpetual license.'}
+                </p>
+                <p className="text-xs text-[var(--text-secondary)] opacity-70">
+                    License renewal details are managed by your service team from the super admin console.
+                </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
