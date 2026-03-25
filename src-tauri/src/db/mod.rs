@@ -110,6 +110,7 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("orders",      "customer_phone",  "customer_phone TEXT");
     add_col!("floor_tables","seat_count",      "seat_count INTEGER NOT NULL DEFAULT 4");
     add_col!("floor_tables","restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("categories",   "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("products",     "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("products",     "stock_quantity",  "stock_quantity INTEGER NOT NULL DEFAULT 0");
     add_col!("products",     "image_path",      "image_path TEXT");
