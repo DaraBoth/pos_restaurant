@@ -50,15 +50,17 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
         setLoading(true);
         try {
             if (item) {
-                await updateInventoryItem(
-                    item.id, name, khmerName, unitLabel, stockQty, 
-                    minStockQty, costPerUnit, restaurantId || ''
-                );
+                await updateInventoryItem({
+                    id: item.id, name, khmer_name: khmerName, unit_label: unitLabel,
+                    stock_qty: stockQty, min_stock_qty: minStockQty,
+                    cost_per_unit: costPerUnit, restaurant_id: restaurantId || ''
+                });
             } else {
-                await createInventoryItem(
-                    name, khmerName, unitLabel, stockQty, 
-                    minStockQty, costPerUnit, restaurantId || undefined
-                );
+                await createInventoryItem({
+                    name, khmer_name: khmerName, unit_label: unitLabel,
+                    stock_qty: stockQty, min_stock_qty: minStockQty,
+                    cost_per_unit: costPerUnit, restaurant_id: restaurantId || undefined
+                });
             }
             onSave();
             onClose();
