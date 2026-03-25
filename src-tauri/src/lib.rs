@@ -29,6 +29,8 @@ async fn trigger_sync(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .register_uri_scheme_protocol("asset", move |ctx, request| {
             let path = request.uri().path();
             // Remove leading slash if present
