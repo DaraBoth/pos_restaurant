@@ -10,7 +10,6 @@ export default function AppUpdater() {
     const [error, setError] = useState('');
     const [dismissedVersion, setDismissedVersion] = useState<string>('');
     const [latestVersion, setLatestVersion] = useState('');
-    const [currentVersion, setCurrentVersion] = useState('');
     const [downloaded, setDownloaded] = useState(0);
     const [contentLength, setContentLength] = useState(0);
     const [pendingUpdate, setPendingUpdate] = useState<any>(null);
@@ -35,15 +34,7 @@ export default function AppUpdater() {
             setState(prev => (prev === 'downloading' ? prev : 'checking'));
 
             try {
-                const [{ check }, { getVersion }] = await Promise.all([
-                    import('@tauri-apps/plugin-updater'),
-                    import('@tauri-apps/api/app'),
-                ]);
-
-                const version = await getVersion();
-                if (!cancelled) {
-                    setCurrentVersion(version);
-                }
+                const { check } = await import('@tauri-apps/plugin-updater');
 
                 const update = await check();
                 if (cancelled) {
@@ -159,7 +150,7 @@ export default function AppUpdater() {
 
             <p className="text-sm text-white">
                 New version <span className="font-black text-emerald-300">{latestVersion}</span>
-                {currentVersion ? ` is ready (current: ${currentVersion}).` : ' is ready.'}
+                {' is ready.'}
             </p>
 
             {state === 'downloading' && (

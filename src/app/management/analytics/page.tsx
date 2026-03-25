@@ -35,6 +35,11 @@ export default function AnalyticsPage() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        if (!restaurantId) {
+            setLoading(false);
+            return;
+        }
+
         async function load() {
             setLoading(true);
             setError('');
@@ -62,7 +67,7 @@ export default function AnalyticsPage() {
             }
         }
         load();
-    }, [period, t]);
+    }, [period, t, restaurantId]);
 
     const maxRevenue = chartData.length > 0 ? Math.max(...chartData.map(d => d.total_usd)) : 1;
 
