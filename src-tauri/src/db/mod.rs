@@ -99,7 +99,17 @@ async fn ensure_critical_columns(conn: &Connection) {
     macro_rules! add_col {
         ($table:expr, $col:expr, $def:expr) => {
             if !column_exists(conn, $table, $col).await {
-                let _ = conn.execute(concat!("ALTER TABLE ", $table, " ADD COLUMN ", $def), ()).await;
+                let sql = concat!("ALTER TABLE ", $table, " ADD COLUMN ", $def);
+                match conn.execute(sql, ()).await {
+                    Ok(_) => println!("[DB] Added column {}.{}", $table, $col),
+                    Err(e) => {
+                        let msg = e.to_string().to_lowercase();
+                        // Only log as warning if it's not an already-exists error
+                        if !msg.contains("already exists") && !msg.contains("duplicate") {
+                            eprintln!("[DB] Error adding {}.{}: {}", $table, $col, e);
+                        }
+                    }
+                }
             }
         };
     }
@@ -126,7 +136,8 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("restaurants", "license_expires_at", "license_expires_at TEXT");
     add_col!("restaurants", "license_support_contact", "license_support_contact TEXT");
 
-    let _ = conn.execute(
+    // Ensure emergency tables exist
+    if let Err(e) = conn.execute(
         "CREATE TABLE IF NOT EXISTS inventory_logs (
             id TEXT PRIMARY KEY,
             inventory_item_id TEXT,
@@ -142,17 +153,21 @@ async fn ensure_critical_columns(conn: &Connection) {
             updated_at TEXT DEFAULT (datetime('now')),
             restaurant_id TEXT
         )", (),
-    ).await;
+    ).await {
+        println!("[DB] Note: inventory_logs table creation returned: {} (may already exist)", e);
+    }
 
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "CREATE TABLE IF NOT EXISTS _sync_state (
             restaurant_id TEXT PRIMARY KEY,
             synced_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00',
             updated_at TEXT DEFAULT (datetime('now'))
         )", (),
-    ).await;
+    ).await {
+        println!("[DB] Note: _sync_state table creation returned: {} (may already exist)", e);
+    }
 
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "CREATE TABLE IF NOT EXISTS table_sessions (
             id TEXT PRIMARY KEY, table_id TEXT,
             status TEXT NOT NULL DEFAULT 'active',
@@ -161,7 +176,9 @@ async fn ensure_critical_columns(conn: &Connection) {
             restaurant_id TEXT,
             updated_at TEXT
         )", (),
-    ).await;
+    ).await {
+        println!("[DB] Note: table_sessions table creation returned: {} (may already exist)", e);
+    }
 
     // ── Emergency Triggers (Ensure sync works for existing installs) ────────────────
     // Since we're updating the baseline.sql after the first install, we need to manually
@@ -173,6 +190,14 @@ async fn ensure_critical_columns(conn: &Connection) {
     
     // Drop product_ingredients as requested by user
     let _ = conn.execute("DROP TABLE IF EXISTS product_ingredients", ()).await;
+    
+    // Fix UNIQUE constraint issue: create a partial unique index for non-deleted floor_tables
+    // This allows soft-deleted rows to be replaced with new ones having the same name
+    let _ = conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_floor_tables_unique_active 
+         ON floor_tables(restaurant_id, name) WHERE is_deleted = 0",
+        ()
+    ).await;
 
     // // Sync Triggers for all tables - REMOVED because recursive updates cause hangs in SQLite
     // let tables = vec![
@@ -208,6 +233,39 @@ pub struct RemoteDb(pub Option<Arc<Connection>>);
 
 // ─── Entry point ────────────────────────────────────────────────────────────
 
+async fn log_schema_info(conn: &Connection) {
+    // Log all tables and their columns for debugging
+    let tables_to_check = vec![
+        "restaurants", "users", "categories", "products", "orders", "order_items", 
+        "payments", "floor_tables", "inventory_items", "inventory_logs", 
+        "exchange_rates", "table_sessions"
+    ];
+    
+    for table_name in tables_to_check {
+        let sql = format!("PRAGMA table_info({})", table_name);
+        match conn.query(&sql, ()).await {
+            Ok(mut rows) => {
+                let mut cols = Vec::new();
+                while let Ok(Some(row)) = rows.next().await {
+                    if let Ok(col_name) = row.get::<String>(1) {
+                        cols.push(col_name);
+                    }
+                }
+                if cols.is_empty() {
+                    eprintln!("[DB Schema] Table {} does NOT exist!", table_name);
+                } else {
+                    println!("[DB Schema] {}: {}", table_name, cols.join(", "));
+                }
+            }
+            Err(_) => {
+                eprintln!("[DB Schema] Could not query schema for table {}", table_name);
+            }
+        }
+    }
+}
+
+// ─── Entry point ────────────────────────────────────────────────────────────
+
 pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<(Arc<Connection>, Option<Arc<Connection>>)> {
     // Credentials: OS env overrides compile-time baked value
     let url   = std::env::var("DATABASE_URL").ok().filter(|s| !s.is_empty())
@@ -226,6 +284,10 @@ pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<(Arc<Connec
         eprintln!("[DB] Migration error (non-fatal): {}", e);
     }
     ensure_critical_columns(&local_conn).await;
+    
+    // Log schema for debugging
+    log_schema_info(&local_conn).await;
+    
     sync::ensure_sync_table(&local_conn).await;
 
     // ── Remote Turso (optional, used only for sync) ──────────────────────────

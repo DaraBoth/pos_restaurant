@@ -56,6 +56,14 @@ pub async fn create_table(
     let id = uuid::Uuid::new_v4().to_string();
     let seats = seat_count.unwrap_or(4);
 
+    // Clean up any soft-deleted table with the same name to avoid UNIQUE constraint violation
+    if let Some(ref rid) = restaurant_id {
+        let _ = pool.execute(
+            "DELETE FROM floor_tables WHERE name = ? AND restaurant_id = ? AND is_deleted = 1",
+            params![name.clone(), rid.clone()],
+        ).await;
+    }
+
     pool.execute(
         "INSERT INTO floor_tables (id, name, status, seat_count, restaurant_id) VALUES (?, ?, 'free', ?, ?)",
         params![id.clone(), name.clone(), seats, restaurant_id]
