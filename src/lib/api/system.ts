@@ -8,3 +8,6 @@ export const setExchangeRate = (rate: number, restaurant_id?: string) =>
     call<ExchangeRate>('set_exchange_rate', { rate, restaurantId: restaurant_id });
 
 export const getDbStatus = () => call<DbStatus>('get_db_status');
+
+export const isRestaurantSynced = (restaurantId: string) =>
+    call<boolean>('is_restaurant_synced', { restaurantId });

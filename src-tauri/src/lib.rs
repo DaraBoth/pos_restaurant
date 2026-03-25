@@ -91,6 +91,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             trigger_sync,
             db::sync::trigger_sync_reset,
+            db::sync::is_restaurant_synced,
             // Auth
             commands::auth::login,
             commands::auth::create_user,

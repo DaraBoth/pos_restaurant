@@ -12,6 +12,7 @@
 use libsql::{Connection, params};
 use std::sync::Arc;
 use tauri::Emitter;
+use crate::db::RemoteDb;
 
 /// Epoch start — used on first-ever sync to download everything
 const EPOCH: &str = "1970-01-01 00:00:00";
@@ -303,4 +304,33 @@ pub async fn trigger_sync_reset(
     ).await.map_err(|e| format!("Database error: {}", e))?;
     
     Ok(())
+}
+
+#[tauri::command]
+pub async fn is_restaurant_synced(
+    restaurant_id: String,
+    local: tauri::State<'_, Arc<Connection>>,
+    remote: tauri::State<'_, RemoteDb>,
+) -> Result<bool, String> {
+    // No remote connection configured: allow access immediately (local-only mode)
+    let Some(remote_conn) = &remote.0 else {
+        return Ok(true);
+    };
+
+    // If cloud is currently unreachable, keep waiting until timeout on frontend
+    if remote_conn.query("SELECT 1", ()).await.is_err() {
+        return Ok(false);
+    }
+
+    let mut rows = local.query(
+        "SELECT synced_at FROM _sync_state WHERE restaurant_id = ?",
+        params![restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let Some(row) = rows.next().await.map_err(|e| e.to_string())? else {
+        return Ok(false);
+    };
+
+    let synced_at = row.get::<String>(0).unwrap_or_default();
+    Ok(!synced_at.trim().starts_with("1970-01-01"))
 }

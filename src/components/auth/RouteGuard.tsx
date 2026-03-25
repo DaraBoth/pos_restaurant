@@ -5,8 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 import { verifyRestaurantLicense } from '@/lib/api/restaurant';
+import { isRestaurantSynced } from '@/lib/api/system';
 import type { RestaurantLicenseStatus } from '@/types';
-import { AlertTriangle, WifiOff } from 'lucide-react';
+import { AlertTriangle, WifiOff, CloudUpload } from 'lucide-react';
 
 const PUBLIC_PATHS = ['/login'];
 const SUPER_ADMIN_PATH = '/super-admin';
@@ -20,6 +21,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     // `checking` is only true during the very first auth check (login → session).
     // Once initialised, subsequent tab/route changes never block rendering.
     const [checking, setChecking] = useState(true);
+    const [initialSyncPending, setInitialSyncPending] = useState(false);
     const [licenseStatus, setLicenseStatus] = useState<RestaurantLicenseStatus | null>(null);
     const initialCheckDone = useRef(false);
     const syncTriggered = useRef(false);
@@ -167,6 +169,50 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         };
     }, [isAuthenticated, user?.restaurant_id, user?.role]);
 
+    useEffect(() => {
+        if (!isAuthenticated || user?.role === 'super_admin' || !user?.restaurant_id) {
+            setInitialSyncPending(false);
+            return;
+        }
+
+        const restaurantId = user.restaurant_id;
+        let cancelled = false;
+
+        async function waitForInitialSync() {
+            setInitialSyncPending(true);
+            const deadline = Date.now() + 60_000;
+
+            while (!cancelled && Date.now() < deadline) {
+                try {
+                    const ready = await isRestaurantSynced(restaurantId);
+                    if (ready) {
+                        if (!cancelled) {
+                            setInitialSyncPending(false);
+                        }
+                        return;
+                    }
+                } catch {
+                    if (!cancelled) {
+                        setInitialSyncPending(false);
+                    }
+                    return;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
+            if (!cancelled) {
+                setInitialSyncPending(false);
+            }
+        }
+
+        waitForInitialSync();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, user?.restaurant_id, user?.role]);
+
     if (checking) {
         return (
             <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-dark)' }}>
@@ -179,6 +225,10 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                 </div>
             </div>
         );
+    }
+
+    if (initialSyncPending) {
+        return <InitialSyncScreen />;
     }
 
     if (licenseStatus?.status === 'expired') {
@@ -217,6 +267,25 @@ function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
                     <p>
                         Offline use is still tolerated when no internet is available. Once the app comes online and confirms the license is expired, access is locked until renewal.
                     </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function InitialSyncScreen() {
+    return (
+        <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-dark)' }}>
+            <div className="text-center max-w-md px-6">
+                <div className="mx-auto mb-4 w-16 h-16 rounded-2xl border border-blue-500/30 bg-blue-500/10 flex items-center justify-center text-blue-300">
+                    <CloudUpload size={28} />
+                </div>
+                <h2 className="text-xl font-black text-white uppercase tracking-widest">Syncing Setup Data</h2>
+                <p className="text-sm text-[var(--text-secondary)] mt-3">
+                    Preparing restaurant data for this device. Please wait a moment before opening POS features.
+                </p>
+                <div className="w-56 h-2 rounded-full bg-white/10 mx-auto mt-6 overflow-hidden">
+                    <div className="h-full bg-blue-400/80 animate-[syncBar_1.6s_ease-in-out_infinite]" style={{ width: '40%' }} />
                 </div>
             </div>
         </div>
