@@ -76,7 +76,7 @@ export default function InventoryManagement() {
         e.preventDefault();
         try {
             if (editingMaterial) {
-                await updateInventoryItem({ id: editingMaterial.id, khmer_name: '', ...formData, restaurantId: restaurantId || '' });
+                await updateInventoryItem({ id: editingMaterial.id, khmer_name: '', ...formData, restaurant_id: restaurantId || '' });
             } else {
                 await createInventoryItem({ khmer_name: '', ...formData, restaurant_id: restaurantId || '' });
             }
