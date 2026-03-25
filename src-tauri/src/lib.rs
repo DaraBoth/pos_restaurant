@@ -78,9 +78,9 @@ pub fn run() {
                     .expect("Failed to initialize database")
             });
 
-            // Seed the built-in super admin account if not present
+            // Seed the built-in super admin account if not present (MUST complete before app is ready)
             let pool_for_seed = Arc::clone(&local_conn);
-            tauri::async_runtime::spawn(async move {
+            tauri::async_runtime::block_on(async {
                 commands::auth::seed_super_admin(&pool_for_seed).await;
             });
 
