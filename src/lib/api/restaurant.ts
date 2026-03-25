@@ -12,7 +12,7 @@ export const updateRestaurantLicense = (
     restaurantId: string,
     licenseExpiresAt?: string,
     licenseSupportContact?: string
-) => call<Restaurant>('update_restaurant_license', {
+) => call<void>('update_restaurant_license', {
     restaurantId,
     licenseExpiresAt: licenseExpiresAt || null,
     licenseSupportContact: licenseSupportContact || null,

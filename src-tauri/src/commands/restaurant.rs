@@ -179,22 +179,28 @@ pub async fn save_logo(
         license_expires_at: Option<String>,
         license_support_contact: Option<String>,
         pool: State<'_, Arc<Connection>>,
-    ) -> Result<Restaurant, String> {
+        remote: State<'_, RemoteDb>,
+    ) -> Result<(), String> {
         let expires_at = normalize_optional_text(license_expires_at);
         let support_contact = normalize_optional_text(license_support_contact);
 
-        pool.execute(
-            "UPDATE restaurants
+        const SQL: &str = "UPDATE restaurants
              SET license_expires_at = ?,
                  license_support_contact = ?,
                  updated_at = datetime('now')
-             WHERE id = ?",
-            params![expires_at.clone(), support_contact.clone(), restaurant_id.clone()]
-        )
-        .await
-        .map_err(|e| format!("Database error: {}", e))?;
+             WHERE id = ?";
 
-        get_restaurant(Some(restaurant_id), pool).await
+        // Write to local (best-effort — restaurant may only exist in cloud)
+        let _ = pool.execute(SQL, params![expires_at.clone(), support_contact.clone(), restaurant_id.clone()]).await;
+
+        // Write to remote so the superadmin list (which reads from cloud) stays in sync.
+        if let Some(remote_conn) = remote.0.as_ref() {
+            remote_conn.execute(SQL, params![expires_at.clone(), support_contact.clone(), restaurant_id.clone()])
+                .await
+                .map_err(|e| format!("Database error: {}", e))?;
+        }
+
+        Ok(())
     }
 
     #[tauri::command]

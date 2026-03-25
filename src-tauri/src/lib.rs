@@ -78,12 +78,7 @@ pub fn run() {
                     .expect("Failed to initialize database")
             });
 
-            // Enforce auth defaults before app is ready (including cloud-only superadmin policy)
-            let pool_for_seed = Arc::clone(&local_conn);
-            let remote_for_seed = remote_conn.clone();
-            tauri::async_runtime::block_on(async {
-                commands::auth::seed_super_admin(&pool_for_seed, remote_for_seed.as_ref()).await;
-            });
+            // App states are registered below.
 
             // Register states — Arc<Connection> for all existing commands, RemoteDb for sync
             app_handle.manage(local_conn);
@@ -107,6 +102,7 @@ pub fn run() {
             commands::auth::delete_restaurant,
             commands::auth::superadmin_update_admin,
             commands::auth::update_superadmin_profile,
+            commands::auth::create_superadmin_account,
             commands::auth::superadmin_get_all_users,
             commands::auth::superadmin_move_user,
             commands::restaurant::get_restaurant,

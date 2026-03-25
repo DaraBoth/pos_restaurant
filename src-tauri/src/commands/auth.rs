@@ -92,24 +92,12 @@ fn is_remote_auth_error(message: &str) -> bool {
 
 async fn ensure_remote_superadmin(remote: &Connection) -> Result<(), String> {
     let mut rows = remote.query(
-        "SELECT id, role, is_deleted FROM users WHERE username = 'superadmin' LIMIT 1",
+        "SELECT 1 FROM users WHERE username = 'superadmin' AND is_deleted = 0 LIMIT 1",
         ()
     ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
 
-    if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
-        let id = row.get::<String>(0).unwrap_or_else(|_| "user-super-admin-0000-0000-000000000001".to_string());
-        let role = row.get::<String>(1).unwrap_or_else(|_| "super_admin".to_string());
-        let is_deleted = row.get::<i64>(2).unwrap_or(0);
-
-        if role != "super_admin" || is_deleted != 0 {
-            remote.execute(
-                "UPDATE users
-                 SET role = 'super_admin', is_deleted = 0, updated_at = datetime('now')
-                 WHERE id = ?",
-                params![id]
-            ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
-            println!("[Auth] Cloud superadmin account normalized.");
-        }
+    if rows.next().await.map_err(|e| e.to_string())?.is_some() {
+        println!("[Auth] Cloud superadmin account already exists.");
         return Ok(());
     }
 
@@ -340,6 +328,22 @@ pub async fn login(
         return Err("Invalid username or password. If this is your first login on a new device, connect to the internet and try again.".to_string());
     };
 
+    // Bootstrap cloud superadmin on-demand when someone tries to login as superadmin.
+    if superadmin_login {
+        match ensure_remote_superadmin(remote_conn).await {
+            Ok(()) => {}
+            Err(error) if error.to_lowercase().contains("namespace") => {
+                eprintln!("[Auth] Cloud superadmin bootstrap failed (namespace): {}", error);
+                return Err(namespace_not_found_message());
+            }
+            Err(error) if is_remote_auth_error(&error) => {
+                eprintln!("[Auth] Cloud superadmin bootstrap failed: {}", error);
+                return Err(first_device_login_message());
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
     let remote_record = match fetch_auth_record(remote_conn, &username).await {
         Ok(record) => record,
         Err(error) if error.to_lowercase().contains("namespace") => {
@@ -508,19 +512,33 @@ pub async fn update_user(
 }
 
 /// Lists all restaurants with their primary admin user (for super admin dashboard).
+/// Prefers the remote (cloud) DB so the superadmin sees every restaurant regardless
+/// of which device it was created on. Falls back to local if offline.
 #[tauri::command]
 pub async fn list_all_restaurants(
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<Vec<RestaurantSummary>, String> {
-    let mut rows = pool.query(
+    let conn: &Connection = match remote.0.as_ref() {
+        Some(r) => r,
+        None => &*pool,
+    };
+
+    const QUERY: &str =
         "SELECT r.id, r.name, r.khmer_name, r.address, r.phone, r.license_expires_at, r.license_support_contact, r.created_at,
                 u.id, u.username, u.full_name
          FROM restaurants r
-         LEFT JOIN users u ON u.restaurant_id = r.id AND u.role = 'admin' AND u.is_deleted = 0
+         LEFT JOIN users u ON u.id = (
+             SELECT id FROM users
+             WHERE restaurant_id = r.id AND role = 'admin' AND is_deleted = 0
+             ORDER BY created_at ASC
+             LIMIT 1
+         )
          WHERE r.is_deleted = 0
-         ORDER BY r.created_at DESC",
-        ()
-    ).await.map_err(|e| format!("Database error: {}", e))?;
+         ORDER BY r.created_at DESC";
+
+    let mut rows = conn.query(QUERY, ())
+        .await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut list = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -612,32 +630,6 @@ pub async fn create_restaurant_with_admin(
     Ok(restaurant_id)
 }
 
-/// Seeds the default super_admin account at startup if it does not exist.
-/// Default credentials: superadmin / superadmin123
-/// This is NOT a Tauri command — called from lib.rs setup.
-pub async fn seed_super_admin(local: &Arc<Connection>, remote: Option<&Arc<Connection>>) {
-    // Enforce cloud-only superadmin: remove any local cached superadmin account.
-    let _ = local.execute(
-        "DELETE FROM users WHERE username = 'superadmin'",
-        ()
-    ).await;
-
-    if let Some(remote_conn) = remote {
-        if let Err(e) = ensure_remote_superadmin(remote_conn).await {
-            eprintln!("[Auth] Could not ensure cloud superadmin account: {}", e);
-        }
-    }
-
-    // Seed default exchange rate locally (without requiring a local superadmin user).
-    let _ = local.execute(
-        "INSERT OR IGNORE INTO exchange_rates (id, rate, effective_from, created_by, restaurant_id)
-         VALUES ('rate-00000000-0000-0000-0000-000000000001', 4100.0, datetime('now'), NULL, 'rest-00000000-0000-0000-0000-000000000001')",
-        ()
-    ).await;
-
-    println!("[Auth] Superadmin local cache cleared; default exchange rate ensured.");
-}
-
 /// Allows Superadmin to manually override restaurant admin details without entering the restaurant
 #[tauri::command]
 pub async fn superadmin_update_admin(
@@ -706,7 +698,13 @@ pub async fn update_superadmin_profile(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
-    let mut rows = pool.query(
+    // Superadmin is cloud-only — read current values from remote when available.
+    let read_conn: &Connection = match remote.0.as_ref() {
+        Some(r) => r,
+        None => &*pool,
+    };
+
+    let mut rows = read_conn.query(
         "SELECT username, password_hash, full_name FROM users WHERE id = ? AND role = 'super_admin'",
         params![superadmin_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
@@ -731,22 +729,21 @@ pub async fn update_superadmin_profile(
         existing_hash
     };
 
-    pool.execute(
-        "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ? AND role = 'super_admin'",
-        params![final_username.clone(), final_hash.clone(), final_fullname.clone(), superadmin_id.clone()]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+    const SQL: &str = "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ? AND role = 'super_admin'";
 
-    mirror_user_update_to_remote(
-        remote.0.as_ref(),
-        &superadmin_id,
-        None,
-        &final_username,
-        &final_hash,
-        "super_admin",
-        &final_fullname,
-    ).await?;
+    // Write to remote (authoritative for superadmin).
+    if let Some(remote_conn) = remote.0.as_ref() {
+        remote_conn.execute(
+            SQL,
+            params![final_username.clone(), final_hash.clone(), final_fullname.clone(), superadmin_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+    }
+
+    // Best-effort local update (may not exist locally — that's fine).
+    let _ = pool.execute(
+        SQL,
+        params![final_username.clone(), final_hash.clone(), final_fullname.clone(), superadmin_id.clone()]
+    ).await;
 
     Ok(())
 }
@@ -765,12 +762,19 @@ pub struct SuperadminUserView {
 #[tauri::command]
 pub async fn superadmin_get_all_users(
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<Vec<SuperadminUserView>, String> {
-    let mut rows = pool.query(
+    let conn: &Connection = match remote.0.as_ref() {
+        Some(r) => r,
+        None => &*pool,
+    };
+
+    let mut rows = conn.query(
         "SELECT u.id, u.restaurant_id, r.name, u.username, u.role, u.full_name, u.created_at
          FROM users u
          LEFT JOIN restaurants r ON u.restaurant_id = r.id AND r.is_deleted = 0
          WHERE u.is_deleted = 0
+           AND u.role != 'super_admin'
          ORDER BY r.name, u.role, u.username",
         ()
     ).await.map_err(|e| format!("Database error: {}", e))?;
@@ -887,6 +891,61 @@ pub async fn superadmin_create_restaurant_user(
     ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
 
     Ok(user_id)
+}
+
+/// Creates an additional super_admin account (cloud-only, no restaurant).  
+/// Only callable from the superadmin dashboard.
+#[tauri::command]
+pub async fn create_superadmin_account(
+    username: String,
+    password: String,
+    full_name: Option<String>,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
+) -> Result<(), String> {
+    if username.trim().is_empty() || password.len() < 6 {
+        return Err("Username is required and password must be at least 6 characters.".to_string());
+    }
+
+    // Check for duplicate username in remote (authoritative source).
+    let check_conn: &Connection = match remote.0.as_ref() {
+        Some(r) => r,
+        None => &*pool,
+    };
+    let mut dup = check_conn.query(
+        "SELECT 1 FROM users WHERE username = ? AND is_deleted = 0 LIMIT 1",
+        params![username.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    if dup.next().await.map_err(|e| e.to_string())?.is_some() {
+        return Err(format!("Username '{}' is already taken.", username));
+    }
+
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| format!("Hash error: {}", e))?
+        .to_string();
+
+    let user_id = uuid::Uuid::new_v4().to_string();
+    let final_full_name = full_name.unwrap_or_default();
+
+    const SQL: &str =
+        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name)
+         VALUES (?, NULL, ?, ?, 'super_admin', ?)";
+
+    // Write to remote (authoritative for super_admin accounts).
+    if let Some(remote_conn) = remote.0.as_ref() {
+        remote_conn.execute(SQL, params![
+            user_id.clone(), username.clone(), hash.clone(), final_full_name.clone()
+        ]).await.map_err(|e| format!("Cloud error: {}", e))?;
+    }
+
+    // Best-effort local copy.
+    let _ = pool.execute(SQL, params![
+        user_id.clone(), username.clone(), hash.clone(), final_full_name.clone()
+    ]).await;
+
+    Ok(())
 }
 
 #[tauri::command]

@@ -5,7 +5,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import {
     listAllRestaurants, createRestaurantWithAdmin, superadminUpdateAdmin,
     updateSuperadminProfile, superadminGetAllUsers, superadminMoveUser, SuperadminUserView,
-    superadminCreateRestaurantUser, deleteRestaurant
+    superadminCreateRestaurantUser, deleteRestaurant, createSuperadminAccount
 } from '@/lib/api/auth';
 import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
@@ -133,8 +133,8 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                         <div className="space-y-3">
                             <Field label="Full Name" value={form.adminFullName} onChange={update('adminFullName')} placeholder="Sokha Chan" />
                             <Field label="Username *" value={form.adminUsername} onChange={update('adminUsername')} placeholder="sokha.cafe" />
-                            <div className="space-y-1">
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-70">
+                            <div className="space-y-1.5">
+                                <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">
                                     Password *
                                 </label>
                                 <div className="relative">
@@ -143,7 +143,7 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                                         value={form.adminPassword}
                                         onChange={update('adminPassword')}
                                         placeholder="min 6 characters"
-                                        className="pos-input w-full pr-10 text-sm"
+                                        className="pos-input w-full pr-10"
                                     />
                                     <button
                                         type="button"
@@ -191,14 +191,14 @@ function Field({ label, value, onChange, placeholder, type }: {
     type?: string;
 }) {
     return (
-        <div className="space-y-1">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-70">{label}</label>
+        <div className="space-y-1.5">
+            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">{label}</label>
             <input
                 type={type || 'text'}
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
-                className="pos-input w-full text-sm"
+                className="pos-input w-full"
             />
         </div>
     );
@@ -403,7 +403,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                             </p>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Renew Period</label>
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Renew Period</label>
                             <div className="grid grid-cols-2 gap-2">
                                 <button
                                     type="button"
@@ -453,22 +453,22 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                             </div>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Expiry Date</label>
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Expiry Date</label>
                             <input
                                 type="date"
                                 value={licenseExpiresAt}
                                 onChange={(event) => setLicenseExpiresAt(event.target.value)}
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="pos-input w-full"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Support Contact</label>
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Support Contact</label>
                             <input
                                 type="text"
                                 value={supportContact}
                                 onChange={(event) => setSupportContact(event.target.value)}
                                 placeholder="Phone, Telegram, office contact"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="pos-input w-full"
                             />
                         </div>
                         {message && <p className="text-[11px] text-[var(--text-secondary)]">{message}</p>}
@@ -532,6 +532,7 @@ export default function SuperAdminPage() {
     const [createUserFor, setCreateUserFor] = useState<RestaurantSummary | null>(null);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [showGlobalUsers, setShowGlobalUsers] = useState(false);
+    const [showCreateSuperadmin, setShowCreateSuperadmin] = useState(false);
     const [movingUser, setMovingUser] = useState<SuperadminUserView | null>(null);
 
     useEffect(() => {
@@ -547,6 +548,8 @@ export default function SuperAdminPage() {
         try {
             const data = await listAllRestaurants();
             setRestaurants(data);
+            // Keep the open drawer in sync with fresh data
+            setSelected(prev => prev ? (data.find(r => r.id === prev.id) ?? prev) : null);
         } catch (e) {
             console.error(e);
         } finally {
@@ -578,6 +581,15 @@ export default function SuperAdminPage() {
 
                 <div className="flex items-center gap-3">
                     <SyncStatus />
+
+                    <button
+                        onClick={() => setShowCreateSuperadmin(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-all"
+                        title="Add Superadmin"
+                    >
+                        <Plus size={12} className="text-purple-400" strokeWidth={3} />
+                        <span className="text-xs font-black text-purple-300 uppercase tracking-widest">Add Superadmin</span>
+                    </button>
 
                     <button
                         onClick={() => setShowEditProfile(true)}
@@ -695,6 +707,12 @@ export default function SuperAdminPage() {
                     restaurant={createUserFor}
                     onClose={() => setCreateUserFor(null)}
                     onCreated={() => { setCreateUserFor(null); load(); }}
+                />
+            )}
+            {showCreateSuperadmin && (
+                <CreateSuperadminModal
+                    onClose={() => setShowCreateSuperadmin(false)}
+                    onCreated={() => setShowCreateSuperadmin(false)}
                 />
             )}
             {showEditProfile && (
@@ -995,6 +1013,96 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
 }
 
 // ─── Edit Superadmin Profile Modal ───────────────────────────────────────────
+// ─── Create Superadmin Modal ─────────────────────────────────────────────────
+function CreateSuperadminModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+    const [username, setUsername] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPw, setShowPw] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        if (!username.trim()) { setError('Username is required.'); return; }
+        if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+        setLoading(true);
+        try {
+            await createSuperadminAccount({ username: username.trim(), password, fullName: fullName || undefined });
+            onCreated();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div
+                className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+            >
+                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-purple-500 to-transparent flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-elevated)]">
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
+                            <ShieldCheck size={14} className="text-purple-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-sm">New Superadmin Account</h3>
+                            <p className="text-[10px] text-[var(--text-secondary)] opacity-50">Platform-wide access, cloud-only</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]"><X size={16} /></button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                    {error && (
+                        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                            <AlertTriangle size={13} strokeWidth={2.5} /> {error}
+                        </div>
+                    )}
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Username *</label>
+                            <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. superadmin2" className="pos-input w-full" required />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Full Name <span className="opacity-50">(optional)</span></label>
+                            <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Admin Name" className="pos-input w-full" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Password *</label>
+                            <div className="relative">
+                                <input
+                                    type={showPw ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    placeholder="min 6 characters"
+                                    className="pos-input w-full pr-10"
+                                />
+                                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-white transition-colors">
+                                    {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 pt-1">
+                        <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">Cancel</button>
+                        <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded-xl bg-purple-500 text-white text-sm font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
+                            {loading ? 'Creating…' : 'Create'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function EditProfileModal({ onClose }: { onClose: () => void }) {
     const { user, setUser } = useAuth();
     const router = useRouter();

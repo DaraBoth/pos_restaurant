@@ -111,3 +111,13 @@ export const superadminGetAllUsers = () =>
 
 export const superadminMoveUser = (params: { userId: string; newRestaurantId: string }) =>
     call<void>('superadmin_move_user', { userId: params.userId, newRestaurantId: params.newRestaurantId });
+
+export const createSuperadminAccount = (params: {
+    username: string;
+    password: string;
+    fullName?: string;
+}) => call<void>('create_superadmin_account', {
+    username: params.username,
+    password: params.password,
+    fullName: params.fullName,
+});
