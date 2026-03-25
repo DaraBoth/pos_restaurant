@@ -640,9 +640,13 @@ pub async fn superadmin_update_admin(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
-    
-    // First, fetch the existing data so we can reuse it if fields are omitted
-    let mut rows = pool.query(
+    // Read from remote (authoritative) when available — admin may only exist in cloud.
+    let read_conn: &Connection = match remote.0.as_ref() {
+        Some(r) => r,
+        None => &*pool,
+    };
+
+    let mut rows = read_conn.query(
         "SELECT restaurant_id, username, password_hash, full_name FROM users WHERE id = ? AND role = 'admin'",
         params![admin_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
@@ -650,12 +654,11 @@ pub async fn superadmin_update_admin(
     let row = rows.next().await.map_err(|e| e.to_string())?
         .ok_or_else(|| "Admin account not found".to_string())?;
 
-    let restaurant_id: Option<String> = row.get(0).ok();
+    let _restaurant_id: Option<String> = row.get(0).ok();
     let existing_username: String = row.get(1).unwrap_or_default();
     let existing_hash: String = row.get(2).unwrap_or_default();
     let existing_fullname: Option<String> = row.get(3).ok();
 
-    // Determine target values
     let final_username = new_username.unwrap_or(existing_username);
     let final_fullname = new_full_name.or(existing_fullname).unwrap_or_default();
 
@@ -669,22 +672,19 @@ pub async fn superadmin_update_admin(
         existing_hash
     };
 
-    pool.execute(
-        "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ?",
-        params![final_username.clone(), final_hash.clone(), final_fullname.clone(), admin_id.clone()]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+    const SQL: &str = "UPDATE users SET username = ?, password_hash = ?, full_name = ?, updated_at = datetime('now') WHERE id = ?";
 
-    mirror_user_update_to_remote(
-        remote.0.as_ref(),
-        &admin_id,
-        restaurant_id.as_deref(),
-        &final_username,
-        &final_hash,
-        "admin",
-        &final_fullname,
-    ).await?;
+    // Write to remote first (authoritative).
+    if let Some(remote_conn) = remote.0.as_ref() {
+        remote_conn.execute(SQL, params![
+            final_username.clone(), final_hash.clone(), final_fullname.clone(), admin_id.clone()
+        ]).await.map_err(|e| format!("Cloud error: {}", e))?;
+    }
+
+    // Best-effort local update.
+    let _ = pool.execute(SQL, params![
+        final_username.clone(), final_hash.clone(), final_fullname.clone(), admin_id.clone()
+    ]).await;
 
     Ok(())
 }
