@@ -1,0 +1,19 @@
+{
+  "version": "0.1.1",
+  "notes": "Initial update: bug fixes, improvements, auto-updater support, and cloud-first login bootstrap",
+  "pub_date": "2026-03-26T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "SIGN_THIS_FILE_ON_YOUR_MACHINE_AND_PASTE_SIGNATURE_HERE",
+      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v0.1.1/DineOS_0.1.1_x64_en-US.msi"
+    },
+    "darwin-aarch64": {
+      "signature": "BUILD_ON_MACOS_AND_ADD_SIGNATURE_HERE",
+      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v0.1.1/DineOS_0.1.1_aarch64.dmg"
+    },
+    "darwin-x86_64": {
+      "signature": "BUILD_ON_MACOS_AND_ADD_SIGNATURE_HERE",
+      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v0.1.1/DineOS_0.1.1_x64.dmg"
+    }
+  }
+}

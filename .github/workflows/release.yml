@@ -1,42 +1,42 @@
-name: Release Template
+name: Release
+
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
 
 jobs:
   publish-tauri:
     permissions:
       contents: write
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Windows — produces .msi + .exe
           - platform: windows-latest
             rust-target: x86_64-pc-windows-msvc
-
-          # macOS Intel — produces .dmg + .app
           - platform: macos-latest
             rust-target: x86_64-apple-darwin
-
-          # macOS Apple Silicon (M1/M2/M3) — produces .dmg + .app
           - platform: macos-latest
             rust-target: aarch64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
+          cache: pnpm
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: 10
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -44,17 +44,19 @@ jobs:
           targets: ${{ matrix.rust-target }}
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
         with:
           args: --target ${{ matrix.rust-target }}
           tagName: v__VERSION__
-          releaseName: "KH POS v__VERSION__"
+          releaseName: "DineOS __VERSION__"
           releaseBody: "See the assets to download this version and install."
           releaseDraft: false
           prerelease: false

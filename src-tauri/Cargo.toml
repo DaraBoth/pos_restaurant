@@ -1,6 +1,6 @@
 [package]
 name = "dineos"
-version = "0.1.0"
+version = "0.1.1"
 description = "DineOS — Premium Cambodia Restaurant POS System"
 authors = ["DineOS Team"]
 edition = "2021"
