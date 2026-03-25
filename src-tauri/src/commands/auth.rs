@@ -64,6 +64,14 @@ fn to_user_session(record: &AuthRecord) -> UserSession {
     }
 }
 
+fn is_superadmin_username(username: &str) -> bool {
+    username.trim().eq_ignore_ascii_case("superadmin")
+}
+
+fn is_superadmin_role(role: &str) -> bool {
+    role.trim().eq_ignore_ascii_case("super_admin")
+}
+
 fn first_device_login_message() -> String {
     "Cloud login is unavailable right now. If this is your first login on a new device, connect to the internet and verify DATABASE_URL and AUTH_TOKEN for the cloud database before trying again.".to_string()
 }
@@ -275,13 +283,21 @@ pub async fn login(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<UserSession, String> {
-    if let Some(local_record) = fetch_auth_record(&pool, &username).await? {
-        if verify_login_password(&password, &local_record.password_hash).is_ok() {
-            return Ok(to_user_session(&local_record));
+    let superadmin_login = is_superadmin_username(&username);
+
+    // Non-superadmin users can still login offline from local cache.
+    if !superadmin_login {
+        if let Some(local_record) = fetch_auth_record(&pool, &username).await? {
+            if verify_login_password(&password, &local_record.password_hash).is_ok() {
+                return Ok(to_user_session(&local_record));
+            }
         }
     }
 
     let Some(remote_conn) = remote.0.as_ref() else {
+        if superadmin_login {
+            return Err("Superadmin login requires internet connection and cloud authentication.".to_string());
+        }
         return Err("Invalid username or password. If this is your first login on a new device, connect to the internet and try again.".to_string());
     };
 
@@ -303,6 +319,12 @@ pub async fn login(
     };
 
     verify_login_password(&password, &remote_record.password_hash)?;
+
+    // Superadmin is intentionally cloud-only and must not be cached locally.
+    if is_superadmin_username(&remote_record.username) || is_superadmin_role(&remote_record.role) {
+        return Ok(to_user_session(&remote_record));
+    }
+
     seed_local_user_from_remote(&pool, &remote_record).await?;
 
     if let Some(restaurant_id) = remote_record.restaurant_id.as_deref() {
@@ -555,37 +577,20 @@ pub async fn create_restaurant_with_admin(
 /// Default credentials: superadmin / superadmin123
 /// This is NOT a Tauri command — called from lib.rs setup.
 pub async fn seed_super_admin(conn: &Arc<Connection>) {
-    let mut rows = match conn.query(
-        "SELECT 1 FROM users WHERE username = 'superadmin' AND is_deleted = 0 LIMIT 1",
-        ()
-    ).await {
-        Ok(r) => r,
-        Err(_) => return,
-    };
-    if rows.next().await.ok().flatten().is_some() {
-        return; // Already exists — skip
-    }
-
-    let salt = SaltString::generate(&mut OsRng);
-    let hash = match Argon2::default().hash_password(b"superadmin123", &salt) {
-        Ok(h) => h.to_string(),
-        Err(_) => return,
-    };
-
+    // Enforce cloud-only superadmin: remove any local cached superadmin account.
     let _ = conn.execute(
-        "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name)
-         VALUES ('user-super-admin-0000-0000-000000000001', 'superadmin', ?, 'super_admin', 'Super Administrator')",
-        params![hash]
+        "DELETE FROM users WHERE username = 'superadmin'",
+        ()
     ).await;
 
-    // Seed default exchange rate here (after user exists)
+    // Seed default exchange rate locally (without requiring a local superadmin user).
     let _ = conn.execute(
         "INSERT OR IGNORE INTO exchange_rates (id, rate, effective_from, created_by, restaurant_id)
-         VALUES ('rate-00000000-0000-0000-0000-000000000001', 4100.0, datetime('now'), 'user-super-admin-0000-0000-000000000001', 'rest-00000000-0000-0000-0000-000000000001')",
+         VALUES ('rate-00000000-0000-0000-0000-000000000001', 4100.0, datetime('now'), NULL, 'rest-00000000-0000-0000-0000-000000000001')",
         ()
     ).await;
 
-    println!("[Auth] Super admin and default exchange rate seeded.");
+    println!("[Auth] Superadmin local cache cleared; default exchange rate ensured.");
 }
 
 /// Allows Superadmin to manually override restaurant admin details without entering the restaurant
