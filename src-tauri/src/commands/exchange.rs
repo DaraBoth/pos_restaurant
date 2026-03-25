@@ -3,6 +3,14 @@ use libsql::{Connection, params};
 use std::sync::Arc;
 use crate::models::{ExchangeRate, DbStatus, Payment};
 
+fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
+    match row.get_value(idx) {
+        Ok(libsql::Value::Integer(i)) => i as f64,
+        Ok(libsql::Value::Real(f)) => f,
+        _ => 0.0,
+    }
+}
+
 #[tauri::command]
 pub async fn get_exchange_rate(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<ExchangeRate, String> {
     let mut rows = pool.query(
@@ -13,7 +21,7 @@ pub async fn get_exchange_rate(restaurant_id: String, pool: State<'_, Arc<Connec
     if let Some(row) = rows.next().await.map_err(|e| format!("Row error: {}", e))? {
         Ok(ExchangeRate {
             id: row.get::<String>(0).unwrap_or_default(),
-            rate: row.get::<f64>(1).unwrap_or(4100.0),
+            rate: get_f64_safe(&row, 1),
             effective_from: row.get::<String>(2).unwrap_or_default(),
         })
     } else {
@@ -106,7 +114,7 @@ pub async fn get_payments_for_order(
             order_id: row.get::<String>(1).unwrap_or_default(),
             method: row.get::<String>(2).unwrap_or_default(),
             currency: row.get::<String>(3).unwrap_or_default(),
-            amount: row.get::<f64>(4).unwrap_or(0.0) as i64,
+            amount: get_f64_safe(&row, 4) as i64,
             bakong_transaction_hash: bakong,
             created_at: row.get::<String>(6).unwrap_or_default(),
         });

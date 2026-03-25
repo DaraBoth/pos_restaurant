@@ -192,7 +192,7 @@ export default function OrdersManagement() {
                                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
                                                     ${o.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}
                                                     ${o.status === 'open' ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20' : ''}
-                                                    ${o.status === 'void' ? 'bg-red-500/10 text-red-500 border-red-500/20' : ''}
+                                                    ${o.status === 'void' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
                                                 `}>
                                                     {o.status === 'completed' && <CheckCircle size={12} strokeWidth={3} />}
                                                     {o.status === 'open' && <Clock size={12} strokeWidth={3} />}

@@ -29,6 +29,36 @@ async fn trigger_sync(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .register_uri_scheme_protocol("asset", move |ctx, request| {
+            let path = request.uri().path();
+            // Remove leading slash if present
+            let filename = path.trim_start_matches('/');
+            
+            let app_handle = ctx.app_handle();
+            let app_dir = app_handle.path().app_data_dir().unwrap();
+            let asset_path = app_dir.join("product-images").join(filename);
+
+            if let Ok(content) = std::fs::read(&asset_path) {
+                tauri::http::Response::builder()
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(content)
+                    .unwrap()
+            } else {
+                // Try "logos" directory as fallback for restaurant logos
+                let logo_path = app_dir.join("logos").join(filename);
+                if let Ok(content) = std::fs::read(logo_path) {
+                    tauri::http::Response::builder()
+                        .header("Access-Control-Allow-Origin", "*")
+                        .body(content)
+                        .unwrap()
+                } else {
+                    tauri::http::Response::builder()
+                        .status(404)
+                        .body(Vec::new())
+                        .unwrap()
+                }
+            }
+        })
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
@@ -111,9 +141,6 @@ pub fn run() {
             commands::inventory::create_inventory_item,
             commands::inventory::update_inventory_item,
             commands::inventory::delete_inventory_item,
-            commands::inventory::get_product_ingredients,
-            commands::inventory::set_product_ingredient,
-            commands::inventory::remove_product_ingredient,
             // Analytics
             commands::analytics::get_top_products,
             commands::analytics::get_revenue_by_category,

@@ -56,6 +56,8 @@ pub struct Product {
     pub image_path: Option<String>,
     pub category_name: Option<String>,
     pub category_khmer: Option<String>,
+    pub inventory_item_id: Option<String>,
+    pub inventory_item_usage: f64,
     pub created_at: String,
 }
 
@@ -207,20 +209,10 @@ pub struct InventoryItem {
     pub name: String,
     pub khmer_name: Option<String>,
     pub unit_label: String,
-    pub stock_qty: i64,
+    pub stock_qty: f64,
     pub stock_pct: f64,
-    pub min_stock_qty: i64,
-    pub cost_per_unit: i64,
+    pub min_stock_qty: f64,
+    pub cost_per_unit: f64,
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProductIngredient {
-    pub id: String,
-    pub product_id: String,
-    pub inventory_item_id: String,
-    pub usage_percentage: f64,
-    pub item_name: Option<String>,
-    pub item_khmer_name: Option<String>,
-    pub unit_label: Option<String>,
-}

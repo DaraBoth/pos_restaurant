@@ -64,8 +64,8 @@ export function SyncStatus() {
         // Initial check
         checkStatus();
 
-        // Poll every 30 seconds
-        pollRef.current = setInterval(checkStatus, 30_000);
+        // Poll every 10 seconds (increased from 30s to compensate for no event listeners)
+        pollRef.current = setInterval(checkStatus, 10_000);
 
         // Browser online/offline events
         const goOffline = () => setState('offline');
@@ -84,15 +84,6 @@ export function SyncStatus() {
         window.addEventListener('dineos:sync-start', startSync);
         window.addEventListener('dineos:sync-end',   endSync);
 
-        // --- Tauri Backend Listeners ---
-        let unlistenStart: (() => void) | null = null;
-        let unlistenEnd: (() => void) | null = null;
-
-        import('@tauri-apps/api/event').then(({ listen }) => {
-            listen('dineos:sync-start', startSync).then(u => unlistenStart = u);
-            listen('dineos:sync-end',   endSync).then(u => unlistenEnd = u);
-        });
-
         return () => {
             if (pollRef.current)   clearInterval(pollRef.current);
             if (syncingTimerRef.current) clearTimeout(syncingTimerRef.current);
@@ -100,8 +91,6 @@ export function SyncStatus() {
             window.removeEventListener('online',  goOnline);
             window.removeEventListener('dineos:sync-start', startSync);
             window.removeEventListener('dineos:sync-end',   endSync);
-            if (unlistenStart) unlistenStart();
-            if (unlistenEnd)   unlistenEnd();
         };
     }, []);
 

@@ -1,7 +1,15 @@
 use tauri::State;
-use libsql::{Connection, params};
 use std::sync::Arc;
+use libsql::{Connection, params};
 use crate::models::{Order, OrderItem, PaymentInput};
+
+fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
+    match row.get_value(idx) {
+        Ok(libsql::Value::Integer(i)) => i as f64,
+        Ok(libsql::Value::Real(f)) => f,
+        _ => 0.0,
+    }
+}
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,7 +157,7 @@ pub async fn add_order_item(
         let current_qty = ext_row.get::<i64>(1).unwrap_or(0);
         let new_qty = current_qty + quantity;
         
-        pool.execute(
+        let _: u64 = pool.execute(
             "UPDATE order_items SET quantity = ? 
              WHERE id = ? AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
             params![new_qty, existing_id.clone(), restaurant_id.clone()]
@@ -212,14 +220,14 @@ pub async fn update_order_item_quantity(
     let order_id = row.get::<String>(0).unwrap_or_default();
 
     if quantity <= 0 {
-        pool.execute(
+        let _: u64 = pool.execute(
             "UPDATE order_items SET is_deleted = 1 
              WHERE id = ? AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
             params![item_id, restaurant_id.clone()]
         )
             .await.map_err(|e| format!("Database error: {}", e))?;
     } else {
-        pool.execute(
+        let _: u64 = pool.execute(
             "UPDATE order_items SET quantity = ? 
              WHERE id = ? AND order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)", 
             params![quantity, item_id, restaurant_id.clone()]
@@ -476,11 +484,13 @@ pub async fn checkout_order(
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Order, String> {
-    let mut tb_rows = pool.query("SELECT table_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
+    let mut tb_rows = pool.query("SELECT table_id, user_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
         .await.map_err(|e| format!("Database error: {}", e))?;
     let mut table_id = None;
+    let mut order_user_id = None;
     if let Some(row) = tb_rows.next().await.map_err(|e| e.to_string())? {
         table_id = row.get::<String>(0).ok();
+        order_user_id = row.get::<String>(1).ok();
     }
 
     let mut sub_rows = pool.query(
@@ -498,7 +508,7 @@ pub async fn checkout_order(
     let mut rate_rows = pool.query("SELECT rate FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1", params![restaurant_id.clone()])
         .await.map_err(|e| e.to_string())?;
     let exch_rate = if let Some(row) = rate_rows.next().await.map_err(|e| e.to_string())? {
-        row.get::<f64>(0).unwrap_or(4100.0)
+        get_f64_safe(&row, 0)
     } else { 4100.0 };
     
     let final_khr = round_khr(final_total, exch_rate);
@@ -523,12 +533,12 @@ pub async fn checkout_order(
     }
 
     for (p_id, qty) in sold_items {
-        deduct_inventory(&p_id, qty, &restaurant_id, &pool).await?;
+        deduct_inventory(&p_id, qty, &restaurant_id, order_user_id.as_deref(), &pool).await?;
     }
 
     for p in &payments {
         let pid = uuid::Uuid::new_v4().to_string();
-        pool.execute(
+        let _: u64 = pool.execute(
             "INSERT INTO payments (id, order_id, method, currency, amount, bakong_transaction_hash)
              VALUES (?, ?, ?, ?, ?, ?)",
             params![pid, order_id.clone(), p.method.clone(), p.currency.clone(), p.amount, p.bakong_transaction_hash.clone().unwrap_or_default()]
@@ -608,13 +618,13 @@ pub async fn checkout_session(
         row.get::<String>(0).ok()
     } else { None };
 
-    let mut session_orders = Vec::new();
+    let mut session_orders = Vec::new(); // Vec<(id, user_id)>
     let mut so_rows = pool.query(
-        "SELECT id FROM orders WHERE session_id = ? AND restaurant_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0",
+        "SELECT id, user_id FROM orders WHERE session_id = ? AND restaurant_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0",
         params![session_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
     while let Some(row) = so_rows.next().await.map_err(|e| e.to_string())? {
-        session_orders.push(row.get::<String>(0).unwrap_or_default());
+        session_orders.push((row.get::<String>(0).unwrap_or_default(), row.get::<String>(1).ok()));
     }
 
     let mut sub_rows = pool.query(
@@ -634,14 +644,14 @@ pub async fn checkout_session(
     let mut rate_rows = pool.query("SELECT rate FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1", params![restaurant_id.clone()])
         .await.map_err(|e| e.to_string())?;
     let exch_rate = if let Some(row) = rate_rows.next().await.map_err(|e| e.to_string())? {
-        row.get::<f64>(0).unwrap_or(4100.0)
+        get_f64_safe(&row, 0)
     } else { 4100.0 };
     let _final_khr = round_khr(final_total, exch_rate);
 
-    for o_id in &session_orders {
+    for (o_id, u_id) in &session_orders {
         recalculate_order_totals(o_id, &restaurant_id, &pool).await?;
         
-        pool.execute(
+        let _: u64 = pool.execute(
             "UPDATE orders SET status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
              WHERE id = ? AND restaurant_id = ?",
              params![o_id.clone(), restaurant_id.clone()]
@@ -659,13 +669,13 @@ pub async fn checkout_session(
         }
 
         for (p_id, qty) in sold_items {
-            deduct_inventory(&p_id, qty, &restaurant_id, &pool).await?;
+            deduct_inventory(&p_id, qty, &restaurant_id, u_id.as_deref(), &pool).await?;
         }
     }
 
-    if let Some(first_order_id) = session_orders.first() {
+    if let Some((first_order_id, _)) = session_orders.first() {
         if discount_cents.unwrap_or(0) > 0 {
-            pool.execute(
+            let _: u64 = pool.execute(
                 "UPDATE orders SET total_usd = MAX(0, total_usd - ?) 
                  WHERE id = ? AND restaurant_id = ?", 
                 params![discount_cents.unwrap_or(0), first_order_id.clone(), restaurant_id.clone()]
@@ -675,7 +685,7 @@ pub async fn checkout_session(
 
         for p in &payments {
             let pid = uuid::Uuid::new_v4().to_string();
-            pool.execute(
+            let _: u64 = pool.execute(
                 "INSERT INTO payments (id, order_id, method, currency, amount, bakong_transaction_hash)
                  VALUES (?, ?, ?, ?, ?, ?)",
                  params![pid, first_order_id.clone(), p.method.clone(), p.currency.clone(), p.amount, p.bakong_transaction_hash.clone().unwrap_or_default()]
@@ -760,37 +770,50 @@ async fn release_table_if_no_open_orders(table_name: &str, restaurant_id: &str, 
     Ok(())
 }
 
-async fn deduct_inventory(product_id: &str, qty: i64, restaurant_id: &str, pool: &Arc<Connection>) -> Result<(), String> {
-    // 1. Fetch ingredients belonging to the restaurant
-    let mut ing_rows = pool.query(
-        "SELECT inventory_item_id, usage_percentage FROM product_ingredients 
-         WHERE product_id = ? AND restaurant_id = ?",
+async fn deduct_inventory(product_id: &str, qty: i64, restaurant_id: &str, user_id: Option<&str>, pool: &Arc<Connection>) -> Result<(), String> {
+    // 1. Fetch direct inventory link from product
+    let mut prod_rows = pool.query(
+        "SELECT inventory_item_id, inventory_item_usage FROM products 
+         WHERE id = ? AND restaurant_id = ?",
         params![product_id.to_string(), restaurant_id.to_string()]
-    ).await.map_err(|e| format!("Recipe fetch error: {}", e))?;
+    ).await.map_err(|e| format!("Product fetch error: {}", e))?;
 
-    let mut ingredients = Vec::new();
-    while let Some(row) = ing_rows.next().await.map_err(|e| e.to_string())? {
-        ingredients.push((row.get::<String>(0).unwrap_or_default(), row.get::<f64>(1).unwrap_or(0.0)));
-    }
+        if let Some(prod_row) = prod_rows.next().await.map_err(|e| e.to_string())? {
+            let inv_id: Option<String> = prod_row.get(0).ok();
+            let usage_amount = get_f64_safe(&prod_row, 1);
 
-    for (inv_id, usage_pct) in ingredients {
-        let total_usage = qty as f64 * usage_pct;
-        
-        let mut inv_rows = pool.query(
-            "SELECT stock_qty, stock_pct FROM inventory_items WHERE id = ? AND restaurant_id = ?",
-            params![inv_id.clone(), restaurant_id.to_string()]
-        ).await.map_err(|e| format!("Inv fetch error: {}", e))?;
+            if let Some(inv_id) = inv_id {
+                if inv_id.is_empty() { return Ok(()); }
 
-        if let Some(inv_row) = inv_rows.next().await.map_err(|e| e.to_string())? {
-            let mut sqty = inv_row.get::<i64>(0).unwrap_or(0);
-            let mut spct = inv_row.get::<f64>(1).unwrap_or(0.0);
-            spct -= total_usage;
-            while spct < 0.0 {
-                sqty -= 1;
-                spct += 100.0;
-            }
-            pool.execute("UPDATE inventory_items SET stock_qty = ?, stock_pct = ? WHERE id = ? AND restaurant_id = ?", params![sqty, spct, inv_id, restaurant_id.to_string()])
+                let total_usage = qty as f64 * usage_amount;
+            
+            let mut inv_rows = pool.query(
+                "SELECT stock_qty, min_stock_qty FROM inventory_items WHERE id = ? AND restaurant_id = ?",
+                params![inv_id.clone(), restaurant_id.to_string()]
+            ).await.map_err(|e| format!("Inv fetch error: {}", e))?;
+
+            if let Some(inv_row) = inv_rows.next().await.map_err(|e| e.to_string())? {
+                let current_qty = get_f64_safe(&inv_row, 0);
+                let min_qty = get_f64_safe(&inv_row, 1);
+                
+                let new_qty = current_qty - total_usage;
+                let new_pct = if min_qty > 0.0 { (new_qty / (min_qty * 2.0)) * 100.0 } else { 100.0 };
+                
+                let _: u64 = pool.execute(
+                    "UPDATE inventory_items SET stock_qty = ?, stock_pct = ?, updated_at = datetime('now') 
+                     WHERE id = ? AND restaurant_id = ?", 
+                    params![new_qty, new_pct, inv_id.clone(), restaurant_id.to_string()]
+                )
                 .await.map_err(|e| format!("Inv update error: {}", e))?;
+
+                // Log the deduction
+                let log_id = uuid::Uuid::new_v4().to_string();
+                let _: u64 = pool.execute(
+                    "INSERT INTO inventory_logs (id, inventory_item_id, product_id, user_id, quantity_change, change_amount, quantity, change_type, restaurant_id) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'sale', ?)",
+                    params![log_id, inv_id, product_id.to_string(), user_id.unwrap_or_default().to_string(), -total_usage, -total_usage, -total_usage, restaurant_id.to_string()]
+                ).await.map_err(|e| e.to_string())?;
+            }
         }
     }
 
@@ -816,7 +839,7 @@ async fn recalculate_order_totals(order_id: &str, restaurant_id: &str, pool: &Ar
         .await.map_err(|e| format!("Exchange rate error: {}", e))?;
     
     let rate = if let Some(row) = rate_rows.next().await.map_err(|e| e.to_string())? {
-        row.get::<f64>(0).unwrap_or(4100.0)
+        get_f64_safe(&row, 0)
     } else { 4100.0 };
 
     let total_khr = round_khr(total_usd, rate);

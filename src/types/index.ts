@@ -75,6 +75,8 @@ export interface Product {
     image_path?: string;
     category_name?: string;
     category_khmer?: string;
+    inventory_item_id?: string;
+    inventory_item_usage: number;
     created_at: string;
 }
 
@@ -199,15 +201,6 @@ export interface InventoryItem {
     created_at: string;
 }
 
-export interface ProductIngredient {
-    id: string;
-    product_id: string;
-    inventory_item_id: string;
-    usage_percentage: number;
-    item_name?: string;
-    item_khmer_name?: string;
-    unit_label?: string;
-}
 
 // --------------- Analytics ---------------
 export interface TopProduct {

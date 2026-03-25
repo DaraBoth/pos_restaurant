@@ -141,10 +141,10 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     name TEXT NOT NULL, 
     khmer_name TEXT,
     unit_label TEXT NOT NULL DEFAULT 'piece',
-    stock_qty INTEGER NOT NULL DEFAULT 0,
+    stock_qty REAL NOT NULL DEFAULT 0,
     stock_pct REAL NOT NULL DEFAULT 0,
-    min_stock_qty INTEGER NOT NULL DEFAULT 1,
-    cost_per_unit INTEGER NOT NULL DEFAULT 0,
+    min_stock_qty REAL NOT NULL DEFAULT 1,
+    cost_per_unit REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     restaurant_id TEXT REFERENCES restaurants(id)
@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS product_ingredients (
     product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     inventory_item_id TEXT NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
     usage_percentage REAL NOT NULL DEFAULT 100,
+    restaurant_id TEXT REFERENCES restaurants(id),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -164,10 +165,10 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
     product_id        TEXT REFERENCES products(id) ON DELETE CASCADE,
     user_id           TEXT REFERENCES users(id) ON DELETE CASCADE,
     change_type       TEXT NOT NULL,  -- 'add', 'deduct', 'set', 'correction'
-    quantity_change   INTEGER NOT NULL,
-    change_amount     INTEGER NOT NULL DEFAULT 0, -- Matches products.rs
+    quantity_change   REAL NOT NULL,
+    change_amount     REAL NOT NULL DEFAULT 0, -- Matches products.rs
     reason            TEXT,                       -- Matches products.rs
-    current_stock     INTEGER NOT NULL DEFAULT 0,
+    current_stock     REAL NOT NULL DEFAULT 0,
     note              TEXT,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at        TEXT DEFAULT (datetime('now')),
@@ -223,12 +224,12 @@ VALUES
     ('cat-00000000-0000-0000-0000-000000000002', 'rest-00000000-0000-0000-0000-000000000001', 'Drinks', 'ភេសជ្ជៈ', 2),
     ('cat-00000000-0000-0000-0000-000000000003', 'rest-00000000-0000-0000-0000-000000000001', 'Desserts', 'បង្អែម', 3);
 
--- Default products (prices in cents)
-INSERT OR IGNORE INTO products (id, restaurant_id, category_id, name, khmer_name, price_cents)
+-- Default products (prices in cents, default stock 100)
+INSERT OR IGNORE INTO products (id, restaurant_id, category_id, name, khmer_name, price_cents, stock_quantity)
 VALUES
-    ('prod-0000-0001', 'rest-00000000-0000-0000-0000-000000000001', 'cat-00000000-0000-0000-0000-000000000001', 'Beef Lok Lak', 'គោឡុកឡាក់', 500),
-    ('prod-0000-0002', 'rest-00000000-0000-0000-0000-000000000001', 'cat-00000000-0000-0000-0000-000000000001', 'Amok Fish', 'អាម៉ុកត្រី', 450),
-    ('prod-0000-0003', 'rest-00000000-0000-0000-0000-000000000001', 'cat-00000000-0000-0000-0000-000000000002', 'Iced Coffee', 'កាហ្វេទឹកកក', 175);
+    ('prod-0000-0001', 'rest-00000000-0000-0000-0000-000000000001', 'cat-00000000-0000-0000-0000-000000000001', 'Beef Lok Lak', 'គោឡុកឡាក់', 500, 100),
+    ('prod-0000-0002', 'rest-00000000-0000-0000-0000-000000000001', 'cat-00000000-0000-0000-0000-000000000001', 'Amok Fish', 'អាម៉ុកត្រី', 450, 100),
+    ('prod-0000-0003', 'rest-00000000-0000-0000-0000-000000000001', 'cat-00000000-0000-0000-0000-000000000002', 'Iced Coffee', 'កាហ្វេទឹកកក', 175, 100);
 
 -- Default Floor Tables
 INSERT OR IGNORE INTO floor_tables (id, restaurant_id, name, seat_count, status) VALUES 

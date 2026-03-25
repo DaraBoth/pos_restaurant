@@ -105,16 +105,48 @@ async fn ensure_critical_columns(conn: &Connection) {
     }
     add_col!("orders",      "session_id",      "session_id TEXT");
     add_col!("orders",      "round_number",    "round_number INTEGER NOT NULL DEFAULT 1");
+    add_col!("orders",      "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("orders",      "customer_name",   "customer_name TEXT");
     add_col!("orders",      "customer_phone",  "customer_phone TEXT");
     add_col!("floor_tables","seat_count",      "seat_count INTEGER NOT NULL DEFAULT 4");
     add_col!("floor_tables","restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("products",     "stock_quantity",  "stock_quantity INTEGER NOT NULL DEFAULT 0");
     add_col!("products",     "image_path",      "image_path TEXT");
+    add_col!("inventory_logs", "inventory_item_id", "inventory_item_id TEXT REFERENCES inventory_items(id) ON DELETE CASCADE");
     add_col!("inventory_logs", "product_id",     "product_id TEXT REFERENCES products(id) ON DELETE CASCADE");
     add_col!("inventory_logs", "user_id",        "user_id TEXT REFERENCES users(id) ON DELETE CASCADE");
-    add_col!("inventory_logs", "change_amount",   "change_amount INTEGER NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "quantity_change", "quantity_change REAL NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "change_amount",   "change_amount REAL NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "quantity",        "quantity REAL NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("inventory_logs", "reason",          "reason TEXT");
+    add_col!("product_ingredients", "restaurant_id", "restaurant_id TEXT REFERENCES restaurants(id)");
+
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS inventory_logs (
+            id TEXT PRIMARY KEY,
+            inventory_item_id TEXT,
+            product_id TEXT,
+            user_id TEXT,
+            change_type TEXT,
+            quantity_change REAL,
+            change_amount REAL,
+            quantity REAL,
+            reason TEXT,
+            current_stock REAL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            restaurant_id TEXT
+        )", (),
+    ).await;
+
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS _sync_state (
+            restaurant_id TEXT PRIMARY KEY,
+            synced_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00',
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", (),
+    ).await;
 
     let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS table_sessions (
@@ -130,23 +162,38 @@ async fn ensure_critical_columns(conn: &Connection) {
     // ── Emergency Triggers (Ensure sync works for existing installs) ────────────────
     // Since we're updating the baseline.sql after the first install, we need to manually
     // inject these once for existing DBs that already marked 001_baseline as "done".
-    let tables = vec![
-        "restaurants", "users", "categories", "products", "floor_tables", 
-        "exchange_rates", "inventory_items", "orders", "order_items", 
-        "payments", "table_sessions", "inventory_logs", "product_ingredients"
-    ];
-    for t in tables {
-        let trigger_sql = format!(
-            "CREATE TRIGGER IF NOT EXISTS trg_{}_upd AFTER UPDATE ON {} 
-             BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id AND (updated_at IS NULL OR updated_at <= OLD.updated_at); END;",
-            t, t, t
-        );
-        let _ = conn.execute(&trigger_sql, ()).await;
-        
-        // Backfill NULL updated_at so they sync on next cycle
-        let update_sql = format!("UPDATE {} SET updated_at = datetime('now') WHERE updated_at IS NULL", t);
-        let _ = conn.execute(&update_sql, ()).await;
-    }
+    add_col!("_sync_state", "updated_at", "updated_at TEXT DEFAULT (datetime('now'))");
+    add_col!("inventory_logs", "updated_at", "updated_at TEXT DEFAULT (datetime('now'))");
+    add_col!("products", "inventory_item_id", "inventory_item_id TEXT");
+    add_col!("products", "inventory_item_usage", "inventory_item_usage REAL NOT NULL DEFAULT 1.0");
+    
+    // Drop product_ingredients as requested by user
+    let _ = conn.execute("DROP TABLE IF EXISTS product_ingredients", ()).await;
+
+    // // Sync Triggers for all tables - REMOVED because recursive updates cause hangs in SQLite
+    // let tables = vec![
+    //     "restaurants", "users", "categories", "products", "floor_tables", 
+    //     "exchange_rates", "inventory_items", "orders", "order_items", 
+    //     "payments", "table_sessions", "inventory_logs"
+    // ];
+    // for t in tables {
+    //     let upd_trigger_sql = format!(
+    //         "CREATE TRIGGER IF NOT EXISTS trg_{}_upd AFTER UPDATE ON {} 
+    //          BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id AND (updated_at IS NULL OR updated_at <= OLD.updated_at); END;",
+    //         t, t, t
+    //     );
+    //     let ins_trigger_sql = format!(
+    //         "CREATE TRIGGER IF NOT EXISTS trg_{}_ins AFTER INSERT ON {} 
+    //          BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+    //         t, t, t
+    //     );
+    //     let _ = conn.execute(&upd_trigger_sql, ()).await;
+    //     let _ = conn.execute(&ins_trigger_sql, ()).await;
+    //     
+    //     // Backfill NULL updated_at so they sync on next cycle
+    //     let update_sql = format!("UPDATE {} SET updated_at = datetime('now') WHERE updated_at IS NULL", t);
+    //     let _ = conn.execute(&update_sql, ()).await;
+    // }
 }
 
 // ─── Public structs exposed to lib.rs ───────────────────────────────────────
@@ -221,6 +268,10 @@ pub fn start_sync_daemon(
         let _ = apply_migrations(&remote).await;
         ensure_critical_columns(&remote).await;
         sync::ensure_sync_table(&remote).await;
+
+        // Force a one-time reset for the first cycle to ensure newly added tables push historical data
+        println!("[Sync] Performing initial catch-up for restaurant={}", restaurant_id);
+        let _ = local.execute("DELETE FROM _sync_state WHERE restaurant_id = ?", [restaurant_id.clone()]).await;
 
         loop {
             // Use the handle to emit events or just pass to sync_restaurant

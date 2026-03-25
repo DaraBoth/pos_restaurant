@@ -9,7 +9,6 @@ import {
 import type { TranslationKey } from '@/lib/i18n';
 
 // ── Sub-view components (imported statically — no lazy chunk loading) ──
-import DashboardView from './views/DashboardView';
 import AnalyticsView from './views/AnalyticsView';
 import ProductsView from './views/ProductsView';
 import TablesView from './views/TablesView';
@@ -20,10 +19,9 @@ import SettingsView from './views/SettingsView';
 import CategoriesView from './views/CategoriesView';
 import InventoryView from './views/InventoryView';
 
-type Tab = 'dashboard' | 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'exchange-rate' | 'orders' | 'inventory' | 'settings';
+type Tab = 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'exchange-rate' | 'orders' | 'inventory' | 'settings';
 
 const TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
-    { id: 'dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
     { id: 'analytics', labelKey: 'analytics', icon: TrendingUp },
     { id: 'products', labelKey: 'products', icon: Package },
     { id: 'categories', labelKey: 'categories', icon: Layers },
@@ -36,7 +34,6 @@ const TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
 ];
 
 const TAB_COMPONENTS: Record<Tab, React.FC> = {
-    dashboard: DashboardView,
     analytics: AnalyticsView,
     products: ProductsView,
     categories: CategoriesView,
@@ -57,7 +54,7 @@ export default function ManagementPage() {
 }
 
 function ManagementContent() {
-    const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+    const [activeTab, setActiveTab] = useState<Tab>('analytics');
     const { t } = useLanguage();
     const searchParams = useSearchParams();
 

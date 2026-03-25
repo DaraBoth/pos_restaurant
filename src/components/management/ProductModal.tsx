@@ -1,14 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { createProduct, updateProduct } from '@/lib/api/products';
-import type { Product, Category } from '@/types';
+import type { Product, Category, InventoryItem } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { Save, ImagePlus, X, Box, Plus, Trash2 } from 'lucide-react';
+import { Save, ImagePlus, X, Box } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 import { getImageSrc } from '@/lib/image';
-import { InventoryItem, ProductIngredient } from '@/types';
-import { getInventoryItems, getProductIngredients, setProductIngredient, removeProductIngredient } from '@/lib/api/inventory';
+import { getInventoryItems } from '@/lib/api/inventory';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -22,6 +21,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     const { t } = useLanguage();
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
+    
+    // Core Product State
     const [name, setName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [priceUsd, setPriceUsd] = useState('0.00');
@@ -33,13 +34,10 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Ingredients Tab State
-    const [activeTab, setActiveTab] = useState<'general' | 'ingredients'>('general');
+    // Inventory Link State
     const [materials, setMaterials] = useState<InventoryItem[]>([]);
-    const [ingredients, setIngredients] = useState<ProductIngredient[]>([]);
-    const [newIngredientId, setNewIngredientId] = useState('');
-    const [newIngredientUsage, setNewIngredientUsage] = useState(1);
-    const [ingredientsLoading, setIngredientsLoading] = useState(false);
+    const [inventoryItemId, setInventoryItemId] = useState('');
+    const [inventoryItemUsage, setInventoryItemUsage] = useState(1);
 
     useEffect(() => {
         if (product) {
@@ -50,6 +48,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setCategoryId(product.category_id || '');
             setIsAvailable(product.is_available === 1);
             setImagePath(product.image_path || '');
+            setInventoryItemId(product.inventory_item_id || '');
+            setInventoryItemUsage(product.inventory_item_usage || 1);
         } else {
             setName('');
             setKhmerName('');
@@ -58,65 +58,23 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setCategoryId(categories[0]?.id || '');
             setIsAvailable(true);
             setImagePath('');
-            setActiveTab('general');
-        }
-        // Load materials always
-        getInventoryItems(restaurantId || undefined).then(setMaterials).catch(console.error);
-        
-        if (product && isOpen) {
-            loadIngredients(product.id);
-        } else {
-            setIngredients([]);
+            setInventoryItemId('');
+            setInventoryItemUsage(1);
         }
         
-        // Reset file input whenever modal opens/closes
+        // Load materials for linking
+        if (isOpen) {
+            getInventoryItems(restaurantId || undefined).then(setMaterials).catch(console.error);
+        }
+        
         if (fileInputRef.current) fileInputRef.current.value = '';
-    }, [product, categories, isOpen]);
-
-    async function loadIngredients(productId: string) {
-        setIngredientsLoading(true);
-        try {
-            const data = await getProductIngredients(productId, restaurantId || '');
-            setIngredients(data);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setIngredientsLoading(false);
-        }
-    }
-
-    async function handleAddIngredient() {
-        if (!product || !newIngredientId) return;
-        setIngredientsLoading(true);
-        try {
-            await setProductIngredient(product.id, newIngredientId, newIngredientUsage, restaurantId || '');
-            await loadIngredients(product.id);
-            setNewIngredientId('');
-            setNewIngredientUsage(1);
-        } catch (e) {
-            console.error(e);
-            alert("Failed to add ingredient.");
-        } finally {
-            setIngredientsLoading(false);
-        }
-    }
-
-    async function handleRemoveIngredient(invId: string) {
-        if (!product) return;
-        try {
-            await removeProductIngredient(product.id, invId, restaurantId || '');
-            await loadIngredients(product.id);
-        } catch (e) {
-            console.error(e);
-        }
-    }
+    }, [product, categories, isOpen, restaurantId]);
 
     async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
         setUploadingImage(true);
         try {
-            // Resize + compress using a canvas so stored data URI stays small (~30-60 KB).
             const dataUri = await new Promise<string>((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => {
@@ -150,11 +108,14 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                 await updateProduct(
                     product.id, name, khmerName, priceCents,
                     stockQuantity, categoryId, isAvailable, imagePath || undefined,
+                    inventoryItemId || undefined, inventoryItemUsage,
                     restaurantId || ''
                 );
             } else {
                 await createProduct(
-                    categoryId, name, khmerName, priceCents, stockQuantity, imagePath, restaurantId || undefined
+                    categoryId, name, khmerName, priceCents, stockQuantity, imagePath, 
+                    inventoryItemId || undefined, inventoryItemUsage,
+                    restaurantId || undefined
                 );
             }
             onSave();
@@ -174,32 +135,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             title={product ? t('editProduct') : t('addProduct')}
             subtitle={product ? product.name : t('addProductSub')}
         >
-            <div className="flex gap-2 mb-6 p-1 bg-white/[0.02] border border-white/5 rounded-2xl w-max">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('general')}
-                    className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                        activeTab === 'general' ? 'bg-[#2a2d36] text-white shadow-md' : 'text-[#8a8a99] hover:text-white'
-                    }`}
-                >
-                    General
-                </button>
-                {product && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab('ingredients')}
-                        className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                            activeTab === 'ingredients' ? 'bg-[#2a2d36] text-white shadow-md' : 'text-[#8a8a99] hover:text-white'
-                        }`}
-                    >
-                        Ingredients
-                    </button>
-                )}
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {activeTab === 'general' && (
-                <>
+            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                 {/* Image upload */}
                 <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
@@ -213,7 +149,6 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                     alt="Product"
                                     className="w-full h-full object-cover"
                                 />
-                                {/* Overlay with change / remove buttons */}
                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                                     <button
                                         type="button"
@@ -263,6 +198,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         />
                     </div>
                 </div>
+
                 {/* Product Name (EN) */}
                 <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
@@ -341,6 +277,54 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     </select>
                 </div>
 
+                {/* Inventory Link */}
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-4 shadow-[0_0_15px_rgba(16,185,129,0.03)]">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Box size={14} className="text-emerald-400" />
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Inventory Integration</h3>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                            Link to Stock Item
+                        </label>
+                        <select
+                            value={inventoryItemId}
+                            onChange={e => setInventoryItemId(e.target.value)}
+                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold focus:border-emerald-500 focus:bg-white/[0.09] outline-none transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="" className="bg-[#1e2229] text-white/50">-- Not linked to inventory --</option>
+                            {materials.map(m => (
+                                <option key={m.id} value={m.id} className="bg-[#1e2229] text-white">{m.name} ({m.unit_label})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {inventoryItemId && (
+                        <div className="space-y-1.5 pt-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                            <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                                Usage per sale (Qty)
+                            </label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.001"
+                                    value={inventoryItemUsage}
+                                    onChange={e => setInventoryItemUsage(parseFloat(e.target.value) || 0)}
+                                    className="flex-1 bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-emerald-500 outline-none transition-all"
+                                />
+                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
+                                    {materials.find(m => m.id === inventoryItemId)?.unit_label}
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-white/40 italic">
+                                e.g. 1 (piece), 0.5 (kg), 250 (ml)
+                            </p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Availability toggle */}
                 <div className="flex items-center justify-between px-4 py-3 bg-white/[0.04] border border-white/10 rounded-xl">
                     <span className="text-sm font-semibold text-white/80">{t('available')}</span>
@@ -359,95 +343,20 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         </span>
                     </label>
                 </div>
-                </>)}
-
-                {/* INGREDIENTS TAB */}
-                {activeTab === 'ingredients' && product && (
-                    <div className="space-y-6 pt-2 h-[500px] overflow-y-auto container-snap">
-                        <div className="bg-[#0f1115] rounded-2xl border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)] p-5">
-                            <h3 className="text-sm font-black text-white tracking-widest uppercase mb-4 flex items-center gap-2">
-                                <Box size={16} className="text-emerald-400" />
-                                Add Ingredient
-                            </h3>
-                            <div className="flex gap-3 items-end">
-                                <div className="flex-1 space-y-1.5">
-                                    <label className="block text-[10px] font-bold text-[#8a8a99] uppercase tracking-widest">Material</label>
-                                    <select
-                                        value={newIngredientId}
-                                        onChange={e => setNewIngredientId(e.target.value)}
-                                        className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none"
-                                    >
-                                        <option value="" disabled>Select material...</option>
-                                        {materials.map(m => (
-                                            <option key={m.id} value={m.id} className="bg-[#1e2229]">{m.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="w-24 space-y-1.5">
-                                    <label className="block text-[10px] font-bold text-[#8a8a99] uppercase tracking-widest">Usage %</label>
-                                    <input
-                                        type="number" step="0.1" min="0.01" max="100"
-                                        value={newIngredientUsage}
-                                        onChange={e => setNewIngredientUsage(parseFloat(e.target.value) || 0)}
-                                        className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none font-mono"
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleAddIngredient}
-                                    disabled={!newIngredientId || ingredientsLoading}
-                                    className="h-[46px] px-6 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 font-bold uppercase tracking-widest text-xs rounded-xl flex items-center gap-2 transition-all disabled:opacity-50"
-                                >
-                                    <Plus size={16} /> Add
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            {ingredients.length === 0 && !ingredientsLoading ? (
-                                <div className="text-center py-10 opacity-50">
-                                    <Box size={32} className="mx-auto mb-3" />
-                                    <p className="text-xs uppercase tracking-widest font-bold">No ingredients mapped</p>
-                                </div>
-                            ) : (
-                                ingredients.map(ing => (
-                                    <div key={ing.id} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-colors">
-                                        <div>
-                                            <div className="font-bold text-white tracking-tight">{ing.item_name}</div>
-                                            <div className="text-[10px] text-[#8a8a99] uppercase font-bold tracking-widest">Stock Unit: {ing.unit_label}</div>
-                                        </div>
-                                        <div className="flex items-center gap-6">
-                                            <div className="font-mono text-emerald-400 font-bold text-lg">
-                                                {ing.usage_percentage}%
-                                            </div>
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleRemoveIngredient(ing.inventory_item_id)}
-                                                className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                )}
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-4">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-xl text-sm font-bold text-white/60 hover:text-white border border-white/15 hover:border-white/30 hover:bg-white/5 transition-all"
+                        className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white/60 hover:text-white border border-white/15 hover:border-white/30 hover:bg-white/5 transition-all"
                     >
                         {t('cancel')}
                     </button>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="flex-1 py-3 rounded-xl bg-[var(--accent)] text-white font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="flex-1 py-3.5 rounded-xl bg-[var(--accent)] text-white font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20"
                     >
                         {loading ? (
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

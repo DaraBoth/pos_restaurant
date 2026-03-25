@@ -33,8 +33,8 @@ const RESTAURANT_TABLES: &[(&str, &str, SyncMode)] = &[
     ("order_items",     "id",           SyncMode::ViaOrders),
     ("payments",        "id",           SyncMode::ViaOrders),
     ("table_sessions",  "id",           SyncMode::Direct),  // table_id links to floor_tables
-    ("product_ingredients", "id",       SyncMode::NoFilter), // product-scoped, no restaurant_id
     ("inventory_logs",  "id",           SyncMode::Direct),
+    ("_sync_state",     "restaurant_id", SyncMode::Direct),
 ];
 
 #[derive(Clone, Copy)]
@@ -43,8 +43,6 @@ pub enum SyncMode {
     Direct,
     /// Table links via order_id → orders.restaurant_id (order_items, payments)
     ViaOrders,
-    /// Table has no restaurant_id, sync all rows
-    NoFilter,
 }
 
 /// Returns the last sync timestamp stored for this restaurant in the local DB.
@@ -69,8 +67,8 @@ pub async fn get_last_sync_at(local: &Connection, restaurant_id: &str) -> String
 /// Persist the sync timestamp for a restaurant.
 pub async fn set_last_sync_at(local: &Connection, restaurant_id: &str, ts: &str) {
     let _ = local.execute(
-        "INSERT INTO _sync_state (restaurant_id, synced_at) VALUES (?, ?)
-         ON CONFLICT(restaurant_id) DO UPDATE SET synced_at = excluded.synced_at",
+        "INSERT INTO _sync_state (restaurant_id, synced_at, updated_at) VALUES (?, ?, datetime('now'))
+         ON CONFLICT(restaurant_id) DO UPDATE SET synced_at = excluded.synced_at, updated_at = datetime('now')",
         params![restaurant_id, ts],
     ).await;
 }
@@ -114,27 +112,20 @@ pub async fn pull_table(
         SyncMode::Direct => {
             let filter_col = if table == "restaurants" { "id" } else { "restaurant_id" };
             format!(
-                "SELECT {} FROM {} WHERE {} = ? AND updated_at > ?",
+                "SELECT {} FROM {} WHERE {} = ? AND updated_at >= ?",
                 col_list, table, filter_col
             )
         },
         SyncMode::ViaOrders => format!(
             "SELECT {} FROM {}
              JOIN orders o ON {}.order_id = o.id
-             WHERE o.restaurant_id = ? AND {}.updated_at > ?",
+             WHERE o.restaurant_id = ? AND {}.updated_at >= ?",
             prefixed_cols, table, table, table
-        ),
-        SyncMode::NoFilter => format!(
-            "SELECT {} FROM {} WHERE updated_at > ?",
-            col_list, table
         ),
     };
 
     println!("[Sync] Pulling table={} since={}", table, since);
-    let mut rows = match mode {
-        SyncMode::NoFilter => remote.query(&sql, [since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?,
-        _ => remote.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?,
-    };
+    let mut rows = remote.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?;
 
     let upsert = format!(
         "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
@@ -143,7 +134,6 @@ pub async fn pull_table(
 
     let mut count = 0;
     while let Some(row) = rows.next().await? {
-        // Build values vec
         let mut vals: Vec<libsql::Value> = Vec::new();
         for i in 0..cols.len() {
             vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
@@ -190,19 +180,12 @@ pub async fn push_table(
         SyncMode::ViaOrders => format!(
             "SELECT {} FROM {}
              JOIN orders o ON {}.order_id = o.id
-             WHERE o.restaurant_id = ? AND {}.updated_at > ?",
+             WHERE o.restaurant_id = ? AND {}.updated_at >= ?",
             prefixed_cols, table, table, table
-        ),
-        SyncMode::NoFilter => format!(
-            "SELECT {} FROM {} WHERE updated_at > ?",
-            col_list, table
         ),
     };
 
-    let mut rows = match mode {
-        SyncMode::NoFilter => local.query(&sql, [since]).await.map_err(|e| anyhow::anyhow!("Local query failed: {}", e))?,
-        _ => local.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Local query failed: {}", e))?,
-    };
+    let mut rows = local.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Local query failed: {}", e))?;
 
     let upsert = format!(
         "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
@@ -267,11 +250,7 @@ pub async fn sync_restaurant(
 
     for (table, pk, mode) in RESTAURANT_TABLES {
         println!("[Sync] Scanning table={} since={} restaurant={}", table, since, restaurant_id);
-        // The user's provided snippet for `let mut rows = match local.query(` was incomplete.
-        // Assuming it was meant to be a placeholder for a query related to scanning.
-        // For now, I'm just inserting the `println!` as requested by "Add scan log before the query."
-        // and keeping the original `push_table` call.
-        // If the user intended a specific query here, they would need to provide the full query.
+        
         // Push local → remote
         match push_table(local, remote, table, pk, *mode, restaurant_id, &since).await {
             Ok(n) => total += n,

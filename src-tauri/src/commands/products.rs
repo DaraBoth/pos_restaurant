@@ -3,6 +3,14 @@ use libsql::{Connection, params};
 use std::sync::Arc;
 use crate::models::{Category, Product};
 
+fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
+    match row.get_value(idx) {
+        Ok(libsql::Value::Integer(i)) => i as f64,
+        Ok(libsql::Value::Real(f)) => f,
+        _ => 0.0,
+    }
+}
+
 #[tauri::command]
 pub async fn get_categories(
     pool: State<'_, Arc<Connection>>,
@@ -37,18 +45,18 @@ pub async fn get_products(
     let mut rows = if let Some(cat_id) = category_id {
         pool.query(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.inventory_item_id, p.inventory_item_usage, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
-             WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.category_id = ? AND p.restaurant_id = ?
+             WHERE p.is_deleted = 0 AND p.category_id = ? AND p.restaurant_id = ?
              ORDER BY p.name",
              params![cat_id, restaurant_id]
         ).await
     } else {
         pool.query(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.inventory_item_id, p.inventory_item_usage, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
-             WHERE p.is_deleted = 0 AND p.is_available = 1 AND p.restaurant_id = ?
+             WHERE p.is_deleted = 0 AND p.restaurant_id = ?
              ORDER BY c.sort_order, p.name",
              params![restaurant_id]
         ).await
@@ -67,7 +75,9 @@ pub async fn get_products(
             image_path: row.get::<String>(7).ok(),
             category_name: row.get::<String>(8).ok(),
             category_khmer: row.get::<String>(9).ok(),
-            created_at: row.get::<String>(10).unwrap_or_default(),
+            inventory_item_id: row.get::<String>(10).ok(),
+            inventory_item_usage: get_f64_safe(&row, 11),
+            created_at: row.get::<String>(12).unwrap_or_default(),
         });
     }
 
@@ -122,12 +132,15 @@ pub async fn create_product(
     price_cents: i64,
     stock_quantity: i64,
     image_path: Option<String>,
+    inventory_item_id: Option<String>,
+    inventory_item_usage: f64,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
-    pool.execute(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path, restaurant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    let _: u64 = pool.execute(
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path, inventory_item_id, inventory_item_usage, restaurant_id, updated_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         params![
             id.clone(),
             category_id,
@@ -136,6 +149,8 @@ pub async fn create_product(
             price_cents,
             stock_quantity,
             image_path.unwrap_or_default(),
+            inventory_item_id,
+            inventory_item_usage,
             restaurant_id
         ]
     )
@@ -154,11 +169,14 @@ pub async fn update_product(
     category_id: String,
     is_available: bool,
     image_path: Option<String>,
+    inventory_item_id: Option<String>,
+    inventory_item_usage: f64,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    pool.execute(
-        "UPDATE products SET name=?, khmer_name=?, price_cents=?, stock_quantity=?, category_id=?, is_available=?, image_path=?, updated_at=datetime('now')
+    let _: u64 = pool.execute(
+        "UPDATE products SET name=?, khmer_name=?, price_cents=?, stock_quantity=?, category_id=?, is_available=?, image_path=?, 
+                inventory_item_id=?, inventory_item_usage=?, updated_at=datetime('now')
          WHERE id=? AND restaurant_id=?",
          params![
              name,
@@ -168,6 +186,8 @@ pub async fn update_product(
              category_id,
              is_available as i64,
              image_path.unwrap_or_default(),
+             inventory_item_id,
+             inventory_item_usage,
              id,
              restaurant_id
          ]

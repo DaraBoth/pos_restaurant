@@ -7,7 +7,7 @@ import { login, getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle } from 'lucide-react';
 
 export default function LoginPage() {
-    const [username, setUsername] = useState('admin');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -15,9 +15,6 @@ export default function LoginPage() {
     const { t, lang, setLang } = useLanguage();
     const router = useRouter();
 
-    // Pre-warm Tauri IPC bridge and SQLite pool as soon as login page mounts.
-    // This runs in the background while the user types their credentials,
-    // so subsequent pages (floor plan, kitchen) don't face the cold-start delay.
     useEffect(() => {
         import('@tauri-apps/api/core').then(({ invoke }) => {
             invoke('get_restaurant').catch(() => {/* ignore errors */});
@@ -31,30 +28,22 @@ export default function LoginPage() {
         try {
             const session = await login(username, password);
             setUser(session);
-
-            // Start per-restaurant cloud sync daemon in background (non-blocking)
             if (session.restaurant_id) {
-                triggerSync(session.restaurant_id).catch(() => {/* offline — ignore */});
+                triggerSync(session.restaurant_id).catch(() => {});
             }
-
-            // Super admin goes to their own console
             if (session.role === 'super_admin') {
                 router.replace('/super-admin');
                 return;
             }
-
-            // Check if restaurant setup is needed (first install)
             try {
                 const status = await getSetupStatus();
                 if (status.needs_restaurant_setup) {
                     router.replace('/setup');
                     return;
                 }
-            } catch {
-                // If check fails, proceed to tables
-            }
+            } catch {}
             router.replace('/pos/tables');
-        } catch (err: unknown) {
+        } catch (err: any) {
             setError(err instanceof Error ? err.message : String(err));
         } finally {
             setLoading(false);
@@ -62,68 +51,95 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[var(--background)]">
-            
-            {/* Language toggle */}
-            <button
-                onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-                className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all z-10 bg-[var(--bg-card)] border border-[var(--border)] hover:bg-[var(--bg-elevated)]"
-            >
-                <Globe size={14} className="text-[var(--accent-blue)]"/>
-                {lang === 'en' ? 'ភាសាខ្មែរ' : 'English'}
-            </button>
-
-            {/* Main Login Container */}
-            <div className="relative z-10 w-full max-w-sm mx-auto px-4 animate-fade-in">
+        <div className="min-h-screen flex font-sans selection:bg-emerald-500/30">
+            {/* Left Side: Branding */}
+            <div className="hidden lg:flex lg:w-1/2 bg-emerald-600 relative overflow-hidden items-center justify-center border-r border-emerald-500/20">
+                {/* Decorative Pattern / Abstract shape */}
+                <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] border-[2px] border-white rounded-full translate-x-12" />
+                    <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] border-[2px] border-white rounded-full -translate-x-12" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] border-[1px] border-white rounded-full scale-150" />
+                </div>
                 
-                {/* Logo & Headline */}
-                <div className="flex flex-col items-center mb-8">
-                    <div className="relative mb-5">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--accent)] shadow-lg shadow-[var(--accent)]/20">
-                            <ChefHat size={28} color="#fff" strokeWidth={2} />
-                        </div>
+                <div className="relative z-10 text-center px-12">
+                    <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-white shadow-2xl mb-8">
+                        <ChefHat size={48} className="text-emerald-600" strokeWidth={2.5} />
                     </div>
-                    <h1 className="text-2xl font-bold tracking-tight text-white">DineOS</h1>
-                    <p className="text-xs mt-1.5 font-medium text-[var(--text-secondary)]">
-                        {t('restaurantManagement')}
+                    <h1 className="text-6xl font-black text-white tracking-tighter mb-4 italic">
+                        Dine<span className="opacity-70">OS</span>
+                    </h1>
+                    <p className="text-emerald-50 text-xl font-medium max-w-md mx-auto leading-relaxed">
+                        {t('restaurantManagement')} — Fast, Reliable, Immersive.
                     </p>
                 </div>
+                
+                <div className="absolute bottom-12 left-12 right-12 flex justify-between items-center text-emerald-200/50 text-[10px] font-bold uppercase tracking-[0.3em]">
+                    <span>Professional Edition</span>
+                    <span>v1.2.0</span>
+                </div>
+            </div>
 
-                {/* Login Card */}
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl">
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        {/* Username */}
-                        <div className="space-y-1.5">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {/* Right Side: Form (DARK) */}
+            <div className="w-full lg:w-1/2 bg-[#0a0c10] flex flex-col relative">
+                {/* Mobile Identity */}
+                <div className="lg:hidden p-8 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
+                            <ChefHat size={16} strokeWidth={2.5} />
+                        </div>
+                        <span className="font-black text-xl tracking-tighter uppercase text-white">Dine<span className="text-emerald-600">OS</span></span>
+                    </div>
+                </div>
+
+                {/* Language Switcher */}
+                <div className="absolute top-8 right-8">
+                    <button
+                        onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest text-white/50 hover:text-white border border-white/10 hover:border-emerald-500/30 transition-all bg-white/[0.03] hover:bg-white/[0.08] backdrop-blur-md"
+                    >
+                        <Globe size={14} className={lang === 'en' ? 'text-emerald-400' : 'text-blue-400'} />
+                        {lang === 'en' ? 'ភាសាខ្មែរ' : 'English'}
+                    </button>
+                </div>
+
+                {/* Main Form Area */}
+                <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 max-w-[640px] mx-auto w-full">
+                    <div className="mb-12">
+                        <h2 className="text-4xl font-black text-white tracking-tight mb-3">Sign In</h2>
+                        <p className="text-white/40 font-medium tracking-tight">Access the POS terminal with your credentials.</p>
+                    </div>
+
+                    <form onSubmit={handleLogin} className="space-y-8">
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-black text-white/20 uppercase tracking-[0.3em] ml-1">
                                 {t('username')}
                             </label>
-                            <div className="relative">
-                                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+                            <div className="relative group">
+                                <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={e => setUsername(e.target.value)}
                                     required
-                                    className="pos-input w-full pl-10 pr-4 py-2.5 text-sm"
-                                    placeholder="admin"
+                                    className="w-full bg-white/[0.02] border border-white/10 focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-5 text-base text-white placeholder:text-white/10 outline-none transition-all font-medium"
+                                    placeholder="Enter username"
                                     autoComplete="username"
                                 />
                             </div>
                         </div>
 
-                        {/* Password */}
-                        <div className="space-y-1.5">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-black text-white/20 uppercase tracking-[0.3em] ml-1">
                                 {t('password')}
                             </label>
-                            <div className="relative">
-                                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+                            <div className="relative group">
+                                <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     required
-                                    className="pos-input w-full pl-10 pr-4 py-2.5 text-sm"
+                                    className="w-full bg-white/[0.02] border border-white/10 focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-5 text-base text-white placeholder:text-white/10 outline-none transition-all font-medium"
                                     placeholder="••••••••"
                                     autoComplete="current-password"
                                 />
@@ -131,29 +147,42 @@ export default function LoginPage() {
                         </div>
 
                         {error && (
-                            <div className="rounded-xl px-3 py-2.5 text-xs font-medium flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400">
-                                <AlertTriangle size={13} strokeWidth={2.5} /> {error}
+                            <div className="bg-red-500/5 border border-red-500/20 text-red-400 p-5 rounded-2xl text-[13px] font-bold flex items-center gap-4 animate-in shake duration-500">
+                                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                                    <AlertTriangle size={18} />
+                                </div>
+                                {error}
                             </div>
                         )}
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="pos-btn-primary w-full py-3 text-sm mt-1 flex items-center justify-center gap-2"
+                            className="relative group w-full py-5 text-lg font-black uppercase tracking-widest text-white overflow-hidden rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 mt-4 shadow-xl shadow-emerald-500/10"
                         >
-                            {loading ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    {t('loading')}
-                                </div>
-                            ) : (
-                                <>
-                                    {t('login')}
-                                    <ArrowRight size={14} />
-                                </>
-                            )}
+                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all group-hover:scale-105" />
+                            <div className="relative flex items-center justify-center gap-3">
+                                {loading ? (
+                                    <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        {t('login')}
+                                        <ArrowRight size={22} className="opacity-70 group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </div>
                         </button>
                     </form>
+
+                    <div className="mt-12 text-center">
+                        <p className="text-white/20 text-sm font-medium">
+                            Need diagnostic help? <span className="text-emerald-500 font-bold hover:underline cursor-pointer">Terminal Support</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div className="p-8 text-center text-white/10 text-[10px] font-bold uppercase tracking-[0.3em] mt-auto">
+                    &copy; 2025 DineOS System &bull; Secure Terminal Access
                 </div>
             </div>
         </div>

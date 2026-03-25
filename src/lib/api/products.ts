@@ -10,11 +10,14 @@ export const getProducts = (category_id?: string, restaurant_id?: string) =>
 export const createProduct = (
     category_id: string, name: string,
     khmer_name?: string, price_cents?: number, stock_quantity?: number,
-    image_path?: string, restaurant_id?: string
+    image_path?: string, inventory_item_id?: string, inventory_item_usage?: number, 
+    restaurant_id?: string
 ) => call<string>('create_product', {
     categoryId: category_id, name, khmerName: khmer_name,
     priceCents: price_cents || 0, stockQuantity: stock_quantity || 0,
     imagePath: image_path,
+    inventoryItemId: inventory_item_id,
+    inventoryItemUsage: inventory_item_usage || 1.0,
     restaurantId: restaurant_id
 });
 
@@ -22,11 +25,13 @@ export const updateProduct = (
     id: string, name: string, khmer_name: string | undefined,
     price_cents: number, stock_quantity: number, category_id: string,
     is_available: boolean, image_path: string | undefined,
+    inventory_item_id: string | undefined, inventory_item_usage: number,
     restaurant_id: string
 ) => call<void>('update_product', {
     id, name, khmerName: khmer_name, priceCents: price_cents,
     stockQuantity: stock_quantity, categoryId: category_id,
     isAvailable: is_available, imagePath: image_path,
+    inventoryItemId: inventory_item_id, inventoryItemUsage: inventory_item_usage,
     restaurantId: restaurant_id
 });
 
