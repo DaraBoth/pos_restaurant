@@ -109,6 +109,13 @@ pub async fn pull_table(
     let prefixed_cols = cols.iter().map(|c| format!("{}.{}", table, c)).collect::<Vec<_>>().join(", ");
     let placeholders = cols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
 
+    // Build the "DO UPDATE SET" part, excluding the primary key
+    let update_set = cols.iter()
+        .filter(|&c| c != _pk)
+        .map(|c| format!("{} = excluded.{}", c, c))
+        .collect::<Vec<_>>()
+        .join(", ");
+
     let sql = match mode {
         SyncMode::Direct => {
             let filter_col = if table == "restaurants" { "id" } else { "restaurant_id" };
@@ -128,10 +135,14 @@ pub async fn pull_table(
     println!("[Sync] Pulling table={} since={}", table, since);
     let mut rows = remote.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Remote query failed: {}", e))?;
 
-    let upsert = format!(
-        "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
-        table, col_list, placeholders
-    );
+    let upsert = if update_set.is_empty() {
+        format!("INSERT OR IGNORE INTO {} ({}) VALUES ({})", table, col_list, placeholders)
+    } else {
+        format!(
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT({}) DO UPDATE SET {}",
+            table, col_list, placeholders, _pk, update_set
+        )
+    };
 
     let mut count = 0;
     while let Some(row) = rows.next().await? {
@@ -140,7 +151,7 @@ pub async fn pull_table(
             vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
         }
         if let Err(e) = local.execute(&upsert, vals).await {
-            eprintln!("[Sync] Pull insert failed for table {}: {}", table, e);
+            eprintln!("[Sync] Pull insert failed for table {}: {} | SQL: {}", table, e, upsert);
         } else {
             count += 1;
         }
@@ -188,10 +199,21 @@ pub async fn push_table(
 
     let mut rows = local.query(&sql, params![restaurant_id, since]).await.map_err(|e| anyhow::anyhow!("Local query failed: {}", e))?;
 
-    let upsert = format!(
-        "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
-        table, col_list, placeholders
-    );
+    // Build the "DO UPDATE SET" part, excluding the primary key
+    let update_set = cols.iter()
+        .filter(|&c| c != _pk)
+        .map(|c| format!("{} = excluded.{}", c, c))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let upsert = if update_set.is_empty() {
+        format!("INSERT OR IGNORE INTO {} ({}) VALUES ({})", table, col_list, placeholders)
+    } else {
+        format!(
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT({}) DO UPDATE SET {}",
+            table, col_list, placeholders, _pk, update_set
+        )
+    };
 
     let mut count = 0;
     while let Some(row) = rows.next().await? {
@@ -200,7 +222,7 @@ pub async fn push_table(
             vals.push(row.get_value(i as i32).unwrap_or(libsql::Value::Null));
         }
         if let Err(e) = remote.execute(&upsert, vals).await {
-            eprintln!("[Sync] Push insert failed for table {}: {}", table, e);
+            eprintln!("[Sync] Push insert failed for table {}: {} | SQL: {}", table, e, upsert);
         } else {
             count += 1;
         }

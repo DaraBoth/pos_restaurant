@@ -70,7 +70,7 @@ export default function LoginPage() {
                         Dine<span className="opacity-70">OS</span>
                     </h1>
                     <p className="text-emerald-50 text-xl font-medium max-w-md mx-auto leading-relaxed">
-                        {t('restaurantManagement')} — Fast, Reliable, Immersive.
+                        {t('businessManagement')} — Fast, Reliable, Immersive.
                     </p>
                 </div>
                 
@@ -186,7 +186,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="p-8 text-center text-white/10 text-[10px] font-bold uppercase tracking-[0.3em] mt-auto">
-                    &copy; 2025 DineOS System &bull; Secure Terminal Access
+                    &copy; 2026 DineOS System &bull; Secure Terminal Access
                 </div>
             </div>
         </div>

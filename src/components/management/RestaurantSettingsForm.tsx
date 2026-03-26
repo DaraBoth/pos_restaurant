@@ -16,21 +16,21 @@ const DEFAULT: RestaurantInput = {
     tin: '',
     vat_number: '',
     website: '',
-    receipt_footer: 'Thank you for dining with us!',
+    receipt_footer: 'Thank you for your visit!',
     license_expires_at: '',
     license_support_contact: '',
 };
 
 const SAMPLE_SETUP_INFO: RestaurantInput = {
-    name: 'Volt Burger Phnom Penh',
-    khmer_name: 'វ៉ុល ប៊ឺហ្គឺ ភ្នំពេញ',
+    name: 'Volt Coffee Phnom Penh',
+    khmer_name: 'វ៉ុល កាហ្វេ ភ្នំពេញ',
     address: 'No. 123, Monivong Blvd, Phnom Penh',
     address_kh: 'ផ្ទះលេខ ១២៣ មហាវិថីមុនីវង្ស ភ្នំពេញ',
     phone: '+855 12 345 678',
     tin: 'K000-123456789',
     vat_number: 'VAT-PP-2026-001',
-    website: 'www.voltburger.kh',
-    receipt_footer: 'Thank you for dining with us!\nPlease come again.',
+    website: 'www.voltcoffee.kh',
+    receipt_footer: 'Thank you for your visit!\nPlease come again.',
 };
 
 interface RestaurantSettingsFormProps {
@@ -190,7 +190,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                     </div>
                     <div>
                         <h1 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">
-                            {mode === 'setup' ? 'Restaurant Setup' : 'Restaurant Settings'}
+                            {mode === 'setup' ? t('businessSetup') : 'Shop Settings'}
                         </h1>
                         <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">
                             {mode === 'setup'
@@ -312,7 +312,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                                 </label>
                             </div>
                             <div className="flex-1 space-y-2">
-                                <h3 className="text-xl font-black text-[var(--foreground)]">Restaurant Logo</h3>
+                                <h3 className="text-xl font-black text-[var(--foreground)]">Shop Logo</h3>
                                 <p className="text-xs font-bold text-[var(--text-secondary)] leading-relaxed uppercase tracking-wider">
                                     Upload a high-quality logo for receipts<br/>and the POS sidebar.
                                 </p>
@@ -328,8 +328,8 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                            <FormField label="Restaurant Name (English)" value={info.name || ''} onChange={value => update('name', value)} placeholder="Volt Burger" icon={Building2} />
-                            <FormField label="Restaurant Name (Khmer)" value={info.khmer_name || ''} onChange={value => update('khmer_name', value)} placeholder="ហាងប៊ឺហ្គឺវ៉ុល" icon={Building2} />
+                            <FormField label="Shop Name (English)" value={info.name || ''} onChange={value => update('name', value)} placeholder="Volt Coffee" icon={Building2} />
+                            <FormField label="Shop Name (Khmer)" value={info.khmer_name || ''} onChange={value => update('khmer_name', value)} placeholder="ហាងកាហ្វេវ៉ុល" icon={Building2} />
                             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField label="Address (English)" value={info.address || ''} onChange={value => update('address', value)} placeholder="123 Neon Ave" icon={MapPin} />
                                 <FormField label="Address (Khmer)" value={info.address_kh || ''} onChange={value => update('address_kh', value)} placeholder="១២៣ ផ្លូវនីអុង" icon={MapPin} />
@@ -371,7 +371,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                             <div className="w-full border-t-2 border-dashed border-[var(--border)] mb-6" />
 
                             <div className="space-y-1.5 w-full">
-                                <p className="font-black text-lg text-[var(--foreground)] uppercase tracking-widest">{info.name || 'RESTAURANT NAME'}</p>
+                                <p className="font-black text-lg text-[var(--foreground)] uppercase tracking-widest">{info.name || 'SHOP NAME'}</p>
                                 {info.khmer_name && <p className="text-sm font-bold text-[var(--text-secondary)] khmer">{info.khmer_name}</p>}
                                 <div className="mt-4 space-y-1">
                                     {info.address && <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">{info.address}</p>}

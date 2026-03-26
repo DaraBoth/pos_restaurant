@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, ChefHat, UtensilsCrossed } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
 import { SyncStatus } from '@/components/ui/SyncStatus';
@@ -65,7 +65,7 @@ export default function SidebarNav() {
                     {restaurant?.logo_path ? (
                         <img src={restaurant.logo_path} alt="Logo" className="w-full h-full object-cover rounded-xl" />
                     ) : (
-                        <ChefHat size={18} color="#fff" strokeWidth={2.5} />
+                        <Store size={18} color="#fff" strokeWidth={2.5} />
                     )}
                 </div>
                 <div className="min-w-0">

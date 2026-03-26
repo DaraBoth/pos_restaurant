@@ -119,8 +119,17 @@ async fn ensure_remote_superadmin(remote: &Connection) -> Result<(), String> {
 
 async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) -> Result<(), String> {
     local.execute(
-        "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
+        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+            restaurant_id = excluded.restaurant_id,
+            username = excluded.username,
+            password_hash = excluded.password_hash,
+            role = excluded.role,
+            full_name = excluded.full_name,
+            khmer_name = excluded.khmer_name,
+            is_deleted = excluded.is_deleted,
+            updated_at = excluded.updated_at",
         params![
             record.id.clone(),
             record.restaurant_id.clone(),
@@ -153,12 +162,27 @@ async fn seed_local_restaurant_from_remote(
     .map_err(|e| format!("Cloud sync error: {}", e))?;
 
     let Some(row) = rows.next().await.map_err(|e| e.to_string())? else {
-        return Ok(());
+        return Err(format!("Business profile (ID: {}) not found in cloud database.", restaurant_id));
     };
 
     local.execute(
-        "INSERT OR REPLACE INTO restaurants (id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO restaurants (id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            khmer_name = excluded.khmer_name,
+            tin = excluded.tin,
+            address = excluded.address,
+            address_kh = excluded.address_kh,
+            phone = excluded.phone,
+            website = excluded.website,
+            vat_number = excluded.vat_number,
+            receipt_footer = excluded.receipt_footer,
+            logo_path = excluded.logo_path,
+            license_expires_at = excluded.license_expires_at,
+            license_support_contact = excluded.license_support_contact,
+            is_deleted = excluded.is_deleted,
+            updated_at = excluded.updated_at",
         params![
             row.get::<String>(0).unwrap_or_default(),
             row.get::<String>(1).unwrap_or_default(),

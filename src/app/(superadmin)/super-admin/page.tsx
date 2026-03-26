@@ -16,8 +16,7 @@ import {
     X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus
 } from 'lucide-react';
 import { updateRestaurantLicense } from '@/lib/api/restaurant';
-
-// ─── Create Restaurant Modal ────────────────────────────────────────────
+// ─── Create Business Modal ────────────────────────────────────────────
 type CreateForm = {
     restaurantName: string;
     restaurantAddress: string;
@@ -29,7 +28,7 @@ type CreateForm = {
     adminFullName: string;
 };
 
-function CreateRestaurantModal({ onClose, onCreated }: {
+function CreateBusinessModal({ onClose, onCreated }: {
     onClose: () => void;
     onCreated: () => void;
 }) {
@@ -49,7 +48,7 @@ function CreateRestaurantModal({ onClose, onCreated }: {
         e.preventDefault();
         setError('');
         if (!form.restaurantName.trim() || !form.adminUsername.trim() || !form.adminPassword.trim()) {
-            setError('Restaurant name, admin username and password are required.');
+            setError('Business name, admin username and password are required.');
             return;
         }
         if (form.adminPassword.length < 6) {
@@ -98,10 +97,7 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                         <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center">
                             <Building2 size={15} className="text-[var(--accent)]" />
                         </div>
-                        <div>
-                            <h2 className="text-sm font-black uppercase tracking-widest">New Restaurant</h2>
-                            <p className="text-[10px] text-[var(--text-secondary)] opacity-60">Creates restaurant + admin account</p>
-                        </div>
+                        <h2 className="text-xl font-black text-white uppercase tracking-wider">New Business</h2>
                     </div>
                     <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-[var(--text-secondary)] transition-colors">
                         <X size={16} />
@@ -113,10 +109,10 @@ function CreateRestaurantModal({ onClose, onCreated }: {
                     {/* Restaurant section */}
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-1.5">
-                            <Store size={10} /> Restaurant Details
+                            <Store size={10} /> Business Details
                         </p>
                         <div className="space-y-3">
-                            <Field label="Restaurant Name *" value={form.restaurantName} onChange={update('restaurantName')} placeholder="Summer Café" />
+                            <Field label="Business Name *" value={form.restaurantName} onChange={update('restaurantName')} placeholder="Summer Café" />
                             <Field label="Address" value={form.restaurantAddress} onChange={update('restaurantAddress')} placeholder="Phnom Penh, Cambodia" />
                             <Field label="Phone" value={form.restaurantPhone} onChange={update('restaurantPhone')} placeholder="+855 12 345 678" />
                             <Field label="License Expiry" type="date" value={form.licenseExpiresAt} onChange={update('licenseExpiresAt')} />
@@ -279,7 +275,7 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest group-hover:border-[var(--accent)]/40"
                 >
                     <ChevronRight size={13} strokeWidth={3} />
-                    View Restaurant
+                    View Business
                 </button>
             </div>
         </div>
@@ -322,7 +318,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
     }
 
     async function handleDeleteRestaurant() {
-        const confirmed = window.confirm(`Delete ${r.name} and all related restaurant data? This will remove users, orders, products, tables, inventory, and sync records.`);
+        const confirmed = window.confirm(`Delete ${r.name} and all related business data? This will remove users, orders, products, tables, inventory, and sync records.`);
         if (!confirmed) {
             return;
         }
@@ -360,7 +356,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    <Row icon={Store} label="Restaurant ID" value={r.id.split('-')[0].toUpperCase()} mono />
+                    <Row icon={Store} label="Business ID" value={r.id.split('-')[0].toUpperCase()} mono />
                     {r.address && <Row icon={MapPin} label="Address" value={r.address} />}
                     {r.phone && <Row icon={Phone} label="Phone" value={r.phone} />}
                     <Row icon={Calendar} label="Created" value={new Date(r.created_at + 'Z').toLocaleDateString()} />
@@ -392,7 +388,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                         {r.admin_full_name && <Row icon={User} label="Full Name" value={r.admin_full_name} />}
                         {!r.admin_id && (
                             <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
-                                This restaurant has no admin account yet. Use Create Admin to set up the first account.
+                                This business has no admin account yet. Use Create Admin to set up the first account.
                             </div>
                         )}
                     </div>
@@ -495,7 +491,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                             disabled={deleting}
                             className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm font-black text-red-300 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                         >
-                            <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Restaurant'}
+                            <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Business'}
                         </button>
                         <button onClick={onClose}
                             className="w-full py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
@@ -633,7 +629,7 @@ export default function SuperAdminPage() {
                 {/* ── Toolbar ── */}
                 <div className="flex items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-base font-black text-white">Registered Restaurants</h2>
+                        <h2 className="text-base font-black text-white">Registered Businesses</h2>
                         <p className="text-xs text-[var(--text-secondary)] opacity-50">Each entry represents a paying client + their admin account.</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -655,7 +651,7 @@ export default function SuperAdminPage() {
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-[var(--accent)]/20"
                         >
                             <Plus size={14} strokeWidth={3} />
-                            New Restaurant
+                            New Business
                         </button>
                     </div>
                 </div>
@@ -669,8 +665,8 @@ export default function SuperAdminPage() {
                     <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-30">
                         <Store size={48} strokeWidth={1} />
                         <div className="text-center">
-                            <p className="font-black uppercase tracking-widest">No restaurants yet</p>
-                            <p className="text-xs mt-1 opacity-60">Click "New Restaurant" to onboard your first client.</p>
+                            <p className="font-black uppercase tracking-widest">No businesses yet</p>
+                            <p className="text-xs mt-1 opacity-60">Click "New Business" to onboard your first client.</p>
                         </div>
                     </div>
                 ) : (
@@ -683,7 +679,7 @@ export default function SuperAdminPage() {
             </main>
 
             {showCreate && (
-                <CreateRestaurantModal
+                <CreateBusinessModal
                     onClose={() => setShowCreate(false)}
                     onCreated={() => { setShowCreate(false); load(); }}
                 />
@@ -1271,9 +1267,9 @@ function GlobalUsersModal({ onClose, restaurants, onMoveUser }: {
                     <div className="flex items-center gap-3">
                         <div className="relative">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-50" />
-                            <input
-                                type="text"
-                                placeholder="Search users by name, role, or origin..."
+                            <input 
+                                    type="text" 
+                                    placeholder="Search users by name, role, or origin..."
                                 className="w-full sm:w-64 bg-black/50 border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
@@ -1397,13 +1393,13 @@ function MoveUserModal({ user, restaurants, onClose, onMoved }: {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Target Restaurant</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Target Business</label>
                         <select 
                             value={selectedId}
                             onChange={(e) => setSelectedId(e.target.value)}
                             className="w-full bg-black/40 border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[var(--accent)] appearance-none"
                         >
-                            <option value="" disabled>Select a restaurant...</option>
+                            <option value="" disabled>Select a business...</option>
                             {restaurants.map(r => (
                                 <option key={r.id} value={r.id}>{r.name}</option>
                             ))}
