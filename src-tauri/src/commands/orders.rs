@@ -675,10 +675,12 @@ pub async fn checkout_session(
 
     if let Some((first_order_id, _)) = session_orders.first() {
         if discount_cents.unwrap_or(0) > 0 {
+            let d_cents = discount_cents.unwrap_or(0);
+            let d_khr = round_khr(d_cents, exch_rate);
             let _: u64 = pool.execute(
-                "UPDATE orders SET total_usd = MAX(0, total_usd - ?) 
+                "UPDATE orders SET total_usd = MAX(0, total_usd - ?), total_khr = MAX(0, total_khr - ?)
                  WHERE id = ? AND restaurant_id = ?", 
-                params![discount_cents.unwrap_or(0), first_order_id.clone(), restaurant_id.clone()]
+                params![d_cents, d_khr, first_order_id.clone(), restaurant_id.clone()]
             )
                 .await.map_err(|e| format!("DB error: {}", e))?;
         }
@@ -925,4 +927,24 @@ pub async fn get_revenue_by_period(
     }
 
     Ok(results)
+}
+
+#[tauri::command]
+pub async fn save_excel_file(
+    content: Vec<u8>,
+    filename: String,
+) -> Result<String, String> {
+    let file_path = rfd::FileDialog::new()
+        .set_title("Save Order History Report")
+        .set_file_name(&filename)
+        .add_filter("Excel Spreadsheet", &["xlsx"])
+        .save_file();
+    
+    if let Some(path) = file_path {
+        std::fs::write(&path, content)
+            .map_err(|e| format!("Failed to write file: {}", e))?;
+        Ok(path.to_string_lossy().to_string())
+    } else {
+        Err("CANCELLED".to_string())
+    }
 }

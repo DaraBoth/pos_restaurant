@@ -1,9 +1,9 @@
 [package]
 name = "dineos"
-version = "0.1.1"
+version = "1.0.1"
 description = "DineOS — Premium Cambodia Business POS System"
 authors = ["DineOS Team"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "dineos_lib"
@@ -21,6 +21,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+rfd = "0.15"
 
 # Database
 libsql = { version = "0.3.4", features = ["core", "replication", "remote", "serde"] }

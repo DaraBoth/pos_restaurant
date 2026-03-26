@@ -167,6 +167,7 @@ pub fn run() {
             commands::orders::void_order,
             commands::orders::get_revenue_summary,
             commands::orders::get_revenue_by_period,
+            commands::orders::save_excel_file,
             // Inventory
             commands::inventory::get_inventory_items,
             commands::inventory::create_inventory_item,

@@ -11,9 +11,13 @@ import {
     ChevronUp, Download, Calendar, Clock, ReceiptText,
     LayoutList, LayoutGrid, Printer
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+// Dynamic import for XLSX to avoid bundling issues
+let XLSX_MODULE: any = null;
 import { useLanguage } from '@/providers/LanguageProvider';
+import { call } from '@/lib/api/client';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
+import { printSummaryReport } from '@/lib/reports';
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'void';
 
@@ -64,15 +68,17 @@ export default function HistoryPage() {
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
     const loadingItemsRef = useRef<Set<string>>(new Set());
     
-    // Default to today
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    // Modern Date Range
+    const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+        from: new Date(),
+        to: new Date()
+    });
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
 
     useEffect(() => {
         loadOrders();
         loadRestaurant();
-    }, [startDate, endDate]);
+    }, [dateRange]);
 
     async function loadRestaurant() {
         try {
@@ -86,7 +92,9 @@ export default function HistoryPage() {
     async function loadOrders() {
         setLoading(true);
         try {
-            const data = await getOrders(undefined, startDate, endDate, restaurantId || '');
+            const startStr = format(dateRange.from, 'yyyy-MM-dd');
+            const endStr = format(dateRange.to, 'yyyy-MM-dd');
+            const data = await getOrders(undefined, startStr, endStr, restaurantId || '');
             setOrders(data.sort((a, b) =>
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             ));
@@ -184,23 +192,82 @@ export default function HistoryPage() {
         });
     }
 
-    const handleExport = () => {
-        const exportData = filtered.map(g => ({
-            'Session / Order #': g.id.split('-')[0].toUpperCase(),
-            'Date & Time': new Date(g.created_at + 'Z').toLocaleString(),
-            'Table': g.table_id || 'Takeout',
-            'Status': g.status === 'void' ? 'HOLD' : g.status,
-            'Total USD': (g.total_usd / 100).toFixed(2),
-            'Total KHR': g.total_khr.toLocaleString(),
-            'Total Rounds': g.orders.length,
-        }));
+    const handleExport = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        try {
+            if (!filtered || filtered.length === 0) {
+                window.alert(t('noMatchingTransactions'));
+                return;
+            }
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Order History');
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `DineOS_Report_${startDate}_to_${endDate}.xlsx`);
+            // Load XLSX
+            if (!XLSX_MODULE) {
+                XLSX_MODULE = await import('xlsx');
+            }
+            const X = XLSX_MODULE.utils ? XLSX_MODULE : XLSX_MODULE.default;
+            if (!X || !X.utils) throw new Error('XLSX utils not found');
+
+            // Map data
+            const exportData = filtered.map(g => {
+                const isoDate = g.created_at.replace(' ', 'T') + 'Z';
+                return {
+                    'ID': g.id.split('-')[0].toUpperCase(),
+                    'Date': new Date(isoDate).toLocaleDateString(),
+                    'Table': g.table_id || 'Takeout',
+                    'Status': g.status.toUpperCase(),
+                    'USD': (g.total_usd / 100).toFixed(2),
+                    'KHR': g.total_khr.toLocaleString(),
+                };
+            });
+
+            // Generate WB
+            const ws = X.utils.json_to_sheet(exportData);
+            const wb = X.utils.book_new();
+            X.utils.book_append_sheet(wb, ws, 'Orders');
+            
+            // Generate Array Buffer
+            const excelBuffer = X.write(wb, { bookType: 'xlsx', type: 'array' });
+            
+            // Convert to regular array for IPC transfer
+            const content = Array.from(new Uint8Array(excelBuffer));
+            const filename = `Report_${format(dateRange.from, 'yyyyMMdd')}_to_${format(dateRange.to, 'yyyyMMdd')}.xlsx`;
+            
+            // Invoke native Rust bridge to save file
+            const savedPath = await call<string>('save_excel_file', { content, filename });
+            
+            if (savedPath === 'CANCELLED') {
+                console.log('Export cancelled by user.');
+                return;
+            }
+            
+            window.alert('Success! Report saved to:\n' + savedPath);
+            console.log('Report saved to:', savedPath);
+        } catch (error: any) {
+            console.error('Export critical failure:', error);
+            window.alert('Export Failed: ' + error.message);
+        }
+    };
+
+    const handlePrintSummary = () => {
+        if (!restaurant || !filtered || filtered.length === 0) return;
+        
+        let totalUsd = 0;
+        let totalKhr = 0;
+        filtered.forEach(g => {
+            totalUsd += g.total_usd;
+            totalKhr += g.total_khr;
+        });
+
+        printSummaryReport({
+            restaurant,
+            startDate: format(dateRange.from, 'yyyy-MM-dd'),
+            endDate: format(dateRange.to, 'yyyy-MM-dd'),
+            orders: filtered,
+            totalUsd,
+            totalKhr
+        });
     };
 
     // Stats
@@ -225,24 +292,23 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 bg-[var(--bg-card)] px-3 py-2 rounded-xl border border-[var(--border)]">
-                        <Calendar size={14} className="text-[var(--accent)]" />
-                        <input 
-                            type="date" 
-                            value={startDate} 
-                            onChange={e => setStartDate(e.target.value)} 
-                            className="bg-transparent text-xs font-black outline-none border-none text-[var(--foreground)]"
-                        />
-                        <span className="text-[var(--text-secondary)] font-black text-[10px] mx-0.5">—</span>
-                        <input 
-                            type="date" 
-                            value={endDate} 
-                            onChange={e => setEndDate(e.target.value)} 
-                            className="bg-transparent text-xs font-black outline-none border-none text-[var(--foreground)]"
-                        />
-                    </div>
+                    <DateRangePicker 
+                        startDate={dateRange.from}
+                        endDate={dateRange.to}
+                        onChange={(range) => setDateRange(range)}
+                    />
+
+                    <button 
+                        onClick={handlePrintSummary}
+                        disabled={loading || !filtered?.length}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
+                    >
+                        <Printer size={14} />
+                        PRINT
+                    </button>
 
                     <button
+                        type="button"
                         onClick={handleExport}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
                     >
