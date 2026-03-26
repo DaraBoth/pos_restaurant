@@ -11,3 +11,9 @@ export const getDbStatus = () => call<DbStatus>('get_db_status');
 
 export const isRestaurantSynced = (restaurantId: string) =>
     call<boolean>('is_restaurant_synced', { restaurantId });
+
+export const triggerSync = (restaurantId: string) =>
+    call<void>('trigger_sync', { restaurantId });
+
+export const stopSync = () =>
+    call<void>('stop_sync');

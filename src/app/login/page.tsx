@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { login, getSetupStatus, triggerSync } from '@/lib/tauri-commands';
+import { login, getSetupStatus } from '@/lib/tauri-commands';
+import { triggerSync } from '@/lib/api/system';
 import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle } from 'lucide-react';
 
 export default function LoginPage() {

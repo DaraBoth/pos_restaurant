@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useRouter, usePathname } from 'next/navigation';
 import { LogOut, LayoutGrid, Settings, History, Globe, ChefHat, UtensilsCrossed } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
+import { stopSync } from '@/lib/api/system';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import Link from 'next/link';
 
@@ -45,6 +46,7 @@ export default function SidebarNav() {
     }, [user?.restaurant_id]);
 
     function handleLogout() {
+        stopSync().catch(() => {});
         setUser(null);
         router.replace('/login');
     }

@@ -9,6 +9,7 @@ import {
 } from '@/lib/api/auth';
 import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
+import { stopSync } from '@/lib/api/system';
 import {
     ShieldCheck, LogOut, Plus, RefreshCw, Store,
     User, Phone, MapPin, Calendar, ChevronRight,
@@ -558,6 +559,7 @@ export default function SuperAdminPage() {
     }
 
     function handleLogout() {
+        stopSync().catch(() => {});
         setUser(null);
         router.replace('/login');
     }

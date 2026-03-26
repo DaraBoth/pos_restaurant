@@ -316,6 +316,201 @@ pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<(Arc<Connec
         None
     };
 
+    add_col!("products",     "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("products",     "stock_quantity",  "stock_quantity INTEGER NOT NULL DEFAULT 0");
+    add_col!("products",     "image_path",      "image_path TEXT");
+    add_col!("inventory_logs", "inventory_item_id", "inventory_item_id TEXT REFERENCES inventory_items(id) ON DELETE CASCADE");
+    add_col!("inventory_logs", "product_id",     "product_id TEXT REFERENCES products(id) ON DELETE CASCADE");
+    add_col!("inventory_logs", "user_id",        "user_id TEXT REFERENCES users(id) ON DELETE CASCADE");
+    add_col!("inventory_logs", "quantity_change", "quantity_change REAL NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "change_amount",   "change_amount REAL NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "quantity",        "quantity REAL NOT NULL DEFAULT 0");
+    add_col!("inventory_logs", "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("inventory_logs", "reason",          "reason TEXT");
+    add_col!("product_ingredients", "restaurant_id", "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("restaurants", "license_expires_at", "license_expires_at TEXT");
+    add_col!("restaurants", "license_support_contact", "license_support_contact TEXT");
+
+    // Ensure emergency tables exist
+    if let Err(e) = conn.execute(
+        "CREATE TABLE IF NOT EXISTS inventory_logs (
+            id TEXT PRIMARY KEY,
+            inventory_item_id TEXT,
+            product_id TEXT,
+            user_id TEXT,
+            change_type TEXT,
+            quantity_change REAL,
+            change_amount REAL,
+            quantity REAL,
+            reason TEXT,
+            current_stock REAL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            restaurant_id TEXT
+        )", (),
+    ).await {
+        println!("[DB] Note: inventory_logs table creation returned: {} (may already exist)", e);
+    }
+
+    if let Err(e) = conn.execute(
+        "CREATE TABLE IF NOT EXISTS _sync_state (
+            restaurant_id TEXT PRIMARY KEY,
+            synced_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00',
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", (),
+    ).await {
+        println!("[DB] Note: _sync_state table creation returned: {} (may already exist)", e);
+    }
+
+    if let Err(e) = conn.execute(
+        "CREATE TABLE IF NOT EXISTS table_sessions (
+            id TEXT PRIMARY KEY, table_id TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            completed_at TEXT,
+            restaurant_id TEXT,
+            updated_at TEXT
+        )", (),
+    ).await {
+        println!("[DB] Note: table_sessions table creation returned: {} (may already exist)", e);
+    }
+
+    // ── Emergency Triggers (Ensure sync works for existing installs) ────────────────
+    // Since we're updating the baseline.sql after the first install, we need to manually
+    // inject these once for existing DBs that already marked 001_baseline as "done".
+    add_col!("_sync_state", "updated_at", "updated_at TEXT DEFAULT (datetime('now'))");
+    add_col!("inventory_logs", "updated_at", "updated_at TEXT DEFAULT (datetime('now'))");
+    add_col!("products", "inventory_item_id", "inventory_item_id TEXT");
+    add_col!("products", "inventory_item_usage", "inventory_item_usage REAL NOT NULL DEFAULT 1.0");
+    
+    // Drop product_ingredients as requested by user
+    let _ = conn.execute("DROP TABLE IF EXISTS product_ingredients", ()).await;
+    
+    // Fix UNIQUE constraint issue: create a partial unique index for non-deleted floor_tables
+    // This allows soft-deleted rows to be replaced with new ones having the same name
+    let _ = conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_floor_tables_unique_active 
+         ON floor_tables(restaurant_id, name) WHERE is_deleted = 0",
+        ()
+    ).await;
+
+    // // Sync Triggers for all tables - REMOVED because recursive updates cause hangs in SQLite
+    // let tables = vec![
+    //     "restaurants", "users", "categories", "products", "floor_tables", 
+    //     "exchange_rates", "inventory_items", "orders", "order_items", 
+    //     "payments", "table_sessions", "inventory_logs"
+    // ];
+    // for t in tables {
+    //     let upd_trigger_sql = format!(
+    //         "CREATE TRIGGER IF NOT EXISTS trg_{}_upd AFTER UPDATE ON {} 
+    //          BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id AND (updated_at IS NULL OR updated_at <= OLD.updated_at); END;",
+    //         t, t, t
+    //     );
+    //     let ins_trigger_sql = format!(
+    //         "CREATE TRIGGER IF NOT EXISTS trg_{}_ins AFTER INSERT ON {} 
+    //          BEGIN UPDATE {} SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+    //         t, t, t
+    //     );
+    //     let _ = conn.execute(&upd_trigger_sql, ()).await;
+    //     let _ = conn.execute(&ins_trigger_sql, ()).await;
+    //     
+    //     // Backfill NULL updated_at so they sync on next cycle
+    //     let update_sql = format!("UPDATE {} SET updated_at = datetime('now') WHERE updated_at IS NULL", t);
+    //     let _ = conn.execute(&update_sql, ()).await;
+    // }
+}
+
+// ─── Public structs exposed to lib.rs ───────────────────────────────────────
+
+/// Wraps the optional Turso remote connection used ONLY for per-restaurant sync.
+/// Is None when running offline (no credentials).
+pub struct RemoteDb(pub Option<Arc<Connection>>);
+
+// ─── Entry point ────────────────────────────────────────────────────────────
+
+async fn log_schema_info(conn: &Connection) {
+    // Log all tables and their columns for debugging
+    let tables_to_check = vec![
+        "restaurants", "users", "categories", "products", "orders", "order_items", 
+        "payments", "floor_tables", "inventory_items", "inventory_logs", 
+        "exchange_rates", "table_sessions"
+    ];
+    
+    for table_name in tables_to_check {
+        let sql = format!("PRAGMA table_info({})", table_name);
+        match conn.query(&sql, ()).await {
+            Ok(mut rows) => {
+                let mut cols = Vec::new();
+                while let Ok(Some(row)) = rows.next().await {
+                    if let Ok(col_name) = row.get::<String>(1) {
+                        cols.push(col_name);
+                    }
+                }
+                if cols.is_empty() {
+                    eprintln!("[DB Schema] Table {} does NOT exist!", table_name);
+                } else {
+                    println!("[DB Schema] {}: {}", table_name, cols.join(", "));
+                }
+            }
+            Err(_) => {
+                eprintln!("[DB Schema] Could not query schema for table {}", table_name);
+            }
+        }
+    }
+}
+
+// ─── Entry point ────────────────────────────────────────────────────────────
+
+pub async fn init_db(db_path: PathBuf, _key: &str) -> anyhow::Result<(Arc<Connection>, Option<Arc<Connection>>)> {
+    // Credentials: OS env overrides compile-time baked value
+    let url   = std::env::var("DATABASE_URL").ok().filter(|s| !s.is_empty())
+        .unwrap_or_else(|| BAKED_URL.to_string());
+    let token = std::env::var("AUTH_TOKEN").ok().filter(|s| !s.is_empty())
+        .unwrap_or_else(|| BAKED_TOKEN.to_string());
+
+    let has_creds = !url.is_empty() && !token.is_empty();
+
+    // ── Local SQLite (always used by command handlers) ──────────────────────
+    let local_db = Builder::new_local(db_path).build().await?;
+    let local_conn = Arc::new(local_db.connect()?);
+
+    // Apply migrations to local DB
+    if let Err(e) = apply_migrations(&local_conn).await {
+        eprintln!("[DB] Migration error (non-fatal): {}", e);
+    }
+    ensure_critical_columns(&local_conn).await;
+    
+    // Log schema for debugging
+    log_schema_info(&local_conn).await;
+    
+    sync::ensure_sync_table(&local_conn).await;
+
+    // ── Remote Turso (optional, used only for sync) ──────────────────────────
+    let remote_conn: Option<Arc<Connection>> = if has_creds {
+        println!("[DB] Connecting to Turso remote for sync (URL: {})…", &url[..url.len().min(50)]);
+        match Builder::new_remote(url.clone(), token.clone()).build().await {
+            Ok(db) => {
+                match db.connect() {
+                    Ok(conn) => {
+                        println!("[DB] Turso remote connected ✓");
+                        Some(Arc::new(conn))
+                    },
+                    Err(e) => {
+                        eprintln!("[DB] Turso remote connect() failed: {}", e);
+                        None
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[DB] Turso remote build failed: {} — sync disabled", e);
+                None
+            }
+        }
+    } else {
+        println!("[DB] No Turso credentials — running offline only");
+        None
+    };
+
     Ok((local_conn, remote_conn))
 }
 
@@ -326,21 +521,36 @@ pub fn start_sync_daemon(
     local: Arc<Connection>,
     remote: Arc<Connection>,
     restaurant_id: String,
+    active_sync: Arc<std::sync::Mutex<Option<String>>>,
 ) {
     spawn(async move {
         println!("[Sync] Daemon started for restaurant={}", restaurant_id);
 
-        // Apply migrations to remote
+        // Applied migrations to remote inside the spawn
         let _ = apply_migrations(&remote).await;
         ensure_critical_columns(&remote).await;
         sync::ensure_sync_table(&remote).await;
 
-        // Force a one-time reset for the first cycle to ensure newly added tables push historical data
-        println!("[Sync] Performing initial catch-up for restaurant={}", restaurant_id);
-        let _ = local.execute("DELETE FROM _sync_state WHERE restaurant_id = ?", [restaurant_id.clone()]).await;
+        println!("[Sync] Performing initial scan for restaurant={}", restaurant_id);
+        // We no longer DELETE from _sync_state here. 
+        // Sync daemon will naturally do a full pull if synced_at is EPOCH (1970).
 
         loop {
-            // Use the handle to emit events or just pass to sync_restaurant
+            // Check if this restaurant is still the active one before EACH cycle
+            {
+                let active = active_sync.lock().unwrap();
+                if let Some(current_id) = active.as_ref() {
+                    if current_id != &restaurant_id {
+                        println!("[Sync] Terminating daemon for restaurant={} (no longer active)", restaurant_id);
+                        break;
+                    }
+                } else {
+                    // No active restaurant (logout)
+                    println!("[Sync] Terminating daemon for restaurant={} (logged out)", restaurant_id);
+                    break;
+                }
+            }
+
             sync::sync_restaurant(&handle, &local, &remote, &restaurant_id).await;
             sleep(Duration::from_secs(30)).await;
         }

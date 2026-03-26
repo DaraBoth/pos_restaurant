@@ -5,24 +5,49 @@ use db::RemoteDb;
 use tauri::Manager;
 use std::sync::Arc;
 
+/// Track the currently active sync restaurant ID globally to avoid redundant deamons
+pub struct ActiveSyncId(pub Arc<std::sync::Mutex<Option<String>>>);
+
 /// Tauri command: called from frontend after login to kick off the
-/// per-restaurant sync daemon.  restaurant_id comes from the login response.
+/// per-restaurant sync daemon. restaurant_id comes from the login response.
 #[tauri::command]
 async fn trigger_sync(
     restaurant_id: String,
     app_handle: tauri::AppHandle,
     local: tauri::State<'_, Arc<libsql::Connection>>,
     remote: tauri::State<'_, RemoteDb>,
+    active_sync: tauri::State<'_, ActiveSyncId>,
 ) -> Result<(), String> {
+    let mut active = active_sync.0.lock().map_err(|e| e.to_string())?;
+    
+    // If already syncing THIS restaurant, do nothing.
+    if let Some(current_id) = active.as_ref() {
+        if current_id == &restaurant_id {
+            return Ok(());
+        }
+    }
+
+    // New restaurant or first sync: update the marker and start daemon
+    *active = Some(restaurant_id.clone());
+
     if let Some(remote_conn) = &remote.0 {
         let local_arc  = Arc::clone(&*local);
         let remote_arc = Arc::clone(remote_conn);
-        db::start_sync_daemon(app_handle, local_arc, remote_arc, restaurant_id);
-        Ok(())
-    } else {
-        // No remote — silently succeed (offline mode)
-        Ok(())
+        let active_arc = Arc::clone(&active_sync.0);
+        db::start_sync_daemon(app_handle, local_arc, remote_arc, restaurant_id, active_arc);
     }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_sync(
+    active_sync: tauri::State<'_, ActiveSyncId>,
+) -> Result<(), String> {
+    let mut active = active_sync.0.lock().map_err(|e| e.to_string())?;
+    *active = None;
+    println!("[Sync] Sync sentinel cleared (explicit stop)");
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -83,11 +108,13 @@ pub fn run() {
             // Register states — Arc<Connection> for all existing commands, RemoteDb for sync
             app_handle.manage(local_conn);
             app_handle.manage(RemoteDb(remote_conn));
+            app_handle.manage(ActiveSyncId(Arc::new(std::sync::Mutex::new(None))));
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             trigger_sync,
+            stop_sync,
             db::sync::trigger_sync_reset,
             db::sync::is_restaurant_synced,
             // Auth

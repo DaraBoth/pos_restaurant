@@ -123,7 +123,7 @@ async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) ->
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
         params![
             record.id.clone(),
-            record.restaurant_id.clone().unwrap_or_default(),
+            record.restaurant_id.clone(),
             record.username.clone(),
             record.password_hash.clone(),
             record.role.clone(),
@@ -368,8 +368,7 @@ pub async fn login(
         return Ok(to_user_session(&remote_record));
     }
 
-    seed_local_user_from_remote(&pool, &remote_record).await?;
-
+    // 1. Seed restaurant FIRST to satisfy foreign key constraints
     if let Some(restaurant_id) = remote_record.restaurant_id.as_deref() {
         match seed_local_restaurant_from_remote(&pool, remote_conn, restaurant_id).await {
             Ok(()) => {}
@@ -384,6 +383,9 @@ pub async fn login(
             Err(error) => return Err(error),
         }
     }
+
+    // 2. Seed user SECOND
+    seed_local_user_from_remote(&pool, &remote_record).await?;
 
     Ok(to_user_session(&remote_record))
 }
