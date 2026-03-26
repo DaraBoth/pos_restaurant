@@ -4,9 +4,6 @@ import type { UserSession, RestaurantSummary } from '@/types';
 export const login = (username: string, password: string) =>
     call<UserSession>('login', { username, password });
 
-/** Called after successful login to start the per-restaurant cloud sync daemon */
-export const triggerSync = (restaurantId: string) =>
-    call<void>('trigger_sync', { restaurantId });
 
 
 export const createUser = (
