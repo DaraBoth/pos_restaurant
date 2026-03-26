@@ -1,4 +1,4 @@
-use libsql::{Builder, Connection};
+use libsql::{Builder, Connection, params};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -186,7 +186,16 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("products", "inventory_item_id", "inventory_item_id TEXT");
     add_col!("products", "inventory_item_usage", "inventory_item_usage REAL NOT NULL DEFAULT 1.0");
     
-    let _ = conn.execute("DROP TABLE IF EXISTS product_ingredients", ()).await;
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS product_ingredients (
+            id TEXT PRIMARY KEY,
+            product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            inventory_item_id TEXT NOT NULL REFERENCES inventory_items(id),
+            usage_quantity REAL NOT NULL DEFAULT 1.0,
+            restaurant_id TEXT NOT NULL REFERENCES restaurants(id),
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", params![]).await;
     let _ = conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_floor_tables_unique_active 
          ON floor_tables(restaurant_id, name) WHERE is_deleted = 0",

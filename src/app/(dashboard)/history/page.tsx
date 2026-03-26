@@ -15,9 +15,8 @@ import {
 let XLSX_MODULE: any = null;
 import { useLanguage } from '@/providers/LanguageProvider';
 import { call } from '@/lib/api/client';
-import { DateRangePicker } from '@/components/ui/DateRangePicker';
+import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { printSummaryReport } from '@/lib/reports';
-import { format, startOfDay, endOfDay } from 'date-fns';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'void';
 
@@ -68,17 +67,14 @@ export default function HistoryPage() {
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
     const loadingItemsRef = useRef<Set<string>>(new Set());
     
-    // Modern Date Range
-    const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-        from: new Date(),
-        to: new Date()
-    });
+    const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+    const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
 
     useEffect(() => {
         loadOrders();
         loadRestaurant();
-    }, [dateRange]);
+    }, [startDate, endDate]);
 
     async function loadRestaurant() {
         try {
@@ -92,9 +88,7 @@ export default function HistoryPage() {
     async function loadOrders() {
         setLoading(true);
         try {
-            const startStr = format(dateRange.from, 'yyyy-MM-dd');
-            const endStr = format(dateRange.to, 'yyyy-MM-dd');
-            const data = await getOrders(undefined, startStr, endStr, restaurantId || '');
+            const data = await getOrders(undefined, startDate, endDate, restaurantId || '');
             setOrders(data.sort((a, b) =>
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             ));
@@ -232,7 +226,7 @@ export default function HistoryPage() {
             
             // Convert to regular array for IPC transfer
             const content = Array.from(new Uint8Array(excelBuffer));
-            const filename = `Report_${format(dateRange.from, 'yyyyMMdd')}_to_${format(dateRange.to, 'yyyyMMdd')}.xlsx`;
+            const filename = `Report_${startDate}_to_${endDate}.xlsx`;
             
             // Invoke native Rust bridge to save file
             const savedPath = await call<string>('save_excel_file', { content, filename });
@@ -262,8 +256,8 @@ export default function HistoryPage() {
 
         printSummaryReport({
             restaurant,
-            startDate: format(dateRange.from, 'yyyy-MM-dd'),
-            endDate: format(dateRange.to, 'yyyy-MM-dd'),
+            startDate: startDate,
+            endDate: endDate,
             orders: filtered,
             totalUsd,
             totalKhr
@@ -292,11 +286,25 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <DateRangePicker 
-                        startDate={dateRange.from}
-                        endDate={dateRange.to}
-                        onChange={(range) => setDateRange(range)}
-                    />
+                    <div className="flex items-center gap-2">
+                        <div className="relative group">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="pos-input px-3 text-xs h-10 w-[160px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-black uppercase tracking-widest text-[var(--foreground)]"
+                            />
+                        </div>
+                        <span className="text-[var(--text-secondary)] font-black text-[10px] uppercase tracking-widest opacity-30">TO</span>
+                        <div className="relative group">
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="pos-input px-3 text-xs h-10 w-[160px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-black uppercase tracking-widest text-[var(--foreground)]"
+                            />
+                        </div>
+                    </div>
 
                     <button 
                         onClick={handlePrintSummary}

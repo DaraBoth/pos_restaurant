@@ -53,7 +53,7 @@ export default function ProductGrid() {
     }, [orderId, setItems, user?.restaurant_id]);
 
     async function handleProductClick(product: Product) {
-        if (product.is_available === 0 || product.stock_quantity <= 0) return;
+        if (product.is_available === 0) return;
         setAddingId(product.id);
         try {
             await addToLocalCart(product);

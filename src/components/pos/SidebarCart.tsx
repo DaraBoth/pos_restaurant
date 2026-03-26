@@ -2,15 +2,16 @@
 import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds } from '@/lib/tauri-commands';
-import { formatUsd, formatKhr } from '@/lib/currency';
+import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds, getRestaurant, getSessionOrderItems } from '@/lib/tauri-commands';
+import { formatUsd, formatKhr, calculateTotals } from '@/lib/currency';
 import { useState, useRef } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
+import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 
 export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
     const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
-            localCart, addToLocalCart, updateLocalCartQty, commitLocalCart } = useOrder();
+            localCart, addToLocalCart, updateLocalCartQty, commitLocalCart, exchangeRate } = useOrder();
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -81,6 +82,73 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const localCartTotalCents = localCart.reduce((s, i) => s + i.priceCents * i.qty, 0);
     const localCartTotalQty = localCart.reduce((s, i) => s + i.qty, 0);
 
+    async function handlePrintReceipt() {
+        if (!user || !user.restaurant_id) return;
+        try {
+            const restaurant = await getRestaurant(user.restaurant_id);
+            
+            let receiptItems = items;
+            let receiptTotals = totals;
+
+            if (sessionId) {
+                // Fetch all items from all rounds in the session
+                const allItems = await getSessionOrderItems(sessionId, user.restaurant_id!);
+                
+                // Group by product_id to combine same items from different rounds
+                const groupedMap = new Map<string, any>();
+                for (const item of allItems) {
+                    if (groupedMap.has(item.product_id)) {
+                        const existing = groupedMap.get(item.product_id)!;
+                        existing.quantity += item.quantity;
+                    } else {
+                        groupedMap.set(item.product_id, { ...item });
+                    }
+                }
+                receiptItems = Array.from(groupedMap.values());
+
+                const subtotal = receiptItems.reduce((sum, item) => sum + (item.price_at_order * item.quantity), 0);
+                receiptTotals = calculateTotals(subtotal, exchangeRate);
+            } else if (!orderId && localCart.length > 0) {
+                // Map local cart to OrderItem for preview
+                receiptItems = localCart.map(i => ({
+                    id: `local-${i.productId}`,
+                    order_id: 'PREVIEW',
+                    product_id: i.productId,
+                    product_name: i.productName,
+                    product_khmer: i.khmerName,
+                    quantity: i.qty,
+                    price_at_order: i.priceCents,
+                    total_at_order: i.priceCents * i.qty,
+                    status: 'pending',
+                    created_at: new Date().toISOString()
+                })) as any; // Cast because status/created_at don't exist on OrderItem type but engine handles them or ignores
+
+                receiptTotals = {
+                    subtotalCents: localCartTotalCents,
+                    vatCents: 0,
+                    pltCents: 0,
+                    totalUsdCents: localCartTotalCents,
+                    totalKhr: localCartTotalCents * 4100 // Approximation or get from provider if available
+                };
+            }
+
+            if (receiptItems.length === 0) return;
+
+            const payload: ReceiptPrintPayload = {
+                restaurant,
+                orderId: orderId || 'PREVIEW',
+                tableId: tableId || undefined,
+                items: receiptItems,
+                payments: [], // Preview has no payments yet
+                totals: receiptTotals
+            };
+
+            printReceipt(payload);
+        } catch (e) {
+            console.error('Failed to print receipt', e);
+        }
+    }
+
     async function handlePlaceOrder() {
         if (!user || localCart.length === 0) return;
         setCommitting(true);
@@ -128,6 +196,14 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 <History size={13} />
                             </button>
                         )}
+                        <button
+                            onClick={handlePrintReceipt}
+                            disabled={orderId ? isEmpty : localCart.length === 0}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent)]/20 text-[var(--accent)] disabled:opacity-30"
+                            title="Print Receipt Preview"
+                        >
+                            <Printer size={13} />
+                        </button>
                     </div>
                 </div>
 

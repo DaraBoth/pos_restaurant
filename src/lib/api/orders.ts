@@ -29,6 +29,9 @@ export const getOrdersForTable = (table_id: string, restaurant_id?: string) =>
 export const getSessionRounds = (session_id: string, restaurant_id?: string) =>
     call<Order[]>('get_session_rounds', { sessionId: session_id, restaurantId: restaurant_id });
 
+export const getSessionOrderItems = (session_id: string, restaurant_id: string) =>
+    call<OrderItem[]>('get_session_order_items', { sessionId: session_id, restaurantId: restaurant_id });
+
 export const addRound = (user_id: string, session_id: string, restaurant_id?: string) =>
     call<string>('add_round', { userId: user_id, sessionId: session_id, restaurantId: restaurant_id });
 

@@ -395,6 +395,42 @@ pub async fn get_session_rounds(
 }
 
 #[tauri::command]
+pub async fn get_session_order_items(
+    session_id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Vec<OrderItem>, String> {
+    let mut rows = pool.query(
+        "SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price_at_order, oi.note,
+                oi.kitchen_status,
+                p.name AS product_name, p.khmer_name AS product_khmer
+         FROM order_items oi
+         JOIN orders o ON oi.order_id = o.id
+         LEFT JOIN products p ON oi.product_id = p.id
+         WHERE o.session_id = ? AND o.restaurant_id = ? AND oi.is_deleted = 0 AND o.is_deleted = 0
+         ORDER BY o.round_number, oi.created_at",
+         params![session_id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut items = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        items.push(OrderItem {
+            id: row.get::<String>(0).unwrap_or_default(),
+            order_id: row.get::<String>(1).unwrap_or_default(),
+            product_id: row.get::<String>(2).unwrap_or_default(),
+            quantity: row.get::<i64>(3).unwrap_or(0),
+            price_at_order: row.get::<i64>(4).unwrap_or(0),
+            note: row.get::<String>(5).ok(),
+            kitchen_status: row.get::<String>(6).unwrap_or_default(),
+            product_name: row.get::<String>(7).ok(),
+            product_khmer: row.get::<String>(8).ok(),
+        });
+    }
+
+    Ok(items)
+}
+
+#[tauri::command]
 pub async fn get_active_order_for_table(
     table_id: String,
     restaurant_id: String,
@@ -773,49 +809,42 @@ async fn release_table_if_no_open_orders(table_name: &str, restaurant_id: &str, 
 }
 
 async fn deduct_inventory(product_id: &str, qty: i64, restaurant_id: &str, user_id: Option<&str>, pool: &Arc<Connection>) -> Result<(), String> {
-    // 1. Fetch direct inventory link from product
-    let mut prod_rows = pool.query(
-        "SELECT inventory_item_id, inventory_item_usage FROM products 
-         WHERE id = ? AND restaurant_id = ?",
+    let mut ing_rows = pool.query(
+        "SELECT inventory_item_id, usage_quantity FROM product_ingredients WHERE product_id=? AND restaurant_id=?",
         params![product_id.to_string(), restaurant_id.to_string()]
-    ).await.map_err(|e| format!("Product fetch error: {}", e))?;
+    ).await.map_err(|e| format!("Ingredients fetch error: {}", e))?;
 
-        if let Some(prod_row) = prod_rows.next().await.map_err(|e| e.to_string())? {
-            let inv_id: Option<String> = prod_row.get(0).ok();
-            let usage_amount = get_f64_safe(&prod_row, 1);
+    while let Some(ing_row) = ing_rows.next().await.map_err(|e| e.to_string())? {
+        let inv_id: String = ing_row.get(0).unwrap_or_default();
+        let usage_amount = get_f64_safe(&ing_row, 1);
+        let total_usage = qty as f64 * usage_amount;
 
-            if let Some(inv_id) = inv_id {
-                if inv_id.is_empty() { return Ok(()); }
+        let mut inv_rows = pool.query(
+            "SELECT stock_qty, min_stock_qty FROM inventory_items WHERE id = ? AND restaurant_id = ?",
+            params![inv_id.clone(), restaurant_id.to_string()]
+        ).await.map_err(|e| format!("Inv fetch error: {}", e))?;
 
-                let total_usage = qty as f64 * usage_amount;
+        if let Some(inv_row) = inv_rows.next().await.map_err(|e| e.to_string())? {
+            let current_qty = get_f64_safe(&inv_row, 0);
+            let min_qty = get_f64_safe(&inv_row, 1);
             
-            let mut inv_rows = pool.query(
-                "SELECT stock_qty, min_stock_qty FROM inventory_items WHERE id = ? AND restaurant_id = ?",
-                params![inv_id.clone(), restaurant_id.to_string()]
-            ).await.map_err(|e| format!("Inv fetch error: {}", e))?;
+            let new_qty = current_qty - total_usage;
+            let new_pct = if min_qty > 0.0 { (new_qty / (min_qty * 2.0)) * 100.0 } else { 100.0 };
+            
+            let _: u64 = pool.execute(
+                "UPDATE inventory_items SET stock_qty = ?, stock_pct = ?, updated_at = datetime('now') 
+                 WHERE id = ? AND restaurant_id = ?", 
+                params![new_qty, new_pct, inv_id.clone(), restaurant_id.to_string()]
+            )
+            .await.map_err(|e| format!("Inv update error: {}", e))?;
 
-            if let Some(inv_row) = inv_rows.next().await.map_err(|e| e.to_string())? {
-                let current_qty = get_f64_safe(&inv_row, 0);
-                let min_qty = get_f64_safe(&inv_row, 1);
-                
-                let new_qty = current_qty - total_usage;
-                let new_pct = if min_qty > 0.0 { (new_qty / (min_qty * 2.0)) * 100.0 } else { 100.0 };
-                
-                let _: u64 = pool.execute(
-                    "UPDATE inventory_items SET stock_qty = ?, stock_pct = ?, updated_at = datetime('now') 
-                     WHERE id = ? AND restaurant_id = ?", 
-                    params![new_qty, new_pct, inv_id.clone(), restaurant_id.to_string()]
-                )
-                .await.map_err(|e| format!("Inv update error: {}", e))?;
-
-                // Log the deduction
-                let log_id = uuid::Uuid::new_v4().to_string();
-                let _: u64 = pool.execute(
-                    "INSERT INTO inventory_logs (id, inventory_item_id, product_id, user_id, quantity_change, change_amount, quantity, change_type, restaurant_id) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 'sale', ?)",
-                    params![log_id, inv_id, product_id.to_string(), user_id.unwrap_or_default().to_string(), -total_usage, -total_usage, -total_usage, restaurant_id.to_string()]
-                ).await.map_err(|e| e.to_string())?;
-            }
+            // Log the deduction
+            let log_id = uuid::Uuid::new_v4().to_string();
+            let _: u64 = pool.execute(
+                "INSERT INTO inventory_logs (id, inventory_item_id, product_id, user_id, quantity_change, change_amount, quantity, change_type, restaurant_id) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'sale', ?)",
+                params![log_id, inv_id, product_id.to_string(), user_id.unwrap_or_default().to_string(), -total_usage, -total_usage, -total_usage, restaurant_id.to_string()]
+            ).await.map_err(|e| e.to_string())?;
         }
     }
 

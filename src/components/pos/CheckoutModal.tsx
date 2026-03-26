@@ -5,9 +5,9 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { checkoutOrder, checkoutSession, getOrderItems, getRestaurant, PaymentInput, OrderItem } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
-import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag } from 'lucide-react';
+import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag, Printer } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
-import { getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
+import { getReceiptHtml, printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 
 export default function CheckoutModal({
     onClose,
@@ -148,6 +148,50 @@ export default function CheckoutModal({
         } finally {
             setLoading(false);
         }
+    }
+
+    function handlePreviewPrint() {
+        if (!orderId) return;
+        const payments: PaymentInput[] = [];
+        if (usdInputCents > 0) {
+            payments.push({
+                method: 'cash',
+                currency: 'USD',
+                amount: Math.min(usdInputCents, discountedTotals.totalUsdCents)
+            });
+        }
+        if (remainingUsdCents > 0) {
+            if (method === 'khqr') {
+                payments.push({
+                    method: 'khqr',
+                    currency: 'KHR',
+                    amount: remainingKhr
+                });
+            } else {
+                payments.push({
+                    method,
+                    currency: 'USD',
+                    amount: remainingUsdCents
+                });
+            }
+        }
+
+        getRestaurant(user?.restaurant_id || '').then(restaurant => {
+            const currentOrder = rounds.find(r => r.id === orderId);
+            const payload: ReceiptPrintPayload = {
+                restaurant,
+                orderId,
+                tableId,
+                customerName: currentOrder?.customer_name,
+                customerPhone: currentOrder?.customer_phone,
+                discountPct: discountPct > 0 ? discountPct : undefined,
+                discountCents: discountCents > 0 ? discountCents : undefined,
+                items: combinedItems,
+                payments,
+                totals: discountedTotals,
+            };
+            printReceipt(payload);
+        });
     }
 
     return (
@@ -300,17 +344,27 @@ export default function CheckoutModal({
                             ) : null}
                         </div>
 
-                        <button
-                            onClick={handleConfirm}
-                            disabled={loading}
-                            className="pos-btn-primary w-full py-4 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 uppercase tracking-widest active:scale-[0.98] transition-all"
-                        >
-                            {loading ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <><CheckCircle size={18} strokeWidth={2.5} /> {t('confirmPayment')}</>
-                            )}
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handlePreviewPrint}
+                                disabled={loading}
+                                className="w-14 h-14 rounded-xl flex items-center justify-center bg-white/[0.07] border border-white/10 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-all active:scale-[0.95]"
+                                title="Print Preview"
+                            >
+                                <Printer size={20} />
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                disabled={loading}
+                                className="pos-btn-primary flex-1 py-4 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 uppercase tracking-widest active:scale-[0.98] transition-all"
+                            >
+                                {loading ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <><CheckCircle size={18} strokeWidth={2.5} /> {t('confirmPayment')}</>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

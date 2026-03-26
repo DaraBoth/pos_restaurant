@@ -80,19 +80,31 @@ export interface Category {
     sort_order: number;
 }
 
+export interface ProductIngredient {
+    id: string;
+    product_id: string;
+    inventory_item_id: string;
+    usage_quantity: number;
+    inventory_item_name?: string;
+    inventory_item_unit?: string;
+}
+
+export interface IngredientInput {
+    inventory_item_id: string;
+    usage_quantity: number;
+}
+
 export interface Product {
     id: string;
     category_id?: string;
     name: string;
     khmer_name?: string;
     price_cents: number;
-    stock_quantity: number;
     is_available: number;
     image_path?: string;
     category_name?: string;
     category_khmer?: string;
-    inventory_item_id?: string;
-    inventory_item_usage: number;
+    ingredients: ProductIngredient[];
     created_at: string;
 }
 

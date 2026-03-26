@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { 
-    getProducts, getCategories, deleteProduct, updateStock, 
+    getProducts, getCategories, deleteProduct, 
     deleteCategory 
 } from '@/lib/api/products';
 import { useAuth } from '@/providers/AuthProvider';
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import ProductModal from '@/components/management/ProductModal';
 import CategoryModal from '@/components/management/CategoryModal';
+import { getImageSrc } from '@/lib/image';
 
 export default function ProductsManagement() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -75,16 +76,7 @@ export default function ProductsManagement() {
         }
     }
 
-    async function handleStockChange(id: string, currentStock: number, delta: number) {
-        try {
-            await updateStock(id, delta, restaurantId || '');
-            const newStock = Math.max(0, currentStock + delta);
-            setProducts(products.map(p => p.id === id ? { ...p, stock_quantity: newStock } : p));
-        } catch (e) {
-            console.error('Failed to update stock', e);
-            alert('Failed to update stock');
-        }
-    }
+
 
     const filteredProducts = products.filter(p => 
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -154,7 +146,6 @@ export default function ProductsManagement() {
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] w-12">Visual</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Product</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Category</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-center">Stock</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Price</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">Actions</th>
                                 </tr>
@@ -165,7 +156,15 @@ export default function ProductsManagement() {
                                         {/* Image */}
                                         <td className="px-4 py-2.5">
                                             <div className="w-9 h-9 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center overflow-hidden">
-                                                <ImageIcon size={15} className="text-white/20" />
+                                                {getImageSrc(p.image_path) ? (
+                                                    <img 
+                                                        src={getImageSrc(p.image_path)!} 
+                                                        alt={p.name} 
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <ImageIcon size={15} className="text-white/20" />
+                                                )}
                                             </div>
                                         </td>
                                         {/* Name */}
@@ -183,26 +182,7 @@ export default function ProductsManagement() {
                                                 {p.category_name}
                                             </span>
                                         </td>
-                                        {/* Stock */}
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => handleStockChange(p.id, p.stock_quantity, -1)}
-                                                    className="w-6 h-6 rounded-md bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/50 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 transition-all active:scale-90"
-                                                >
-                                                    <Minus size={11} strokeWidth={3} />
-                                                </button>
-                                                <span className={`w-9 text-center font-mono font-bold text-sm ${p.stock_quantity <= 0 ? 'text-red-400' : 'text-white'}`}>
-                                                    {p.stock_quantity}
-                                                </span>
-                                                <button
-                                                    onClick={() => handleStockChange(p.id, p.stock_quantity, 1)}
-                                                    className="w-6 h-6 rounded-md bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/50 hover:bg-green-500/20 hover:text-green-400 hover:border-green-500/30 transition-all active:scale-90"
-                                                >
-                                                    <Plus size={11} strokeWidth={3} />
-                                                </button>
-                                            </div>
-                                        </td>
+
                                         {/* Price */}
                                         <td className="px-4 py-2.5 text-right">
                                             <span className="font-mono font-bold text-sm text-[var(--accent)]">{formatUsd(p.price_cents)}</span>

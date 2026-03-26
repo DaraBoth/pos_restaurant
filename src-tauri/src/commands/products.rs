@@ -36,48 +36,75 @@ pub async fn get_categories(
     Ok(cats)
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IngredientInput {
+    pub inventory_item_id: String,
+    pub usage_quantity: f64,
+}
+
 #[tauri::command]
 pub async fn get_products(
     category_id: Option<String>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Product>, String> {
+    let mut products = Vec::new();
+    
     let mut rows = if let Some(cat_id) = category_id {
         pool.query(
-            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer, p.inventory_item_id, p.inventory_item_usage, p.created_at
+            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available, p.image_path,
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.category_id = ? AND p.restaurant_id = ?
              ORDER BY p.name",
-             params![cat_id, restaurant_id]
+             params![cat_id, restaurant_id.clone()]
         ).await
     } else {
         pool.query(
-            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.stock_quantity, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer, p.inventory_item_id, p.inventory_item_usage, p.created_at
+            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available, p.image_path,
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.restaurant_id = ?
              ORDER BY c.sort_order, p.name",
-             params![restaurant_id]
+             params![restaurant_id.clone()]
         ).await
     }.map_err(|e| format!("Database error: {}", e))?;
 
-    let mut products = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        let product_id = row.get::<String>(0).unwrap_or_default();
+        
+        let mut ingredients = Vec::new();
+        let mut ing_rows = pool.query(
+            "SELECT pi.id, pi.product_id, pi.inventory_item_id, pi.usage_quantity, ii.name, ii.unit_label
+             FROM product_ingredients pi
+             JOIN inventory_items ii ON pi.inventory_item_id = ii.id
+             WHERE pi.product_id = ? AND pi.restaurant_id = ?",
+            params![product_id.clone(), restaurant_id.clone()]
+        ).await.map_err(|e| format!("Ingredient fetch error: {}", e))?;
+        
+        while let Some(i_row) = ing_rows.next().await.map_err(|e| e.to_string())? {
+            ingredients.push(crate::models::ProductIngredient {
+                id: i_row.get(0).unwrap_or_default(),
+                product_id: i_row.get(1).unwrap_or_default(),
+                inventory_item_id: i_row.get(2).unwrap_or_default(),
+                usage_quantity: get_f64_safe(&i_row, 3),
+                inventory_item_name: i_row.get(4).ok(),
+                inventory_item_unit: i_row.get(5).ok(),
+            });
+        }
+
         products.push(Product {
-            id: row.get::<String>(0).unwrap_or_default(),
+            id: product_id,
             category_id: row.get::<String>(1).ok(),
             name: row.get::<String>(2).unwrap_or_default(),
             khmer_name: row.get::<String>(3).ok(),
             price_cents: row.get::<i64>(4).unwrap_or(0),
-            stock_quantity: row.get::<i64>(5).unwrap_or(0),
-            is_available: row.get::<i64>(6).unwrap_or(1),
-            image_path: row.get::<String>(7).ok(),
-            category_name: row.get::<String>(8).ok(),
-            category_khmer: row.get::<String>(9).ok(),
-            inventory_item_id: row.get::<String>(10).ok(),
-            inventory_item_usage: get_f64_safe(&row, 11),
-            created_at: row.get::<String>(12).unwrap_or_default(),
+            is_available: row.get::<i64>(5).unwrap_or(1),
+            image_path: row.get::<String>(6).ok(),
+            category_name: row.get::<String>(7).ok(),
+            category_khmer: row.get::<String>(8).ok(),
+            ingredients,
+            created_at: row.get::<String>(9).unwrap_or_default(),
         });
     }
 
@@ -93,14 +120,14 @@ pub async fn get_inventory_logs(
         r#"
         SELECT 
             il.id, 
-            il.product_id, 
-            p.name as product_name, 
+            il.inventory_item_id, 
+            ii.name as item_name, 
             il.change_amount, 
-            il.reason, 
+            il.change_type, 
             il.created_at
         FROM inventory_logs il
-        JOIN products p ON il.product_id = p.id
-        WHERE p.restaurant_id = ?
+        JOIN inventory_items ii ON il.inventory_item_id = ii.id
+        WHERE il.restaurant_id = ?
         ORDER BY il.created_at DESC
         LIMIT 100
         "#,
@@ -113,10 +140,10 @@ pub async fn get_inventory_logs(
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
         result.push(serde_json::json!({
             "id": row.get::<String>(0).unwrap_or_default(),
-            "product_id": row.get::<String>(1).unwrap_or_default(),
-            "product_name": row.get::<String>(2).unwrap_or_default(),
-            "change_amount": row.get::<i64>(3).unwrap_or(0),
-            "reason": row.get::<String>(4).unwrap_or_default(),
+            "item_id": row.get::<String>(1).unwrap_or_default(),
+            "item_name": row.get::<String>(2).unwrap_or_default(),
+            "change_amount": get_f64_safe(&row, 3),
+            "change_type": row.get::<String>(4).unwrap_or_default(),
             "created_at": row.get::<String>(5).unwrap_or_default()
         }));
     }
@@ -130,32 +157,37 @@ pub async fn create_product(
     name: String,
     khmer_name: Option<String>,
     price_cents: i64,
-    stock_quantity: i64,
     image_path: Option<String>,
-    inventory_item_id: Option<String>,
-    inventory_item_usage: f64,
+    ingredients: Vec<IngredientInput>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let _: u64 = pool.execute(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, stock_quantity, image_path, inventory_item_id, inventory_item_usage, restaurant_id, updated_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, image_path, restaurant_id, updated_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         params![
             id.clone(),
             category_id,
             name,
             khmer_name.unwrap_or_default(),
             price_cents,
-            stock_quantity,
             image_path.unwrap_or_default(),
-            inventory_item_id,
-            inventory_item_usage,
-            restaurant_id
+            restaurant_id.clone()
         ]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    for ing in ingredients {
+        let ing_id = uuid::Uuid::new_v4().to_string();
+        let _: u64 = pool.execute(
+            "INSERT INTO product_ingredients (id, product_id, inventory_item_id, usage_quantity, restaurant_id) 
+             VALUES (?, ?, ?, ?, ?)",
+            params![ing_id, id.clone(), ing.inventory_item_id, ing.usage_quantity, restaurant_id.clone()]
+        ).await.map_err(|e| format!("Ingredient insert error: {}", e))?;
+    }
+
     Ok(id)
 }
 
@@ -165,51 +197,44 @@ pub async fn update_product(
     name: String,
     khmer_name: Option<String>,
     price_cents: i64,
-    stock_quantity: i64,
     category_id: String,
     is_available: bool,
     image_path: Option<String>,
-    inventory_item_id: Option<String>,
-    inventory_item_usage: f64,
+    ingredients: Vec<IngredientInput>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     let _: u64 = pool.execute(
-        "UPDATE products SET name=?, khmer_name=?, price_cents=?, stock_quantity=?, category_id=?, is_available=?, image_path=?, 
-                inventory_item_id=?, inventory_item_usage=?, updated_at=datetime('now')
+        "UPDATE products SET name=?, khmer_name=?, price_cents=?, category_id=?, is_available=?, image_path=?, updated_at=datetime('now')
          WHERE id=? AND restaurant_id=?",
          params![
              name,
              khmer_name.unwrap_or_default(),
              price_cents,
-             stock_quantity,
              category_id,
              is_available as i64,
              image_path.unwrap_or_default(),
-             inventory_item_id,
-             inventory_item_usage,
-             id,
-             restaurant_id
+             id.clone(),
+             restaurant_id.clone()
          ]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
-    Ok(())
-}
 
-#[tauri::command]
-pub async fn update_stock(
-    id: String,
-    delta: i64,
-    restaurant_id: String,
-    pool: State<'_, Arc<Connection>>,
-) -> Result<(), String> {
-    pool.execute(
-        "UPDATE products SET stock_quantity = stock_quantity + ?, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
-        params![delta, id, restaurant_id]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+    let _: u64 = pool.execute(
+        "DELETE FROM product_ingredients WHERE product_id = ? AND restaurant_id = ?",
+        params![id.clone(), restaurant_id.clone()]
+    ).await.map_err(|e| format!("Ingredient delete error: {}", e))?;
+
+    for ing in ingredients {
+        let ing_id = uuid::Uuid::new_v4().to_string();
+        let _: u64 = pool.execute(
+            "INSERT INTO product_ingredients (id, product_id, inventory_item_id, usage_quantity, restaurant_id) 
+             VALUES (?, ?, ?, ?, ?)",
+            params![ing_id, id.clone(), ing.inventory_item_id, ing.usage_quantity, restaurant_id.clone()]
+        ).await.map_err(|e| format!("Ingredient re-insert error: {}", e))?;
+    }
+
     Ok(())
 }
 

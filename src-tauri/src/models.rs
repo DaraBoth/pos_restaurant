@@ -47,19 +47,27 @@ pub struct Category {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductIngredient {
+    pub id: String,
+    pub product_id: String,
+    pub inventory_item_id: String,
+    pub usage_quantity: f64,
+    pub inventory_item_name: Option<String>,
+    pub inventory_item_unit: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
     pub id: String,
     pub category_id: Option<String>,
     pub name: String,
     pub khmer_name: Option<String>,
     pub price_cents: i64,
-    pub stock_quantity: i64,
     pub is_available: i64,
     pub image_path: Option<String>,
     pub category_name: Option<String>,
     pub category_khmer: Option<String>,
-    pub inventory_item_id: Option<String>,
-    pub inventory_item_usage: f64,
+    pub ingredients: Vec<ProductIngredient>,
     pub created_at: String,
 }
 
