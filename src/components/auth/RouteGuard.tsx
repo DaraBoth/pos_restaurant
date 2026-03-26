@@ -25,12 +25,18 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     const [licenseStatus, setLicenseStatus] = useState<RestaurantLicenseStatus | null>(null);
     const initialCheckDone = useRef(false);
     const syncTriggered = useRef(false);
+    // Track the PREVIOUS auth state so we only reset the check on real login/logout
+    // transitions, NOT on every path change. Resetting on every path change caused a
+    // full-screen spinner (checking=true) to appear on every tab/route click.
+    const wasAuthenticatedRef = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
-        
-        // Reset check state on auth transition to ensure new users go through setup flow
-        if (isAuthenticated) {
+
+        // Only reset the initial-check gate when auth state actually transitions
+        // (false→true on login, true→false on logout). Path changes must be ignored.
+        if (isAuthenticated !== wasAuthenticatedRef.current) {
+            wasAuthenticatedRef.current = isAuthenticated;
             initialCheckDone.current = false;
         }
 

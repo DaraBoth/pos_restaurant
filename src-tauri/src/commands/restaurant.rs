@@ -57,13 +57,24 @@ pub async fn get_restaurant(restaurant_id: Option<String>, pool: State<'_, Arc<C
 
 #[tauri::command]
 pub async fn get_setup_status(restaurant_id: Option<String>, pool: State<'_, Arc<Connection>>) -> Result<SetupStatus, String> {
-    let restaurant = get_restaurant(restaurant_id, pool).await?;
+    // If a non-empty restaurant_id was supplied but the restaurant isn't in the
+    // local DB yet (cloud-only / pending sync), treat as already set up so the
+    // user isn't incorrectly routed to the setup screen while sync is in progress.
+    let rid_nonempty = restaurant_id.as_deref().map(|s| !s.is_empty()).unwrap_or(false);
 
-    Ok(SetupStatus {
-        needs_restaurant_setup: restaurant.name.trim() == "My Restaurant"
-            || restaurant.address.as_deref().unwrap_or_default().trim().is_empty()
-            || restaurant.phone.as_deref().unwrap_or_default().trim().is_empty(),
-    })
+    match get_restaurant(restaurant_id, pool).await {
+        Ok(restaurant) => Ok(SetupStatus {
+            needs_restaurant_setup: restaurant.name.trim() == "My Restaurant"
+                || restaurant.address.as_deref().unwrap_or_default().trim().is_empty()
+                || restaurant.phone.as_deref().unwrap_or_default().trim().is_empty(),
+        }),
+        Err(_) if rid_nonempty => {
+            // Restaurant ID given but not in local DB yet — cloud-only pending sync;
+            // assume setup is already done on the originating device.
+            Ok(SetupStatus { needs_restaurant_setup: false })
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[tauri::command]
