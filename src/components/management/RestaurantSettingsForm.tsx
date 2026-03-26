@@ -5,7 +5,8 @@ import { Building2, Save, RefreshCw, Phone, MapPin, Hash, Globe, StickyNote, Arr
 import { getRestaurant, updateRestaurant, triggerSyncReset } from '@/lib/api/restaurant';
 import type { RestaurantInput } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
-import { CloudResetDialog } from './CloudResetDialog'; // I'll create this or just inline it
+import { useLanguage } from '@/providers/LanguageProvider';
+import { CloudResetDialog } from './CloudResetDialog';
 
 const DEFAULT: RestaurantInput = {
     name: '',
@@ -78,6 +79,7 @@ function FormField({ label, value, placeholder, icon: Icon, multiline, onChange 
 
 export default function RestaurantSettingsForm({ mode, onSaved, onNext }: RestaurantSettingsFormProps) {
     const { user } = useAuth();
+    const { t } = useLanguage();
     const restaurantId = user?.restaurant_id;
     const [info, setInfo] = useState<RestaurantInput>(DEFAULT);
     const [loading, setLoading] = useState(true);
