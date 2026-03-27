@@ -196,6 +196,11 @@ async fn ensure_critical_columns(conn: &Connection) {
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         )", params![]).await;
+    // Migration: add usage_quantity if the table existed before this column was introduced
+    add_col!("product_ingredients", "usage_quantity", "usage_quantity REAL NOT NULL DEFAULT 1.0");
+    // Snapshot columns: store product name/khmer at order time so deleted products still show in history
+    add_col!("order_items", "product_name", "product_name TEXT");
+    add_col!("order_items", "product_khmer", "product_khmer TEXT");
     let _ = conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_floor_tables_unique_active 
          ON floor_tables(restaurant_id, name) WHERE is_deleted = 0",

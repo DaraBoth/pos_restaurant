@@ -8,13 +8,11 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     const router = useRouter();
 
     useEffect(() => {
-        // Strict role check for any path within this route group
         if (isAuthenticated && user?.role !== 'super_admin') {
             router.replace('/pos');
         }
     }, [isAuthenticated, user, router]);
 
-    // Prevent rendering children for unauthorized users to avoid layout flash
     if (!isAuthenticated || user?.role !== 'super_admin') {
         return (
             <div className="flex items-center justify-center h-screen bg-[var(--bg-dark)]">

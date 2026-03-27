@@ -334,25 +334,45 @@ pub async fn is_restaurant_synced(
     local: tauri::State<'_, Arc<Connection>>,
     remote: tauri::State<'_, RemoteDb>,
 ) -> Result<bool, String> {
-    // No remote connection configured: allow access immediately (local-only mode)
+    // Step 1: Check if we already have local data for this restaurant.
+    // If yes, the user can work immediately regardless of internet state.
+    // The sync daemon will handle cloud sync in the background.
+    let mut rows = local.query(
+        "SELECT synced_at FROM _sync_state WHERE restaurant_id = ?",
+        params![restaurant_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    if let Ok(Some(row)) = rows.next().await {
+        let synced_at = row.get::<String>(0).unwrap_or_default();
+        if !synced_at.trim().starts_with("1970-01-01") {
+            // ✅ Already synced before — let the user in immediately (offline-safe)
+            return Ok(true);
+        }
+    }
+
+    // Step 2: No local sync record. This is a first-time setup on this device.
+    // Check if cloud is reachable to do the initial data download.
     let Some(remote_conn) = &remote.0 else {
+        // No remote configured — local-only mode, allow access
         return Ok(true);
     };
 
-    // If cloud is currently unreachable, keep waiting until timeout on frontend
     if remote_conn.query("SELECT 1", ()).await.is_err() {
+        // Cloud unreachable AND no local data — user needs internet for first sync.
+        // Return false to keep showing the sync screen until connection appears.
         return Ok(false);
     }
 
-    let mut rows = local.query(
+    // Cloud is reachable, check if the initial sync has completed via _sync_state
+    let mut remote_rows = local.query(
         "SELECT synced_at FROM _sync_state WHERE restaurant_id = ?",
         params![restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
-    let Some(row) = rows.next().await.map_err(|e| e.to_string())? else {
-        return Ok(false);
-    };
+    if let Ok(Some(row)) = remote_rows.next().await {
+        let synced_at = row.get::<String>(0).unwrap_or_default();
+        return Ok(!synced_at.trim().starts_with("1970-01-01"));
+    }
 
-    let synced_at = row.get::<String>(0).unwrap_or_default();
-    Ok(!synced_at.trim().starts_with("1970-01-01"))
+    Ok(false)
 }

@@ -336,20 +336,41 @@ pub async fn login(
 ) -> Result<UserSession, String> {
     let superadmin_login = is_superadmin_username(&username);
 
-    // Non-superadmin users can still login offline from local cache.
+    // ── Local-first check (for returning users who have already logged in once) ──
+    // We do this for ALL non-superadmin users regardless of internet state.
+    // If local DB errors (e.g. pending migration), we log and fall through gracefully.
     if !superadmin_login {
-        if let Some(local_record) = fetch_auth_record(&pool, &username).await? {
-            if verify_login_password(&password, &local_record.password_hash).is_ok() {
-                return Ok(to_user_session(&local_record));
+        match fetch_auth_record(&pool, &username).await {
+            Ok(Some(local_record)) => {
+                if verify_login_password(&password, &local_record.password_hash).is_ok() {
+                    // ✅ Known user, correct password — allow offline login
+                    println!("[Auth] Offline login granted for '{}'", username);
+                    return Ok(to_user_session(&local_record));
+                }
+                // Known user, wrong password — don't fall through to remote,
+                // give them the correct error directly.
+                return Err("Invalid username or password.".to_string());
+            }
+            Ok(None) => {
+                // User not found locally — may be first login on this device.
+                // Fall through to remote authentication below.
+                println!("[Auth] No local record for '{}', attempting remote login.", username);
+            }
+            Err(local_err) => {
+                // Local DB query failed (e.g. missing column from pending migration).
+                // Log and fall through to remote; if offline this will also fail
+                // but with a proper "requires internet" message.
+                eprintln!("[Auth] Local DB lookup failed for '{}': {}", username, local_err);
             }
         }
     }
 
+    // ── Remote connection required beyond this point ──
     let Some(remote_conn) = remote.0.as_ref() else {
         if superadmin_login {
             return Err("Superadmin login requires internet connection and cloud authentication.".to_string());
         }
-        return Err("Invalid username or password. If this is your first login on a new device, connect to the internet and try again.".to_string());
+        return Err("No local account found on this device. An internet connection is required for first-time login. Please connect and try again.".to_string());
     };
 
     // Bootstrap cloud superadmin on-demand when someone tries to login as superadmin.
@@ -375,8 +396,9 @@ pub async fn login(
             return Err(namespace_not_found_message());
         }
         Err(error) if is_remote_auth_error(&error) => {
-            eprintln!("[Auth] Remote login failed: {}", error);
-            return Err(first_device_login_message());
+            eprintln!("[Auth] Remote login failed (unreachable): {}", error);
+            // Give a helpful offline message — user may have lost connection
+            return Err("Cannot reach cloud database. If you have logged in before, reconnect to the internet and try again. If this is your first login on this device, internet is required.".to_string());
         }
         Err(error) => return Err(error),
     };
@@ -408,8 +430,11 @@ pub async fn login(
         }
     }
 
-    // 2. Seed user SECOND
-    seed_local_user_from_remote(&pool, &remote_record).await?;
+    // 2. Seed user SECOND (stores credentials locally for future offline logins)
+    if let Err(e) = seed_local_user_from_remote(&pool, &remote_record).await {
+        eprintln!("[Auth] Warning: failed to cache user locally: {}", e);
+        // Non-fatal — user is still authenticated this session
+    }
 
     Ok(to_user_session(&remote_record))
 }
