@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   // dozens of tiny icon files over Tauri's file:// protocol, causing visible lag.
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    turbopack: {},
   },
 
   // Prevent Next.js from splitting JS into too many micro-chunks.
