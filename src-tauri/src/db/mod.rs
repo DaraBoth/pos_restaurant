@@ -283,6 +283,66 @@ async fn ensure_critical_columns(conn: &Connection) {
          ON floor_tables(restaurant_id, name) WHERE is_deleted = 0",
         ()
     ).await;
+
+    // ── Migration: Rebuild order_items and payments to fix broken FKs after orders rebuild ──
+    let needs_fk_fix = {
+        let mut r = conn.query(
+            "SELECT 1 FROM _migrations WHERE id = '003_fix_broken_order_fks'",
+            ()
+        ).await;
+        match r {
+            Ok(ref mut rows) => rows.next().await.ok().flatten().is_none(),
+            Err(_) => false,
+        }
+    };
+    if needs_fk_fix {
+        println!("[DB] Rebuilding order_items and payments to restore foreign keys…");
+        let stmts = [
+            // 1. Rebuild order_items
+            "ALTER TABLE order_items RENAME TO _order_items_old",
+            "CREATE TABLE order_items (
+                id              TEXT PRIMARY KEY,
+                order_id        TEXT NOT NULL REFERENCES orders(id),
+                product_id      TEXT NOT NULL REFERENCES products(id),
+                quantity        INTEGER NOT NULL DEFAULT 1,
+                price_at_order  INTEGER NOT NULL,
+                note            TEXT,
+                kitchen_status  TEXT NOT NULL DEFAULT 'pending',
+                is_deleted      INTEGER NOT NULL DEFAULT 0,
+                product_name    TEXT,
+                product_khmer   TEXT,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT DEFAULT (datetime('now'))
+            )",
+            "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status, is_deleted, product_name, product_khmer, created_at, updated_at)
+             SELECT id, order_id, product_id, quantity, price_at_order, note, kitchen_status, is_deleted, product_name, product_khmer, created_at, updated_at FROM _order_items_old",
+            "DROP TABLE _order_items_old",
+
+            // 2. Rebuild payments
+            "ALTER TABLE payments RENAME TO _payments_old",
+            "CREATE TABLE payments (
+                id                      TEXT PRIMARY KEY,
+                order_id                TEXT NOT NULL REFERENCES orders(id),
+                method                  TEXT NOT NULL CHECK(method IN ('cash','khqr','card')),
+                currency                TEXT NOT NULL CHECK(currency IN ('USD','KHR')),
+                amount                  INTEGER NOT NULL,
+                bakong_transaction_hash TEXT,
+                created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at              TEXT DEFAULT (datetime('now'))
+            )",
+            "INSERT INTO payments (id, order_id, method, currency, amount, bakong_transaction_hash, created_at, updated_at)
+             SELECT id, order_id, method, currency, amount, bakong_transaction_hash, created_at, updated_at FROM _payments_old",
+            "DROP TABLE _payments_old",
+        ];
+        for stmt in stmts {
+            if let Err(e) = conn.execute(stmt, ()).await {
+                eprintln!("[DB] FK Fix Error: {} — SQL: {}", e, stmt);
+                break;
+            }
+        }
+        let _ = conn.execute("INSERT OR IGNORE INTO _migrations (id) VALUES ('003_fix_broken_order_fks')", ()).await;
+        println!("[DB] order_items and payments foreign keys restored ✓");
+    }
 }
 
 // ─── Public structs exposed to lib.rs ───────────────────────────────────────
