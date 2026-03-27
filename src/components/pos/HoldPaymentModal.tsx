@@ -57,7 +57,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                 {/* Body */}
                 <div className="px-5 py-4 space-y-3">
                     <p className="text-[11px] text-[var(--text-secondary)]">
-                        Save customer info and mark the table as waiting for payment. The order stays open — pay later at checkout.
+                        Customer leaves without paying? Save their contact info — the table will be freed immediately and the order stored as a <span className="text-yellow-400 font-semibold">Hold</span> receipt so you can follow up for payment later.
                     </p>
 
                     {/* Customer Name */}

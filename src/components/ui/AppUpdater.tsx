@@ -55,9 +55,11 @@ export default function AppUpdater() {
                     setPendingUpdate(null);
                 }
             } catch (err: any) {
+                // Silently ignore update check errors (e.g. no release published yet).
+                // This avoids showing a confusing toast during dev or early production.
                 if (!cancelled) {
-                    setState('error');
-                    setError(err?.message || String(err));
+                    setState('idle');
+                    console.warn('[AppUpdater] Update check failed:', err?.message || err);
                 }
             }
         }

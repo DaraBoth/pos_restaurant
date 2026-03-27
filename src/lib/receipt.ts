@@ -30,9 +30,6 @@ function escapeHtml(value: string) {
 }
 
 export function getReceiptHtml(payload: ReceiptPrintPayload): string {
-    const logoHtml = payload.restaurant.logo_path
-        ? `<img src="${payload.restaurant.logo_path}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px; filter: grayscale(1);" />`
-        : '';
 
     const itemRows = payload.items.map((item, idx) => `
         <tr class="item-row">
@@ -90,7 +87,6 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 
     /* ── Header ── */
     .hd { text-align: center; padding-bottom: 6px; }
-    .hd img { max-width: 70px; max-height: 50px; margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto; }
     .hd .biz-name { font-size: 15px; font-weight: 900; font-family: Arial, sans-serif; letter-spacing: 0.5px; }
     .hd .biz-km   { font-size: 12px; font-weight: 700; font-family: Arial, sans-serif; margin-top: 1px; }
     .hd .addr     { font-size: 10px; margin-top: 3px; line-height: 1.5; }
@@ -152,7 +148,6 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 
   <!-- HEADER -->
   <div class="hd">
-    ${logoHtml}
     <div class="biz-name">${escapeHtml(payload.restaurant.name)}</div>
     ${payload.restaurant.khmer_name ? `<div class="biz-km">${escapeHtml(payload.restaurant.khmer_name)}</div>` : ''}
     ${payload.restaurant.address || payload.restaurant.address_kh ? `

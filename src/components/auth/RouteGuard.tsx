@@ -14,9 +14,12 @@ const SUPER_ADMIN_PATH = '/super-admin';
 const SETUP_PATH = '/setup';
 
 export default function RouteGuard({ children }: { children: React.ReactNode }) {
-    const { user, isAuthenticated } = useAuth();
-    const pathname = usePathname();
+    const { user, isAuthenticated, loading: authLoading } = useAuth();
+    const pathnameRaw = usePathname();
     const router = useRouter();
+
+    // Normalise pathname to ignore trailing slashes (handles next.config.ts trailingSlash: true)
+    const pathname = pathnameRaw.replace(/\/$/, '') || '/';
 
     // `checking` is only true during the very first auth check (login → session).
     // Once initialised, subsequent tab/route changes never block rendering.
@@ -41,6 +44,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         }
 
         async function checkAccess() {
+            if (authLoading) return;
             // console.log(`[RouteGuard] Checking access for ${pathname}, auth=${isAuthenticated}`);
             if (!isAuthenticated) {
                 setLicenseStatus(null);
@@ -131,7 +135,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         return () => {
             cancelled = true;
         };
-    }, [isAuthenticated, pathname, router, user]);
+    }, [isAuthenticated, pathnameRaw, router, user, authLoading]);
 
     useEffect(() => {
         if (!isAuthenticated || user?.role === 'super_admin' || !user?.restaurant_id) {
@@ -219,7 +223,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         };
     }, [isAuthenticated, user?.restaurant_id, user?.role]);
 
-    if (checking) {
+    if (checking || authLoading) {
         return (
             <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-dark)' }}>
                 <div className="text-center">

@@ -757,11 +757,44 @@ pub async fn hold_order(
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
-    pool.execute(
-        "UPDATE orders SET status = 'pending_payment', customer_name = ?, customer_phone = ?,
-                updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
-        params![customer_name.unwrap_or_default(), customer_phone.unwrap_or_default(), order_id, restaurant_id]
+    // 1. Fetch table info before changing status
+    let mut tb_rows = pool.query(
+        "SELECT table_id, session_id FROM orders WHERE id = ? AND restaurant_id = ?",
+        params![order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let (table_id, session_id) = if let Some(row) = tb_rows.next().await.map_err(|e| e.to_string())? {
+        (row.get::<String>(0).ok(), row.get::<String>(1).ok())
+    } else {
+        return Err("Order not found".to_string());
+    };
+
+    // 2. Mark order as 'hold' with customer contact info
+    pool.execute(
+        "UPDATE orders SET status = 'hold', customer_name = ?, customer_phone = ?,
+                completed_at = datetime('now'), updated_at = datetime('now')
+         WHERE id = ? AND restaurant_id = ?",
+        params![
+            customer_name.unwrap_or_default(),
+            customer_phone.unwrap_or_default(),
+            order_id.clone(),
+            restaurant_id.clone()
+        ]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    // 3. Close the table session so the table is released
+    if let Some(sid) = session_id.as_deref().filter(|s| !s.is_empty()) {
+        let _ = pool.execute(
+            "UPDATE table_sessions SET status = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
+             WHERE id = ? AND restaurant_id = ?",
+            params![sid, restaurant_id.clone()]
+        ).await;
+    }
+
+    // 4. Free the table (set back to 'free') so the next customer can sit down
+    if let Some(table_name) = table_id.as_deref().filter(|t| !t.is_empty()) {
+        let _ = set_table_status(table_name, "free", &restaurant_id, &pool).await;
+    }
 
     Ok(())
 }

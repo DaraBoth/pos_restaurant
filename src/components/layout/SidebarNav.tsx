@@ -7,6 +7,7 @@ import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, Utensil
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
 import { SyncStatus } from '@/components/ui/SyncStatus';
+import { UpdateStatus } from '@/components/ui/UpdateStatus';
 import Link from 'next/link';
 
 const NavItem = ({
@@ -59,13 +60,12 @@ export default function SidebarNav() {
             {/* Logo */}
             <div className="px-3 mb-4 flex items-center gap-2.5">
                 <div
-                    className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center border border-[var(--border)]"
-                    style={{ background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' }}
+                    className="w-11 h-11 flex-shrink-0 flex items-center justify-center overflow-hidden"
                 >
                     {restaurant?.logo_path ? (
-                        <img src={restaurant.logo_path} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+                        <img src={restaurant.logo_path} alt="Logo" className="w-full h-full object-cover rounded-2xl" />
                     ) : (
-                        <Store size={18} color="#fff" strokeWidth={2.5} />
+                        <img src="/logo_dark.png" alt="DineOS Logo" className="w-full h-full object-contain" />
                     )}
                 </div>
                 <div className="min-w-0">
@@ -92,6 +92,9 @@ export default function SidebarNav() {
             <div className="px-2 mt-2 space-y-1.5">
                 {/* Sync status */}
                 <SyncStatus />
+
+                {/* Update status — only appears when update is available */}
+                <UpdateStatus />
 
                 <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]">
                     <button

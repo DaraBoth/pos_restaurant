@@ -11,6 +11,7 @@ export const translations = {
         username: 'Username',
         password: 'Password',
         logout: 'Logout',
+        firstLoginDesc: 'First login on a new device requires internet access.',
         // Navigation
         pos: 'POS',
         management: 'Management',
@@ -216,7 +217,7 @@ export const translations = {
         noActiveOrders: 'No active orders',
         allCooking: 'All cooking',
         // Business management settings
-        businessManagement: 'Shop Management System',
+        businessManagement: 'Business Management System',
         manageOperations: 'Manage your operations',
         analyticsDesc: 'Revenue, orders, and earnings reports.',
         productsDesc: 'Menu items, pricing, and stock.',
@@ -258,6 +259,7 @@ export const translations = {
         username: 'ឈ្មោះអ្នកប្រើ',
         password: 'លេខសម្ងាត់',
         logout: 'ចាកចេញ',
+        firstLoginDesc: 'ការចូលប្រព័ន្ធលើកដំបូងទាមទារអុីនធើណេត។',
         // Navigation
         pos: 'ប្រព័ន្ធលក់',
         management: 'គ្រប់គ្រង',

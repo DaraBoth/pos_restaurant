@@ -18,12 +18,12 @@ import { call } from '@/lib/api/client';
 import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { printSummaryReport } from '@/lib/reports';
 
-type StatusFilter = 'all' | 'open' | 'completed' | 'void';
+type StatusFilter = 'all' | 'open' | 'completed' | 'hold';
 
 export interface GroupedOrder {
     id: string; // session_id or order_id
     table_id: string | null;
-    status: StatusFilter;
+    status: StatusFilter | 'pending_payment';
     created_at: string;
     total_usd: number;
     total_khr: number;
@@ -46,13 +46,14 @@ const STATUS_TABS: { id: StatusFilter; labelKey: any }[] = [
     { id: 'all', labelKey: 'allFilter' },
     { id: 'open', labelKey: 'open' },
     { id: 'completed', labelKey: 'completed' },
-    { id: 'void', labelKey: 'hold' },
+    { id: 'hold', labelKey: 'hold' },
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-    completed: { bg: 'rgba(34,197,94,0.1)', text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
-    open:      { bg: 'rgba(249,115,22,0.1)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
-    void:      { bg: 'rgba(239,68,68,0.1)', text: '#ef4444', border: 'rgba(239,68,68,0.25)' },
+    completed:       { bg: 'rgba(34,197,94,0.1)',  text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
+    open:            { bg: 'rgba(249,115,22,0.1)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
+    hold:            { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
+    pending_payment: { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
 };
 
 export default function HistoryPage() {
@@ -99,7 +100,7 @@ export default function HistoryPage() {
         }
     }
 
-    const groupedOrders = useMemo(() => {
+    const allGroupedOrders = useMemo(() => {
         const map = new Map<string, GroupedOrder>();
         for (const o of orders) {
             const key = o.session_id || o.id;
@@ -107,7 +108,7 @@ export default function HistoryPage() {
                 map.set(key, {
                     id: key,
                     table_id: o.table_id || null,
-                    status: o.status as StatusFilter,
+                    status: o.status as any,
                     created_at: o.created_at,
                     total_usd: 0,
                     total_khr: 0,
@@ -122,14 +123,17 @@ export default function HistoryPage() {
             if (new Date(o.created_at) < new Date(g.created_at)) {
                 g.created_at = o.created_at;
             }
-            // Upgrade group status
-            if (o.status === 'open') g.status = 'open';
-            else if (o.status === 'completed' && g.status === 'void') g.status = 'completed';
+            // Upgrade group status priority: open > hold > completed
+            if (o.status === 'open') g.status = 'open' as any;
+            else if (['hold', 'pending_payment'].includes(o.status) && g.status !== 'open') g.status = 'hold' as any;
         }
-        const flat = Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        if (filter === 'all') return flat;
-        return flat.filter(g => g.status === filter);
-    }, [orders, filter]);
+        return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }, [orders]);
+
+    const groupedOrders = useMemo(() => {
+        if (filter === 'all') return allGroupedOrders;
+        return allGroupedOrders.filter(g => g.status === filter);
+    }, [allGroupedOrders, filter]);
 
     const filtered = groupedOrders;
 
@@ -265,8 +269,7 @@ export default function HistoryPage() {
     };
 
     // Stats
-    const completed = groupedOrders.filter(g => g.status === 'completed');
-    const groupedAll = groupedOrders;
+    const completed = allGroupedOrders.filter(g => g.status === 'completed');
     
     // Total revenue is just the sum of completed groups
     const totalRevenueCents = completed.reduce((s, g) => s + g.total_usd, 0);
@@ -337,9 +340,9 @@ export default function HistoryPage() {
             <div className="flex flex-wrap gap-3">
                 {[
                     { label: t('revenue'), value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
-                    { label: t('open'), value: String(groupedOrders.filter(g => g.status === 'open').length), accent: '#f97316' },
+                    { label: t('open'), value: String(allGroupedOrders.filter(g => g.status === 'open').length), accent: '#f97316' },
                     { label: t('completed'), value: String(completed.length), accent: '#22c55e' },
-                    { label: 'HOLD', value: String(groupedOrders.filter(g => g.status === 'void').length), accent: '#ef4444' },
+                    { label: 'HOLD', value: String(allGroupedOrders.filter(g => g.status === 'hold' || g.status === 'pending_payment').length), accent: '#eab308' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
@@ -363,7 +366,7 @@ export default function HistoryPage() {
                             >
                                 {t(tab.labelKey)}
                                 <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-white/5'}`}>
-                                    {groupedOrders.filter(g => g.status === tab.id || tab.id === 'all').length}
+                                    {allGroupedOrders.filter(g => tab.id === 'all' || g.status === tab.id).length}
                                 </span>
                             </button>
                         ))}
@@ -420,7 +423,7 @@ export default function HistoryPage() {
                                 ) : (
                                     filtered.map((g) => {
                                         const isExpanded = expandedRows.includes(g.id);
-                                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['void'];
+                                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['completed'];
                                         
                                         return (
                                             <React.Fragment key={g.id}>
@@ -458,16 +461,16 @@ export default function HistoryPage() {
                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
                                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                         >
-                                                            {g.status === 'void' ? 'HOLD' : t(g.status as any)}
+                                                            {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: g.status === 'void' ? 'inherit' : 'var(--accent)' }}>
-                                                        <div className={g.status === 'void' ? 'line-through opacity-30 font-medium' : ''}>
+                                                    <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: 'var(--accent)' }}>
+                                                        <div>
                                                             {formatUsd(g.total_usd)}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2.5 font-mono text-xs opacity-60 font-black">
-                                                        <div className={g.status === 'void' ? 'line-through opacity-20' : ''}>
+                                                        <div>
                                                             {formatKhr(g.total_khr)}
                                                         </div>
                                                     </td>
@@ -571,7 +574,7 @@ export default function HistoryPage() {
                 ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
                     {filtered.map(g => {
-                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['void'];
+                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['completed'];
                         const items = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
                         const isLoaded = g.orders.every(o => orderDetails[o.id] !== undefined);
                         
@@ -594,7 +597,7 @@ export default function HistoryPage() {
                                             className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
                                             style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                         >
-                                            {g.status === 'void' ? 'HOLD' : t(g.status as any)}
+                                            {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
                                         </span>
                                         {g.table_id ? (
                                             <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
@@ -659,22 +662,35 @@ export default function HistoryPage() {
                                     )}
                                 </div>
 
+                                {/* Customer info for HOLD receipts */}
+                                {(g.status === 'hold' || g.status === 'pending_payment') && (() => {
+                                    const holdOrder = g.orders[0];
+                                    const name = holdOrder?.customer_name;
+                                    const phone = holdOrder?.customer_phone;
+                                    if (!name && !phone) return null;
+                                    return (
+                                        <div className="mx-4 mb-2 px-3 py-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 space-y-1">
+                                            {name && <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">👤 {name}</p>}
+                                            {phone && <p className="text-[10px] font-bold text-yellow-300/70 font-mono">📞 {phone}</p>}
+                                        </div>
+                                    );
+                                })()}
+
                                 {/* Totals */}
                                 <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-white/10 space-y-1">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('total')}</span>
                                         <span
-                                            className="font-mono font-black text-sm"
-                                            style={{ color: g.status === 'void' ? undefined : 'var(--accent)' }}
+                                            className="font-mono font-black text-sm text-[var(--accent)]"
                                         >
-                                            <span className={g.status === 'void' ? 'line-through opacity-30' : ''}>
+                                            <span>
                                                 {formatUsd(g.total_usd)}
                                             </span>
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-25">{t('khr')}</span>
-                                        <span className={`font-mono text-[10px] font-bold opacity-40 ${g.status === 'void' ? 'line-through' : ''}`}>
+                                        <span className={`font-mono text-[10px] font-bold opacity-40`}>
                                             {formatKhr(g.total_khr)}
                                         </span>
                                     </div>
