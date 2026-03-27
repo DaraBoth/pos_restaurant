@@ -184,7 +184,7 @@ pub async fn add_order_item(
     pool.execute(
         "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status, product_name, product_khmer) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
         params![id.clone(), order_id.clone(), product_id.clone(), quantity, price_cents, note.clone().unwrap_or_default(), p_name.clone(), p_khmer.clone().unwrap_or_default()]
-    ).await.map_err(|e| format!("Insert order_items error (order_id={}, product_id={}): {}", order_id, product_id, e))?
+    ).await.map_err(|e| format!("Insert order_items error (order_id={}, product_id={}): {}", order_id, product_id, e))?;
 
     recalculate_order_totals(&order_id, &restaurant_id, &pool).await?;
 
