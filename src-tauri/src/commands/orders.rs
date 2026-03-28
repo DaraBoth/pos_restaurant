@@ -176,6 +176,7 @@ pub async fn add_order_item(
             kitchen_status: "pending".to_string(),
             product_name: Some(p_name),
             product_khmer: p_khmer,
+            image_path: None,
         });
     }
 
@@ -198,6 +199,7 @@ pub async fn add_order_item(
         kitchen_status: "pending".to_string(),
         product_name: Some(p_name),
         product_khmer: p_khmer,
+        image_path: None,
     })
 }
 
@@ -251,7 +253,8 @@ pub async fn get_order_items(
         "SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price_at_order, oi.note,
                 oi.kitchen_status,
                 COALESCE(NULLIF(oi.product_name, ''), p.name)       AS product_name,
-                COALESCE(NULLIF(oi.product_khmer, ''), p.khmer_name) AS product_khmer
+                COALESCE(NULLIF(oi.product_khmer, ''), p.khmer_name) AS product_khmer,
+                p.image_path
          FROM order_items oi
          JOIN orders o ON oi.order_id = o.id
          LEFT JOIN products p ON oi.product_id = p.id
@@ -272,6 +275,7 @@ pub async fn get_order_items(
             kitchen_status: row.get::<String>(6).unwrap_or_default(),
             product_name: row.get::<String>(7).ok(),
             product_khmer: row.get::<String>(8).ok(),
+            image_path: row.get::<String>(9).ok(),
         });
     }
 
@@ -407,7 +411,8 @@ pub async fn get_session_order_items(
         "SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price_at_order, oi.note,
                 oi.kitchen_status,
                 COALESCE(NULLIF(oi.product_name, ''), p.name)        AS product_name,
-                COALESCE(NULLIF(oi.product_khmer, ''), p.khmer_name)  AS product_khmer
+                COALESCE(NULLIF(oi.product_khmer, ''), p.khmer_name)  AS product_khmer,
+                p.image_path
          FROM order_items oi
          JOIN orders o ON oi.order_id = o.id
          LEFT JOIN products p ON oi.product_id = p.id
@@ -428,6 +433,7 @@ pub async fn get_session_order_items(
             kitchen_status: row.get::<String>(6).unwrap_or_default(),
             product_name: row.get::<String>(7).ok(),
             product_khmer: row.get::<String>(8).ok(),
+            image_path: row.get::<String>(9).ok(),
         });
     }
 

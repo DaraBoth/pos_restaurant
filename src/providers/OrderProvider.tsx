@@ -12,6 +12,7 @@ export interface LocalCartItem {
     khmerName?: string;
     priceCents: number;
     qty: number;
+    imagePath?: string;
 }
 
 interface OrderContextValue {
@@ -153,6 +154,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
                 khmerName: product.khmer_name,
                 priceCents: product.price_cents,
                 qty: 1,
+                imagePath: product.image_path,
             }];
         });
     }, [orderId, restaurantId]); // Add restaurantId dependency

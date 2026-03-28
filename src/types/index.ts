@@ -149,6 +149,7 @@ export interface OrderItem {
     kitchen_status: 'pending' | 'cooking' | 'done';
     product_name?: string;
     product_khmer?: string;
+    image_path?: string;
 }
 
 export interface KitchenOrderItem {

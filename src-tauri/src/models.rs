@@ -171,6 +171,7 @@ pub struct OrderItem {
     pub kitchen_status: String,
     pub product_name: Option<String>,
     pub product_khmer: Option<String>,
+    pub image_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
