@@ -172,7 +172,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 {/* Header */}
                 <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
                     <div className="flex items-center gap-2">
-                        <ShoppingCart size={14} className="text-[var(--accent)]" />
+                        <ShoppingCart size={18} className="text-[var(--accent)]" />
                         <span className="text-xs font-bold text-[var(--foreground)]">
                             {t('currentOrder')}
                         </span>
@@ -228,7 +228,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                     <button
                                         key={round.id}
                                         onClick={() => switchRound(round.id)}
-                                        className={`snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide transition-all ${
+                                        className={`snap-start flex-shrink-0 px-4 py-3 rounded-xl text-sm font-bold tracking-wide transition-all ${
                                             isActive
                                                 ? 'bg-[var(--accent-blue)] text-white shadow-sm'
                                                 : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
@@ -241,9 +241,9 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             })}
                             <button
                                 onClick={handleAddRound}
-                                className="snap-start flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center gap-1"
+                                className="snap-start flex-shrink-0 px-4 py-3 rounded-xl text-sm font-bold tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center gap-2"
                             >
-                                <Plus size={11} strokeWidth={3} />
+                                <Plus size={14} strokeWidth={3} />
                                 New Round
                             </button>
                         </div>
@@ -272,7 +272,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         <div key={item.productId} className="rounded-xl border bg-[var(--bg-elevated)] border-[var(--border)] overflow-hidden">
                             <div className="flex gap-2.5 p-2.5">
                                 {/* Thumbnail */}
-                                <div className="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
+                                <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
                                     {getImageSrc(item.imagePath) ? (
                                         <img src={getImageSrc(item.imagePath)!} alt={item.productName} className="w-full h-full object-cover" />
                                     ) : (
@@ -284,31 +284,31 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start gap-1 mb-1">
-                                        <p className={`text-xs font-semibold text-[var(--foreground)] truncate leading-snug ${item.khmerName ? 'khmer' : ''}`}>
+                                        <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${item.khmerName ? 'khmer' : ''}`}>
                                             {item.productName}
                                         </p>
-                                        <span className="text-xs font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
+                                        <span className="text-sm font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
                                             {formatUsd(item.priceCents * item.qty)}
                                         </span>
                                     </div>
-                                    <p className="text-[10px] font-mono text-[var(--text-secondary)] mb-1.5">
+                                    <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
                                         {formatUsd(item.priceCents)}
                                     </p>
-                                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)]">
+                                    <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)]">
                                         <button
                                             onClick={() => updateLocalCartQty(item.productId, item.qty - 1)}
-                                            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
+                                            className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
                                         >
-                                            {item.qty <= 1 ? <Trash2 size={12} /> : <Minus size={12} />}
+                                            {item.qty <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
                                         </button>
-                                        <span className="font-bold font-mono text-sm flex-1 text-center text-[var(--foreground)]">
+                                        <span className="font-bold font-mono text-lg flex-1 text-center text-[var(--foreground)]">
                                             {item.qty}
                                         </span>
                                         <button
                                             onClick={() => updateLocalCartQty(item.productId, item.qty + 1)}
-                                            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
+                                            className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
                                         >
-                                            <Plus size={12} />
+                                            <Plus size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -332,7 +332,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 >
                                     <div className="flex gap-2.5 p-2.5">
                                         {/* Thumbnail */}
-                                        <div className="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
+                                        <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
                                             {getImageSrc(item.image_path) ? (
                                                 <img src={getImageSrc(item.image_path)!} alt={item.product_name} className="w-full h-full object-cover" />
                                             ) : (
@@ -344,10 +344,10 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                         {/* Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start gap-1 mb-0.5">
-                                                <p className={`text-xs font-semibold text-[var(--foreground)] truncate leading-snug ${lang === 'km' ? 'khmer' : ''}`}>
+                                                <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
                                                     {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
                                                 </p>
-                                                <span className="text-xs font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
+                                                <span className="text-sm font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
                                                     {formatUsd(item.price_at_order * item.quantity)}
                                                 </span>
                                             </div>
@@ -356,24 +356,24 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                                     {item.note}
                                                 </p>
                                             )}
-                                            <p className="text-[10px] font-mono text-[var(--text-secondary)] mb-1.5">
+                                            <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
                                                 {formatUsd(item.price_at_order)}
                                             </p>
-                                            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)]">
+                                            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)]">
                                                 <button
                                                     onClick={() => handleQtyChange(item.id, item.quantity, -1)}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
+                                                    className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
                                                 >
-                                                    {item.quantity <= 1 ? <Trash2 size={12} /> : <Minus size={12} />}
+                                                    {item.quantity <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
                                                 </button>
-                                                <span className="font-bold font-mono text-sm flex-1 text-center text-[var(--foreground)]">
+                                                <span className="font-bold font-mono text-lg flex-1 text-center text-[var(--foreground)]">
                                                     {item.quantity}
                                                 </span>
                                                 <button
                                                     onClick={() => handleQtyChange(item.id, item.quantity, 1)}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
+                                                    className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
                                                 >
-                                                    <Plus size={12} />
+                                                    <Plus size={16} />
                                                 </button>
                                             </div>
                                             {editingNoteId === item.id ? (
@@ -414,10 +414,10 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
 
                 {/* Footer */}
                 <div className="flex-shrink-0 px-3 py-3 bg-[var(--bg-elevated)] border-t border-[var(--border)] space-y-2.5">
-                    <div className="space-y-0.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                    <div className="space-y-1 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                         <div className="flex justify-between">
                             <span>{t('subtotal')}</span>
-                            <span className="font-mono text-[var(--foreground)]">
+                            <span className="font-mono text-sm text-[var(--foreground)]">
                                 {orderId ? formatUsd(totals.subtotalCents) : formatUsd(localCartTotalCents)}
                             </span>
                         </div>
@@ -425,12 +425,12 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
 
                     <div className="flex items-end justify-between">
                         <div>
-                            <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-0.5">{t('total')}</p>
-                            <p className="text-lg font-black font-mono text-[var(--foreground)] leading-none">
+                            <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-1">{t('total')}</p>
+                            <p className="text-3xl font-black font-mono text-[var(--foreground)] leading-none">
                                 {orderId ? formatUsd(totals.totalUsdCents) : formatUsd(localCartTotalCents)}
                             </p>
                         </div>
-                        <p className="text-xs font-mono text-[var(--text-secondary)] opacity-50">
+                        <p className="text-sm font-mono text-[var(--text-secondary)] opacity-50">
                             {orderId ? formatKhr(totals.totalKhr) : ''}
                         </p>
                     </div>
@@ -440,9 +440,9 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         <div className="grid grid-cols-2 gap-1.5">
                             <button
                                 onClick={clearOrder}
-                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
+                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
                             >
-                                <XCircle size={12} strokeWidth={2.5} />
+                                <XCircle size={16} strokeWidth={2.5} />
                                 {t('cancel')}
                             </button>
 
@@ -450,11 +450,11 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 <button
                                     onClick={onCheckout}
                                     disabled={localCart.length === 0 || committing}
-                                    className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                    className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
                                 >
                                     {committing
-                                        ? <Loader2 size={12} className="animate-spin" />
-                                        : <CreditCard size={12} strokeWidth={2.5} />
+                                        ? <Loader2 size={16} className="animate-spin" />
+                                        : <CreditCard size={16} strokeWidth={2.5} />
                                     }
                                     {t('checkout')}
                                 </button>
@@ -462,11 +462,11 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 <button
                                     onClick={handlePlaceOrder}
                                     disabled={localCart.length === 0 || committing}
-                                    className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                    className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-all disabled:opacity-40 active:scale-95"
                                 >
                                     {committing
-                                        ? <Loader2 size={12} className="animate-spin" />
-                                        : <Check size={12} strokeWidth={2.5} />
+                                        ? <Loader2 size={16} className="animate-spin" />
+                                        : <Check size={16} strokeWidth={2.5} />
                                     }
                                     Place Order
                                 </button>
@@ -479,25 +479,25 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         <div className="grid grid-cols-3 gap-1.5">
                             <button
                                 onClick={handleVoid}
-                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
+                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
                             >
-                                <XCircle size={12} strokeWidth={2.5} />
+                                <XCircle size={16} strokeWidth={2.5} />
                                 {t('cancel')}
                             </button>
                             <button
                                 onClick={onHold}
                                 disabled={isEmpty}
-                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-yellow-500/8 border border-yellow-500/25 text-yellow-400/80 hover:text-yellow-400 hover:border-yellow-500/45 transition-all disabled:opacity-40 active:scale-95"
+                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-yellow-500/8 border border-yellow-500/25 text-yellow-400/80 hover:text-yellow-400 hover:border-yellow-500/45 transition-all disabled:opacity-40 active:scale-95"
                             >
-                                <PauseCircle size={12} strokeWidth={2.5} />
+                                <PauseCircle size={16} strokeWidth={2.5} />
                                 Hold
                             </button>
                             <button
-                                className="py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
+                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
                                 disabled={isEmpty}
                                 onClick={onCheckout}
                             >
-                                <CreditCard size={12} strokeWidth={2.5} />
+                                <CreditCard size={16} strokeWidth={2.5} />
                                 {t('checkout')}
                             </button>
                         </div>

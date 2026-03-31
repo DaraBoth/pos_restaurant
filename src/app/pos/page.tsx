@@ -6,16 +6,13 @@ import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
 import FloorPlanView from '@/components/pos/FloorPlanView';
 import HoldPaymentModal from '@/components/pos/HoldPaymentModal';
-import ReceiptPreviewModal from '@/components/pos/ReceiptPreviewModal';
 import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { printReceipt, getReceiptHtml, ReceiptPrintPayload } from '@/lib/receipt';
 
 export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isHoldOpen, setIsHoldOpen] = useState(false);
-    const [receiptPayload, setReceiptPayload] = useState<ReceiptPrintPayload | null>(null);
     const { tableId, isTakeout, items, clearOrder, localCart, orderId, commitLocalCart } = useOrder();
     const { user } = useAuth();
     const { lang, t } = useLanguage();
@@ -96,9 +93,8 @@ export default function POSPage() {
             {isCheckoutOpen && (
                 <CheckoutModal
                     onClose={() => setIsCheckoutOpen(false)}
-                    onComplete={(payload) => {
+                    onComplete={() => {
                         setIsCheckoutOpen(false);
-                        setReceiptPayload(payload);
                     }}
                 />
             )}
@@ -108,13 +104,7 @@ export default function POSPage() {
                     onComplete={() => { setIsHoldOpen(false); clearOrder(); }}
                 />
             )}
-            {receiptPayload && (
-                <ReceiptPreviewModal
-                    html={getReceiptHtml(receiptPayload)}
-                    onClose={() => setReceiptPayload(null)}
-                    onPrint={() => { printReceipt(receiptPayload); setReceiptPayload(null); }}
-                />
-            )}
+
         </>
     );
 }
