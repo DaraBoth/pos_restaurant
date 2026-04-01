@@ -30,6 +30,7 @@
     },
     "bundle": {
         "active": true,
+        "createUpdaterArtifacts": "v1Compatible",
         "targets": "all",
         "publisher": "GuoErrOS",
         "icon": [
