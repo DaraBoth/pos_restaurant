@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { createCategory, updateCategory } from '@/lib/api/products';
 import type { Category } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
-import { Save } from 'lucide-react';
+import { Save, ChevronDown, Check } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 
 interface CategoryModalProps {
@@ -18,6 +18,8 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
     const [name, setName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [parentId, setParentId] = useState('');
+    const [parentSearch, setParentSearch] = useState('');
+    const [isParentPickerOpen, setIsParentPickerOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
@@ -32,7 +34,11 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
             setKhmerName('');
             setParentId('');
         }
+        setParentSearch('');
+        setIsParentPickerOpen(false);
     }, [category, isOpen]);
+
+    const selectedParent = allCategories.find(c => c.id === parentId);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -84,21 +90,71 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
 
                 <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Parent Category</label>
-                    <select
-                        value={parentId}
-                        onChange={e => setParentId(e.target.value)}
-                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold focus:border-[var(--accent)] outline-none transition-all appearance-none cursor-pointer"
+                    <button
+                        type="button"
+                        onClick={() => setIsParentPickerOpen(prev => !prev)}
+                        className="w-full flex items-center justify-between bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm font-semibold hover:border-[var(--accent)]/40 transition-colors"
                     >
-                        <option value="">— None (top-level category) —</option>
-                        {allCategories
-                            .filter(c => c.id !== category?.id)
-                            .map(c => (
-                                <option key={c.id} value={c.id} className="bg-[var(--bg-elevated)] text-[var(--foreground)]">
-                                    {'\u00a0\u00a0\u00a0'.repeat(c.depth || 0)}{(c.depth || 0) > 0 ? '└ ' : ''}{c.name}
-                                </option>
-                            ))
-                        }
-                    </select>
+                        <span className="truncate text-left">
+                            {selectedParent ? selectedParent.name : '— None (top-level category) —'}
+                        </span>
+                        <ChevronDown size={16} className={`text-[var(--text-secondary)] transition-transform ${isParentPickerOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isParentPickerOpen && (
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2 space-y-2">
+                            <input
+                                value={parentSearch}
+                                onChange={e => setParentSearch(e.target.value)}
+                                placeholder="Search parent category"
+                                className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--foreground)] text-sm placeholder:text-[var(--text-secondary)]/60 focus:border-[var(--accent)] outline-none transition-all"
+                            />
+                            <div className="max-h-44 overflow-y-auto rounded-lg border border-[var(--border)]">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setParentId('');
+                                        setIsParentPickerOpen(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between text-left px-3 py-2.5 text-sm font-semibold border-b border-[var(--border)] transition-colors ${
+                                        parentId === ''
+                                            ? 'bg-[var(--accent)]/15 text-[var(--foreground)]'
+                                            : 'text-[var(--foreground)] hover:bg-[var(--bg-dark)]'
+                                    }`}
+                                >
+                                    <span>— None (top-level category) —</span>
+                                    {parentId === '' && <Check size={14} className="text-[var(--accent)]" />}
+                                </button>
+
+                                {allCategories
+                                    .filter(c => c.id !== category?.id)
+                                    .filter(c => {
+                                        const q = parentSearch.trim().toLowerCase();
+                                        if (!q) return true;
+                                        return c.name.toLowerCase().includes(q) || (c.khmer_name || '').toLowerCase().includes(q);
+                                    })
+                                    .map(c => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setParentId(c.id);
+                                                setIsParentPickerOpen(false);
+                                            }}
+                                            className={`w-full flex items-center justify-between text-left py-2 pr-3 text-sm transition-colors ${
+                                                parentId === c.id
+                                                    ? 'bg-[var(--accent)]/15 text-[var(--foreground)] font-semibold'
+                                                    : 'text-[var(--foreground)] hover:bg-[var(--bg-dark)]'
+                                            }`}
+                                            style={{ paddingLeft: `${12 + (c.depth || 0) * 18}px` }}
+                                        >
+                                            <span>{(c.depth || 0) > 0 ? '└ ' : ''}{c.name}</span>
+                                            {parentId === c.id && <Check size={14} className="text-[var(--accent)]" />}
+                                        </button>
+                                    ))}
+                            </div>
+                        </div>
+                    )}
                     <p className="text-[10px] text-[var(--text-secondary)]">Assign this as a sub-category of another category.</p>
                 </div>
 

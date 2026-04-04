@@ -43,6 +43,8 @@ export default function CategoriesManagement() {
         (c.khmer_name && c.khmer_name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
+    const categoryRows = searchQuery.trim() ? filtered : categories;
+
     return (
         <div className="animate-fade-in space-y-3 pb-6">
             {/* Header — matches Products page style */}
@@ -82,7 +84,7 @@ export default function CategoriesManagement() {
                 </div>
             </div>
 
-            {/* Category grid */}
+            {/* Category tree list */}
             {filtered.length === 0 ? (
                 <div className="pos-card p-10 text-center">
                     <Layers size={32} className="mx-auto mb-3 text-[var(--text-secondary)] opacity-30" />
@@ -91,42 +93,69 @@ export default function CategoriesManagement() {
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {filtered.map(cat => (
-                        <div
-                            key={cat.id}
-                            className="pos-card p-4 group hover:border-[var(--accent)]/40 transition-all relative"
-                        >
-                            {/* Action buttons — visible on hover */}
-                            <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={() => { setEditingCategory(cat); setIsModalOpen(true); }}
-                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-secondary)] transition-all"
-                                >
-                                    <Edit3 size={11} />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(cat.id)}
-                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
-                                >
-                                    <Trash2 size={11} />
-                                </button>
-                            </div>
+                <div className="pos-card overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">
+                        <span>Category Tree</span>
+                        <span>{categoryRows.length} items</span>
+                    </div>
+                    <div className="divide-y divide-[var(--border)]">
+                        {categoryRows.map(cat => {
+                            const depth = cat.depth || 0;
+                            const childrenCount = categories.filter(c => c.parent_id === cat.id).length;
 
-                            {/* Icon */}
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--accent)]/10 border border-[var(--accent)]/20 mb-3 group-hover:bg-[var(--accent)]/20 transition-colors">
-                                <Layers size={15} className="text-[var(--accent)]" />
-                            </div>
+                            return (
+                                <div key={cat.id} className="group px-4 py-3 hover:bg-[var(--bg-elevated)]/60 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className="flex items-center gap-2 min-w-0 flex-1"
+                                            style={{ paddingLeft: `${depth * 22}px` }}
+                                        >
+                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex-shrink-0">
+                                                <Layers size={13} className="text-[var(--accent)]" />
+                                            </div>
 
-                            {/* Name */}
-                            <p className="text-sm font-black text-[var(--foreground)] leading-tight truncate pr-8">
-                                {cat.name}
-                            </p>
-                            <p className="text-[11px] text-[var(--text-secondary)] khmer mt-0.5 truncate">
-                                {cat.khmer_name || '—'}
-                            </p>
-                        </div>
-                    ))}
+                                            {depth > 0 && <span className="text-[var(--text-secondary)] text-xs select-none">└</span>}
+
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-black text-[var(--foreground)] leading-tight truncate">
+                                                    {cat.name}
+                                                </p>
+                                                <p className="text-[11px] text-[var(--text-secondary)] khmer mt-0.5 truncate">
+                                                    {cat.khmer_name || '—'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="hidden sm:flex items-center gap-1.5">
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border border-[var(--border)] text-[var(--text-secondary)] bg-[var(--bg-dark)]">
+                                                {depth === 0 ? 'Main' : `Level ${depth + 1}`}
+                                            </span>
+                                            {childrenCount > 0 && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border border-[var(--accent)]/30 text-[var(--accent)] bg-[var(--accent)]/10">
+                                                    {childrenCount} sub
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => { setEditingCategory(cat); setIsModalOpen(true); }}
+                                                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-secondary)] transition-all"
+                                            >
+                                                <Edit3 size={12} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(cat.id)}
+                                                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
