@@ -78,6 +78,8 @@ export interface Category {
     name: string;
     khmer_name?: string;
     sort_order: number;
+    parent_id?: string;
+    depth?: number;
 }
 
 export interface ProductIngredient {

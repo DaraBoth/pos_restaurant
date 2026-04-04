@@ -3,6 +3,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/providers/LanguageProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { OrderProvider } from "@/providers/OrderProvider";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import RouteGuard from "@/components/auth/RouteGuard";
 
 import AppShell from "@/components/layout/AppShell";
@@ -19,18 +20,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <LanguageProvider>
-          <AuthProvider>
-            <OrderProvider>
-              <RouteGuard>
-                <AppShell>{children}</AppShell>
-              </RouteGuard>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <OrderProvider>
+                <RouteGuard>
+                  <AppShell>{children}</AppShell>
+                </RouteGuard>
 
-            </OrderProvider>
-          </AuthProvider>
-        </LanguageProvider>
+              </OrderProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

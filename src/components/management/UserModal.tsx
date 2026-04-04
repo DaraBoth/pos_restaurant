@@ -88,7 +88,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         disabled={!!user}
                         value={username}
                         onChange={e => setUsername(e.target.value)}
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-medium disabled:opacity-50"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-medium disabled:opacity-50"
                         placeholder="e.g. johndoe"
                     />
                 </div>
@@ -98,13 +98,13 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         {user ? 'New Password (leave blank to keep)' : 'Password'}
                     </label>
                     <div className="relative">
-                        <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
+                        <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-50" />
                         <input
                             type="password"
                             required={!user}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-mono"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-10 pr-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-mono"
                             placeholder="••••••••"
                         />
                     </div>
@@ -116,7 +116,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         <input
                             value={fullName}
                             onChange={e => setFullName(e.target.value)}
-                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all font-medium"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-medium"
                             placeholder="John Doe"
                         />
                     </div>
@@ -126,7 +126,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         <input
                             value={khmerName}
                             onChange={e => setKhmerName(e.target.value)}
-                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all khmer"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all khmer"
                             placeholder="ចន ដូ"
                         />
                     </div>
@@ -142,8 +142,8 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 onClick={() => setRole(r)}
                                 className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all ${
                                     role === r 
-                                        ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-white' 
-                                        : 'bg-white/[0.07] border-white/10 text-[var(--text-secondary)] hover:border-white/20'
+                                        ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--foreground)]' 
+                                        : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)]/40'
                                 }`}
                             >
                                 <Shield size={14} className={role === r ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
@@ -153,11 +153,11 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 border-t border-white/10">
+                <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)]">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-white border border-white/10 hover:border-white/25 transition-colors"
+                        className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-colors"
                     >
                         Cancel
                     </button>

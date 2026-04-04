@@ -23,8 +23,8 @@ type Tab = 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'excha
 
 const TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
     { id: 'analytics', labelKey: 'analytics', icon: TrendingUp },
-    { id: 'products', labelKey: 'products', icon: Package },
     { id: 'categories', labelKey: 'categories', icon: Layers },
+    { id: 'products', labelKey: 'products', icon: Package },
     { id: 'inventory', labelKey: 'inventory', icon: BoxesIcon },
     { id: 'tables', labelKey: 'floorPlan', icon: LayoutGrid },
     { id: 'users', labelKey: 'users', icon: Users },

@@ -44,6 +44,8 @@ pub struct Category {
     pub name: String,
     pub khmer_name: Option<String>,
     pub sort_order: i64,
+    pub parent_id: Option<String>,
+    pub depth: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

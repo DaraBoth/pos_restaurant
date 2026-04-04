@@ -90,7 +90,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                         value={name}
                         onChange={e => setName(e.target.value)}
                         placeholder="e.g. Jasmine Rice"
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold placeholder:text-white/30 focus:border-emerald-500 focus:bg-white/[0.09] outline-none transition-all"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold placeholder:text-[var(--text-secondary)]/50 focus:border-emerald-500 outline-none transition-all"
                     />
                 </div>
 
@@ -103,7 +103,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
                         placeholder="អង្ករម្លិះ"
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold khmer placeholder:text-white/30 focus:border-emerald-500 focus:bg-white/[0.09] outline-none transition-all"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold khmer placeholder:text-[var(--text-secondary)]/50 focus:border-emerald-500 outline-none transition-all"
                     />
                 </div>
 
@@ -117,7 +117,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                         value={unitLabel}
                         onChange={e => setUnitLabel(e.target.value)}
                         placeholder="kg"
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold placeholder:text-white/30 focus:border-emerald-500 focus:bg-white/[0.09] outline-none transition-all"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold placeholder:text-[var(--text-secondary)]/50 focus:border-emerald-500 outline-none transition-all"
                     />
                 </div>
 
@@ -134,7 +134,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                             min="0"
                             value={stockQty}
                             onChange={e => setStockQty(parseFloat(e.target.value) || 0)}
-                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-emerald-500 outline-none transition-all"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono font-bold focus:border-emerald-500 outline-none transition-all"
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -148,7 +148,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                             min="0"
                             value={minStockQty}
                             onChange={e => setMinStockQty(parseFloat(e.target.value) || 0)}
-                            className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-emerald-500 outline-none transition-all"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono font-bold focus:border-emerald-500 outline-none transition-all"
                         />
                     </div>
                 </div>
@@ -164,7 +164,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                         min="0"
                         value={costPerUnit}
                         onChange={e => setCostPerUnit(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-emerald-500 outline-none transition-all"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono font-bold focus:border-emerald-500 outline-none transition-all"
                     />
                 </div>
 
@@ -173,7 +173,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white/60 hover:text-white border border-white/15 hover:border-white/30 hover:bg-white/5 transition-all"
+                        className="flex-1 py-3.5 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-all"
                     >
                         {t('cancel')}
                     </button>

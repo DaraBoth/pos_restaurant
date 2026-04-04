@@ -39,11 +39,11 @@ export const updateProduct = (
 export const deleteProduct = (id: string, restaurant_id: string) => 
     call<void>('delete_product', { id, restaurantId: restaurant_id });
 
-export const createCategory = (name: string, khmer_name?: string, restaurant_id?: string) =>
-    call<string>('create_category', { name, khmerName: khmer_name, restaurantId: restaurant_id });
+export const createCategory = (name: string, khmer_name?: string, parent_id?: string, restaurant_id?: string) =>
+    call<string>('create_category', { name, khmerName: khmer_name, parentId: parent_id, restaurantId: restaurant_id });
 
-export const updateCategory = (id: string, name: string, khmer_name: string | undefined, restaurant_id: string) =>
-    call<void>('update_category', { id, name, khmerName: khmer_name, restaurantId: restaurant_id });
+export const updateCategory = (id: string, name: string, khmer_name: string | undefined, parent_id: string | undefined, restaurant_id: string) =>
+    call<void>('update_category', { id, name, khmerName: khmer_name, parentId: parent_id, restaurantId: restaurant_id });
 
 export const deleteCategory = (id: string, restaurant_id: string) =>
     call<void>('delete_category', { id, restaurantId: restaurant_id });

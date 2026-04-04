@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { useTheme } from '@/providers/ThemeProvider';
 import { useRouter, usePathname } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ChevronsLeft, ChevronsRight, Sun, Moon } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
 import { SyncStatus } from '@/components/ui/SyncStatus';
@@ -21,7 +22,7 @@ const NavItem = ({
         <Link
             href={path}
             className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl transition-all group active:scale-95 text-sm ${isExact
-                ? 'bg-[var(--accent-blue)]/15 text-white border border-[var(--accent-blue)]/40 font-semibold'
+                ? 'bg-[var(--accent-blue)]/15 text-[var(--foreground)] border border-[var(--accent-blue)]/40 font-semibold'
                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] font-medium'
             } ${collapsed ? 'justify-center px-0' : ''}`}
             title={label}
@@ -35,6 +36,7 @@ const NavItem = ({
 export default function SidebarNav() {
     const { t, lang, setLang } = useLanguage();
     const { user, setUser } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const router = useRouter();
     const pathname = usePathname();
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -55,8 +57,8 @@ export default function SidebarNav() {
 
     return (
         <aside
-            className={`flex-shrink-0 flex flex-col py-3 h-screen sticky top-0 bg-[#0a1118] z-40 border-r border-[var(--border)] transition-all duration-200 ${collapsed ? 'w-14' : 'w-48'}`}
-            style={{ boxShadow: '1px 0 20px rgba(2,6,23,0.5)' }}
+            className={`flex-shrink-0 flex flex-col py-3 h-screen sticky top-0 bg-[var(--sidebar-bg)] z-40 border-r border-[var(--border)] transition-all duration-200 ${collapsed ? 'w-14' : 'w-48'}`}
+            style={{ boxShadow: '1px 0 20px rgba(2,6,23,0.12)' }}
         >
             {/* Logo + toggle */}
             <div className={`mb-4 flex items-center ${collapsed ? 'justify-center px-0' : 'px-3 gap-2.5'}`}>
@@ -127,6 +129,13 @@ export default function SidebarNav() {
                     >
                         <Globe size={13} className="text-[var(--accent-blue)]" />
                         {!collapsed && (lang === 'en' ? 'EN' : 'ខ្មែរ')}
+                    </button>
+                    <button
+                        onClick={toggleTheme}
+                        className="p-1.5 rounded-lg transition-all hover:bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    >
+                        {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
                     </button>
                     <button
                         onClick={handleLogout}

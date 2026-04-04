@@ -87,7 +87,7 @@ export default function ProductGrid() {
     });
 
     return (
-        <div className="flex flex-col min-h-0 h-full bg-[#0c1520]">
+        <div className="flex flex-col min-h-0 h-full bg-[var(--bg-dark)]">
 
             {/* Search + Category bar */}
             <div className="flex-shrink-0 px-3 pt-3 pb-2 border-b border-[var(--border)] bg-[var(--bg-card)]">
@@ -115,22 +115,75 @@ export default function ProductGrid() {
                     >
                         {t('allCategories')}
                     </button>
-                    {categories.map(cat => (
+                    {categories.filter(c => !c.parent_id).map(cat => (
                         <button
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.id)}
                             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                                 lang === 'km' ? 'khmer' : ''
                             } ${
-                                selectedCategory === cat.id
+                                selectedCategory === cat.id || categories.some(c => c.id === selectedCategory && (c.parent_id === cat.id || (c.depth || 0) > 0 && categories.find(p => p.id === c.parent_id)?.parent_id === cat.id))
                                     ? 'bg-[var(--accent)] text-white'
                                     : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border)] hover:text-[var(--foreground)]'
                             }`}
                         >
                             {lang === 'km' ? (cat.khmer_name || cat.name) : cat.name}
+                            {categories.some(c => c.parent_id === cat.id) && <span className="ml-1 opacity-60">›</span>}
                         </button>
                     ))}
                 </div>
+
+                {/* Sub-category breadcrumb + sub-pills */}
+                {selectedCategory && (() => {
+                    // Build ancestor path from root → selectedCategory
+                    const getPath = (id: string): Category[] => {
+                        const cat = categories.find(c => c.id === id);
+                        if (!cat) return [];
+                        if (!cat.parent_id) return [cat];
+                        return [...getPath(cat.parent_id), cat];
+                    };
+                    const path = getPath(selectedCategory);
+                    const children = categories.filter(c => c.parent_id === selectedCategory);
+                    if (path.length === 0) return null;
+                    return (
+                        <div className="mt-1.5 space-y-1">
+                            {/* Breadcrumb */}
+                            <div className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)]">
+                                <button onClick={() => setSelectedCategory(null)} className="hover:text-[var(--foreground)] transition-colors">All</button>
+                                {path.map((cat, i) => (
+                                    <span key={cat.id} className="flex items-center gap-1">
+                                        <span className="opacity-40">/</span>
+                                        <button
+                                            onClick={() => setSelectedCategory(cat.id)}
+                                            className={`hover:text-[var(--foreground)] transition-colors ${i === path.length - 1 ? 'text-[var(--foreground)] font-bold' : ''}`}
+                                        >
+                                            {lang === 'km' ? (cat.khmer_name || cat.name) : cat.name}
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                            {/* Children pills */}
+                            {children.length > 0 && (
+                                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                                    {children.map(sub => (
+                                        <button
+                                            key={sub.id}
+                                            onClick={() => setSelectedCategory(sub.id)}
+                                            className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${lang === 'km' ? 'khmer' : ''} ${
+                                                selectedCategory === sub.id
+                                                    ? 'bg-[var(--accent-blue)] text-white'
+                                                    : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border)] hover:text-[var(--foreground)]'
+                                            }`}
+                                        >
+                                            {lang === 'km' ? (sub.khmer_name || sub.name) : sub.name}
+                                            {categories.some(c => c.parent_id === sub.id) && <span className="ml-1 opacity-60">›</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Product Grid */}

@@ -280,7 +280,7 @@ export default function RestaurantSettingsForm({ mode, onSaved, onNext }: Restau
                         
                         <div className="flex flex-col md:flex-row gap-10 mb-10 pb-10 border-b border-white/5">
                             <div className="relative group/logo">
-                                <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-[#0d1721] border-2 border-dashed border-[var(--border)] group-hover:border-[var(--accent-blue)]/50 transition-all flex items-center justify-center overflow-hidden">
+                                <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-[var(--bg-elevated)] border-2 border-dashed border-[var(--border)] group-hover:border-[var(--accent-blue)]/50 transition-all flex items-center justify-center overflow-hidden">
                                     {info.logo_path ? (
                                         <img src={info.logo_path} alt="Logo" className="w-full h-full object-cover" />
                                     ) : (

@@ -59,10 +59,20 @@ export default function ProductsManagement() {
     }
 
     async function handleDeleteCategory(id: string) {
-        // Safety check: is any product using this category?
-        const hasProducts = products.some(p => p.category_id === id);
+        // Recursively gather this category and all its descendants
+        const getDescendantIds = (catId: string): string[] => {
+            const children = categories.filter(c => c.parent_id === catId);
+            return [catId, ...children.flatMap(c => getDescendantIds(c.id))];
+        };
+        const allIds = getDescendantIds(id);
+        const hasProducts = products.some(p => allIds.includes(p.category_id || ''));
         if (hasProducts) {
-            alert('Cannot delete category: It still contains products. Please move or delete the products first.');
+            alert('Cannot delete: this category or one of its sub-categories still contains products. Please move or delete them first.');
+            return;
+        }
+        const hasChildren = categories.some(c => c.parent_id === id);
+        if (hasChildren) {
+            alert('Cannot delete: this category still has sub-categories. Please delete or reassign them first.');
             return;
         }
 
@@ -120,7 +130,7 @@ export default function ProductsManagement() {
                             placeholder={t('searchItems')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="bg-white/[0.07] border border-white/20 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[var(--accent)] outline-none transition-all w-44"
+                            className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors w-44"
                         />
                     </div>
                     <button
@@ -230,14 +240,24 @@ export default function ProductsManagement() {
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
                                 {categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).map(c => (
-                                    <tr key={c.id} className="hover:bg-white/[0.03] group transition-colors">
-                                        <td className="px-4 py-2.5">
-                                            <div className="font-semibold text-sm text-white leading-tight">{c.name}</div>
-                                            {c.khmer_name && <div className="text-xs text-[var(--text-secondary)] khmer mt-0.5">{c.khmer_name}</div>}
+                                    <tr key={c.id} className="hover:bg-[var(--bg-elevated)] group transition-colors">
+                                        <td className="py-2.5" style={{ paddingLeft: `${16 + (c.depth || 0) * 20}px`, paddingRight: '16px' }}>
+                                            <div className="flex items-center gap-1.5">
+                                                {(c.depth || 0) > 0 && <span className="text-[var(--text-secondary)] text-xs select-none">└</span>}
+                                                <div>
+                                                    <div className="font-semibold text-sm text-[var(--foreground)] leading-tight">{c.name}</div>
+                                                    {c.khmer_name && <div className="text-xs text-[var(--text-secondary)] khmer mt-0.5">{c.khmer_name}</div>}
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <span className="text-xs font-bold text-[var(--text-secondary)]">
                                                 {products.filter(p => p.category_id === c.id).length} items
+                                                {categories.some(sub => sub.parent_id === c.id) && (
+                                                    <span className="ml-2 text-[var(--accent)] opacity-70">
+                                                        · {categories.filter(sub => sub.parent_id === c.id).length} sub-cats
+                                                    </span>
+                                                )}
                                             </span>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
@@ -284,6 +304,7 @@ export default function ProductsManagement() {
                 onClose={() => setIsCategoryModalOpen(false)}
                 onSave={loadData}
                 category={editingCategory}
+                allCategories={categories}
             />
         </div>
     );

@@ -7,7 +7,7 @@ import { getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 import { verifyRestaurantLicense } from '@/lib/api/restaurant';
 import { isRestaurantSynced } from '@/lib/api/system';
 import type { RestaurantLicenseStatus } from '@/types';
-import { AlertTriangle, WifiOff, CloudUpload } from 'lucide-react';
+import { AlertTriangle, WifiOff, CloudUpload, LogIn } from 'lucide-react';
 
 const PUBLIC_PATHS = ['/login'];
 const SUPER_ADMIN_PATH = '/super-admin';
@@ -249,9 +249,16 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 }
 
 function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
+    const router = useRouter();
+    const { setUser } = useAuth();
+
+    function handleBackToLogin() {
+        setUser(null);
+        router.replace('/login');
+    }
     return (
         <div className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--bg-dark)' }}>
-            <div className="w-full max-w-lg rounded-3xl border border-red-500/25 bg-[#10151d] shadow-2xl p-8 space-y-6 text-center">
+            <div className="w-full max-w-lg rounded-3xl border border-red-500/25 bg-[var(--bg-card)] shadow-2xl p-8 space-y-6 text-center">
                 <div className="mx-auto w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
                     <AlertTriangle size={28} />
                 </div>
@@ -278,6 +285,13 @@ function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
                         Offline use is still tolerated when no internet is available. Once the app comes online and confirms the license is expired, access is locked until renewal.
                     </p>
                 </div>
+                <button
+                    onClick={handleBackToLogin}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-red-500/30 transition-all"
+                >
+                    <LogIn size={15} />
+                    Back to Login
+                </button>
             </div>
         </div>
     );

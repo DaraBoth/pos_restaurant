@@ -4,8 +4,8 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds, getRestaurant, getSessionOrderItems } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, calculateTotals } from '@/lib/currency';
-import { useState, useRef } from 'react';
-import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight, Printer, X } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 import { getImageSrc } from '@/lib/image';
@@ -19,6 +19,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
     const [committing, setCommitting] = useState(false);
+    const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
     const roundsScrollRef = useRef<HTMLDivElement>(null);
 
     const scrollRounds = (dir: 'left' | 'right') => {
@@ -26,6 +27,22 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             roundsScrollRef.current.scrollBy({ left: dir === 'left' ? -150 : 150, behavior: 'smooth' });
         }
     };
+
+    useEffect(() => {
+        setQuantityDrafts(prev => {
+            const next = { ...prev };
+
+            for (const item of localCart) {
+                next[`local-${item.productId}`] = String(item.qty);
+            }
+
+            for (const item of items) {
+                next[item.id] = String(item.quantity);
+            }
+
+            return next;
+        });
+    }, [items, localCart]);
 
 
 
@@ -54,6 +71,41 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         } catch (e) {
             console.error(e);
         }
+    }
+
+    async function handleCommittedQtySet(id: string, rawValue: string, fallbackQty: number) {
+        if (!orderId) return;
+
+        const trimmed = rawValue.trim();
+        const parsed = Number.parseInt(trimmed, 10);
+
+        if (!trimmed || Number.isNaN(parsed)) {
+            setQuantityDrafts(prev => ({ ...prev, [id]: String(fallbackQty) }));
+            return;
+        }
+
+        const nextQty = Math.max(0, parsed);
+
+        try {
+            await updateOrderItemQuantity(id, nextQty, user?.restaurant_id || '');
+            const updated = await getOrderItems(orderId, user?.restaurant_id || '');
+            setItems(updated);
+        } catch (e) {
+            console.error(e);
+            setQuantityDrafts(prev => ({ ...prev, [id]: String(fallbackQty) }));
+        }
+    }
+
+    function handleLocalQtySet(productId: string, rawValue: string, fallbackQty: number) {
+        const trimmed = rawValue.trim();
+        const parsed = Number.parseInt(trimmed, 10);
+
+        if (!trimmed || Number.isNaN(parsed)) {
+            setQuantityDrafts(prev => ({ ...prev, [`local-${productId}`]: String(fallbackQty) }));
+            return;
+        }
+
+        updateLocalCartQty(productId, Math.max(0, parsed));
     }
 
     async function handleVoid() {
@@ -166,8 +218,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     return (
         <>
             <div
-                className="flex-shrink-0 flex flex-col min-h-0 bg-[var(--bg-card)]"
-                style={{ width: 'var(--sidebar-cart-width)', borderLeft: '1px solid var(--border)' }}
+                className="flex-shrink-0 flex flex-col min-h-0 bg-[var(--bg-card)] border-l border-y border-[var(--border)] rounded-l-2xl overflow-hidden"
+                style={{ width: 'var(--sidebar-cart-width)', boxShadow: 'inset 0 0 0 1px var(--border)' }}
             >
                 {/* Header */}
                 <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
@@ -269,10 +321,10 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         </div>
                     )}
                     {!orderId && localCart.map(item => (
-                        <div key={item.productId} className="rounded-xl border bg-[var(--bg-elevated)] border-[var(--border)] overflow-hidden">
-                            <div className="flex gap-2.5 p-2.5">
+                        <div key={item.productId} className="rounded-none border bg-[var(--bg-elevated)] border-[var(--border-strong)] overflow-hidden">
+                            <div className="flex gap-2.5 p-2.5 items-start">
                                 {/* Thumbnail */}
-                                <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
+                                <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
                                     {getImageSrc(item.imagePath) ? (
                                         <img src={getImageSrc(item.imagePath)!} alt={item.productName} className="w-full h-full object-cover" />
                                     ) : (
@@ -287,23 +339,47 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                         <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${item.khmerName ? 'khmer' : ''}`}>
                                             {item.productName}
                                         </p>
-                                        <span className="text-sm font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
-                                            {formatUsd(item.priceCents * item.qty)}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
+                                                {formatUsd(item.priceCents * item.qty)}
+                                            </span>
+                                            <button
+                                                onClick={() => updateLocalCartQty(item.productId, 0)}
+                                                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                title="Remove item"
+                                            >
+                                                <X size={13} strokeWidth={2.5} />
+                                            </button>
+                                        </div>
                                     </div>
                                     <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
                                         {formatUsd(item.priceCents)}
                                     </p>
-                                    <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)]">
+                                    <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)] min-h-14">
                                         <button
                                             onClick={() => updateLocalCartQty(item.productId, item.qty - 1)}
                                             className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
                                         >
                                             {item.qty <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
                                         </button>
-                                        <span className="font-bold font-mono text-lg flex-1 text-center text-[var(--foreground)]">
-                                            {item.qty}
-                                        </span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            inputMode="numeric"
+                                            value={quantityDrafts[`local-${item.productId}`] ?? String(item.qty)}
+                                            onChange={(e) => setQuantityDrafts(prev => ({ ...prev, [`local-${item.productId}`]: e.target.value }))}
+                                            onBlur={(e) => handleLocalQtySet(item.productId, e.target.value, item.qty)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.currentTarget.blur();
+                                                }
+                                                if (e.key === 'Escape') {
+                                                    setQuantityDrafts(prev => ({ ...prev, [`local-${item.productId}`]: String(item.qty) }));
+                                                    e.currentTarget.blur();
+                                                }
+                                            }}
+                                            className="font-bold font-mono text-lg flex-1 min-w-0 text-center text-[var(--foreground)] bg-transparent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                        />
                                         <button
                                             onClick={() => updateLocalCartQty(item.productId, item.qty + 1)}
                                             className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
@@ -328,11 +404,11 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             return (
                                 <div
                                     key={item.id}
-                                    className="rounded-xl border bg-[var(--bg-elevated)] border-[var(--border)] transition-colors overflow-hidden"
+                                    className="rounded-none border bg-[var(--bg-elevated)] border-[var(--border-strong)] transition-colors overflow-hidden"
                                 >
-                                    <div className="flex gap-2.5 p-2.5">
+                                    <div className="flex gap-2.5 p-2.5 items-start">
                                         {/* Thumbnail */}
-                                        <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
+                                        <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
                                             {getImageSrc(item.image_path) ? (
                                                 <img src={getImageSrc(item.image_path)!} alt={item.product_name} className="w-full h-full object-cover" />
                                             ) : (
@@ -347,9 +423,18 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                                 <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
                                                     {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
                                                 </p>
-                                                <span className="text-sm font-bold font-mono flex-shrink-0 text-[var(--accent-green)]">
-                                                    {formatUsd(item.price_at_order * item.quantity)}
-                                                </span>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
+                                                        {formatUsd(item.price_at_order * item.quantity)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => void handleCommittedQtySet(item.id, '0', item.quantity)}
+                                                        className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                        title="Remove item"
+                                                    >
+                                                        <X size={13} strokeWidth={2.5} />
+                                                    </button>
+                                                </div>
                                             </div>
                                             {item.note && (
                                                 <p className="text-[10px] text-[var(--accent-blue)] italic truncate mb-0.5">
@@ -359,16 +444,31 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                             <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
                                                 {formatUsd(item.price_at_order)}
                                             </p>
-                                            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)]">
+                                            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)] min-h-14">
                                                 <button
                                                     onClick={() => handleQtyChange(item.id, item.quantity, -1)}
                                                     className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
                                                 >
                                                     {item.quantity <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
                                                 </button>
-                                                <span className="font-bold font-mono text-lg flex-1 text-center text-[var(--foreground)]">
-                                                    {item.quantity}
-                                                </span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    inputMode="numeric"
+                                                    value={quantityDrafts[item.id] ?? String(item.quantity)}
+                                                    onChange={(e) => setQuantityDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                                    onBlur={(e) => handleCommittedQtySet(item.id, e.target.value, item.quantity)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.currentTarget.blur();
+                                                        }
+                                                        if (e.key === 'Escape') {
+                                                            setQuantityDrafts(prev => ({ ...prev, [item.id]: String(item.quantity) }));
+                                                            e.currentTarget.blur();
+                                                        }
+                                                    }}
+                                                    className="font-bold font-mono text-lg flex-1 min-w-0 text-center text-[var(--foreground)] bg-transparent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                />
                                                 <button
                                                     onClick={() => handleQtyChange(item.id, item.quantity, 1)}
                                                     className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"

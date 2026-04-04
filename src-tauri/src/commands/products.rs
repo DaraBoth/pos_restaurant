@@ -17,7 +17,19 @@ pub async fn get_categories(
     restaurant_id: String,
 ) -> Result<Vec<Category>, String> {
     let mut rows = pool.query(
-        "SELECT id, name, khmer_name, sort_order FROM categories WHERE is_deleted = 0 AND restaurant_id = ? ORDER BY sort_order",
+        "WITH RECURSIVE cat_tree(id, name, khmer_name, sort_order, parent_id, depth, path) AS (
+            SELECT id, name, khmer_name, sort_order, parent_id, 0,
+                   printf('%010d', sort_order)
+            FROM categories
+            WHERE (parent_id IS NULL OR parent_id = '') AND is_deleted = 0 AND restaurant_id = ?
+            UNION ALL
+            SELECT c.id, c.name, c.khmer_name, c.sort_order, c.parent_id, ct.depth + 1,
+                   ct.path || '/' || printf('%010d', c.sort_order)
+            FROM categories c
+            JOIN cat_tree ct ON c.parent_id = ct.id
+            WHERE c.is_deleted = 0 AND ct.depth < 10
+        )
+        SELECT id, name, khmer_name, sort_order, parent_id, depth FROM cat_tree ORDER BY path",
         params![restaurant_id]
     )
     .await
@@ -30,6 +42,8 @@ pub async fn get_categories(
             name: row.get::<String>(1).unwrap_or_default(),
             khmer_name: row.get::<String>(2).ok(),
             sort_order: row.get::<i64>(3).unwrap_or(0),
+            parent_id: row.get::<String>(4).ok().filter(|s| !s.is_empty()),
+            depth: row.get::<i64>(5).unwrap_or(0),
         });
     }
     
@@ -52,10 +66,17 @@ pub async fn get_products(
     
     let mut rows = if let Some(cat_id) = category_id {
         pool.query(
-            "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available, p.image_path,
+            "WITH RECURSIVE subcats(id) AS (
+                SELECT ?
+                UNION ALL
+                SELECT c.id FROM categories c
+                JOIN subcats s ON c.parent_id = s.id
+                WHERE c.is_deleted = 0
+             )
+             SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available, p.image_path,
                     c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
-             WHERE p.is_deleted = 0 AND p.category_id = ? AND p.restaurant_id = ?
+             WHERE p.is_deleted = 0 AND p.category_id IN (SELECT id FROM subcats) AND p.restaurant_id = ?
              ORDER BY p.name",
              params![cat_id, restaurant_id.clone()]
         ).await
@@ -253,6 +274,7 @@ pub async fn delete_product(id: String, restaurant_id: String, pool: State<'_, A
 pub async fn create_category(
     name: String,
     khmer_name: Option<String>,
+    parent_id: Option<String>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
@@ -268,8 +290,8 @@ pub async fn create_category(
     };
 
     pool.execute(
-        "INSERT INTO categories (id, name, khmer_name, sort_order, restaurant_id) VALUES (?, ?, ?, ?, ?)",
-        params![id.clone(), name, khmer_name.unwrap_or_default(), max_order + 1, restaurant_id]
+        "INSERT INTO categories (id, name, khmer_name, sort_order, parent_id, restaurant_id) VALUES (?, ?, ?, ?, ?, ?)",
+        params![id.clone(), name, khmer_name.unwrap_or_default(), max_order + 1, parent_id.unwrap_or_default(), restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -281,12 +303,13 @@ pub async fn update_category(
     id: String,
     name: String,
     khmer_name: Option<String>,
+    parent_id: Option<String>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     pool.execute(
-        "UPDATE categories SET name=?, khmer_name=?, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
-        params![name, khmer_name.unwrap_or_default(), id, restaurant_id]
+        "UPDATE categories SET name=?, khmer_name=?, parent_id=?, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![name, khmer_name.unwrap_or_default(), parent_id.unwrap_or_default(), id, restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;

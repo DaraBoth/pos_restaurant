@@ -11,9 +11,9 @@ import { useAuth } from '@/providers/AuthProvider';
 
 // Status color maps - labels resolved via t() keys
 const STATUS_KEYS = {
-    available: { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.35)', text: '#86efac', dot: 'bg-green-500', labelKey: 'tableStatusFree'  as const },
-    busy:      { bg: 'rgba(249,115,22,0.10)', border: 'rgba(249,115,22,0.45)', text: '#fdba74', dot: 'bg-orange-400', labelKey: 'tableStatusBusy'  as const },
-    waiting:   { bg: 'rgba(234,179,8,0.10)',  border: 'rgba(234,179,8,0.50)',  text: '#fde047', dot: 'bg-yellow-400', labelKey: 'tableStatusWaiting' as const },
+    available: { bg: 'rgba(34,197,94,0.14)', border: 'rgba(34,197,94,0.55)', text: '#16a34a', dot: 'bg-green-500', labelKey: 'tableStatusFree'  as const },
+    busy:      { bg: 'rgba(249,115,22,0.14)', border: 'rgba(249,115,22,0.60)', text: '#ea580c', dot: 'bg-orange-400', labelKey: 'tableStatusBusy'  as const },
+    waiting:   { bg: 'rgba(234,179,8,0.14)',  border: 'rgba(234,179,8,0.65)',  text: '#ca8a04', dot: 'bg-yellow-400', labelKey: 'tableStatusWaiting' as const },
 } as const;
 
 export default function FloorPlanView() {

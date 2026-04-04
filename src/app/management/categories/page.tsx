@@ -135,6 +135,7 @@ export default function CategoriesManagement() {
                 onClose={() => setIsModalOpen(false)}
                 onSave={loadData}
                 category={editingCategory}
+                allCategories={categories}
             />
         </div>
     );

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
+import { useTheme } from '@/providers/ThemeProvider';
 import {
     listAllRestaurants, createRestaurantWithAdmin, superadminUpdateAdmin,
     updateSuperadminProfile, superadminGetAllUsers, superadminMoveUser, SuperadminUserView,
@@ -13,7 +14,7 @@ import { stopSync } from '@/lib/api/system';
 import {
     ShieldCheck, LogOut, Plus, RefreshCw, Store,
     User, Phone, MapPin, Calendar, ChevronRight,
-    X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus
+    X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus, Sun, Moon
 } from 'lucide-react';
 import { updateRestaurantLicense } from '@/lib/api/restaurant';
 // ─── Create Business Modal ────────────────────────────────────────────
@@ -97,9 +98,9 @@ function CreateBusinessModal({ onClose, onCreated }: {
                         <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center">
                             <Building2 size={15} className="text-[var(--accent)]" />
                         </div>
-                        <h2 className="text-xl font-black text-white uppercase tracking-wider">New Business</h2>
+                        <h2 className="text-xl font-black text-[var(--foreground)] uppercase tracking-wider">New Business</h2>
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-[var(--text-secondary)] transition-colors">
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors">
                         <X size={16} />
                     </button>
                 </div>
@@ -120,7 +121,7 @@ function CreateBusinessModal({ onClose, onCreated }: {
                         </div>
                     </div>
 
-                    <div className="border-t border-dashed border-white/10" />
+                    <div className="border-t border-dashed border-[var(--border)]" />
 
                     {/* Admin section */}
                     <div>
@@ -145,7 +146,7 @@ function CreateBusinessModal({ onClose, onCreated }: {
                                     <button
                                         type="button"
                                         onClick={() => setShowPw(v => !v)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-white transition-colors"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                                     >
                                         {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                                     </button>
@@ -164,7 +165,7 @@ function CreateBusinessModal({ onClose, onCreated }: {
                 {/* Sticky footer buttons */}
                 <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-elevated)]">
                     <button type="button" onClick={onClose}
-                        className="flex-1 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
+                        className="flex-1 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all">
                         Cancel
                     </button>
                     <button
@@ -218,7 +219,7 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
                         <Store size={18} className="text-[var(--accent)]" />
                     </div>
                     <div className="min-w-0">
-                        <h3 className="font-black text-sm text-white leading-tight truncate">{r.name}</h3>
+                        <h3 className="font-black text-sm text-[var(--foreground)] leading-tight truncate">{r.name}</h3>
                         {r.khmer_name && (
                             <p className="text-[11px] font-medium text-[var(--text-secondary)] opacity-60 truncate">{r.khmer_name}</p>
                         )}
@@ -227,7 +228,7 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 
                 {/* Details */}
                 <div className="space-y-1.5">
-                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${licenseExpired ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'}`}>
+                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${licenseExpired ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'}`}>
                         {licenseExpired ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
                         {licenseLabel}
                     </div>
@@ -250,7 +251,7 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
                 </div>
 
                 {/* Admin badge */}
-                <div className="pt-1 border-t border-white/5">
+                <div className="pt-1 border-t border-[var(--border)]">
                     <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-blue-500/8 border border-blue-500/15">
                         <User size={12} className="text-blue-400 flex-shrink-0" />
                         <div className="min-w-0">
@@ -350,7 +351,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                         <Store size={16} className="text-[var(--accent)]" />
                         <h2 className="font-black text-sm">{r.name}</h2>
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-[var(--text-secondary)]">
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
                         <X size={16} />
                     </button>
                 </div>
@@ -362,7 +363,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                     <Row icon={Calendar} label="Created" value={new Date(r.created_at + 'Z').toLocaleDateString()} />
                     <Row icon={licenseExpired ? ShieldAlert : ShieldCheck} label="License" value={licenseExpiresAt || 'Perpetual'} />
 
-                    <div className="border-t border-white/5 pt-4 space-y-3">
+                    <div className="border-t border-[var(--border)] pt-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-1.5">
                                 <User size={10} /> Admin Account
@@ -393,7 +394,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                         )}
                     </div>
 
-                    <div className="border-t border-white/5 pt-4 space-y-3">
+                    <div className="border-t border-[var(--border)] pt-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-1.5">
                                 <ShieldCheck size={10} /> License Control
@@ -433,7 +434,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                                 <button
                                     type="button"
                                     onClick={() => applyLicenseDuration('years', 1)}
-                                    className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                                    className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
                                 >
                                     +1 Year
                                 </button>
@@ -489,12 +490,12 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                         <button
                             onClick={handleDeleteRestaurant}
                             disabled={deleting}
-                            className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm font-black text-red-300 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                            className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm font-black text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                         >
                             <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Business'}
                         </button>
                         <button onClick={onClose}
-                            className="w-full py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">
+                            className="w-full py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all">
                             Close
                         </button>
                     </div>
@@ -511,7 +512,7 @@ function Row({ icon: Icon, label, value, mono }: {
         <div className="flex items-center gap-3">
             <Icon size={13} className="text-[var(--text-secondary)] opacity-50 flex-shrink-0" />
             <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-50 w-20 flex-shrink-0">{label}</span>
-            <span className={`text-xs font-medium text-white truncate ${mono ? 'font-mono' : ''}`}>{value}</span>
+            <span className={`text-xs font-medium text-[var(--foreground)] truncate ${mono ? 'font-mono' : ''}`}>{value}</span>
         </div>
     );
 }
@@ -520,6 +521,7 @@ function Row({ icon: Icon, label, value, mono }: {
 export default function SuperAdminPage() {
     const { user, setUser } = useAuth();
     const router = useRouter();
+    const { theme, toggleTheme } = useTheme();
 
     const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -566,13 +568,13 @@ export default function SuperAdminPage() {
     return (
         <div className="min-h-screen bg-[var(--background)]">
             {/* ── Top Bar ── */}
-            <header className="sticky top-0 z-30 bg-[#0a1118]/95 backdrop-blur border-b border-[var(--border)] px-6 py-3 flex items-center justify-between">
+            <header className="sticky top-0 z-30 bg-[var(--sidebar-bg)]/95 backdrop-blur border-b border-[var(--border)] px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
                         <ShieldCheck size={18} className="text-purple-400" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-black text-white uppercase tracking-widest">Super Admin Console</h1>
+                        <h1 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">Super Admin Console</h1>
                         <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-50 uppercase tracking-widest">DineOS Platform</p>
                     </div>
                 </div>
@@ -598,6 +600,14 @@ export default function SuperAdminPage() {
                         <span className="text-xs font-black text-purple-300 uppercase tracking-widest">
                             {user?.full_name || user?.username}
                         </span>
+                    </button>
+
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    >
+                        {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
                     </button>
 
                     <button
@@ -629,7 +639,7 @@ export default function SuperAdminPage() {
                 {/* ── Toolbar ── */}
                 <div className="flex items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-base font-black text-white">Registered Businesses</h2>
+                        <h2 className="text-base font-black text-[var(--foreground)]">Registered Businesses</h2>
                         <p className="text-xs text-[var(--text-secondary)] opacity-50">Each entry represents a paying client + their admin account.</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -641,7 +651,7 @@ export default function SuperAdminPage() {
                         </button>
                         <button
                             onClick={() => setShowGlobalUsers(true)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-white font-black text-xs uppercase tracking-widest hover:border-blue-500/50 hover:bg-blue-500/10 transition-all"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-black text-xs uppercase tracking-widest hover:border-blue-500/50 hover:bg-blue-500/10 transition-all"
                         >
                             <Users size={14} className="text-blue-400" />
                             Global Users
@@ -846,7 +856,7 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                         <h3 className="font-black text-sm">{restaurant.admin_id ? 'Add Restaurant User' : 'Create Restaurant Admin'}</h3>
                         <p className="text-[11px] text-[var(--text-secondary)]">{restaurant.name}</p>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]">
+                    <button onClick={onClose} className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]">
                         <X size={16} />
                     </button>
                 </div>
@@ -857,7 +867,7 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                         <select
                             value={role}
                             onChange={(event) => setRole(event.target.value)}
-                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                         >
                             <option value="admin">Admin</option>
                             <option value="manager">Manager</option>
@@ -872,7 +882,7 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                             type="text"
                             value={fullName}
                             onChange={(event) => setFullName(event.target.value)}
-                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -881,7 +891,7 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                             type="text"
                             value={username}
                             onChange={(event) => setUsername(event.target.value)}
-                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -890,12 +900,12 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                             type="password"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
-                            className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                         />
                     </div>
 
                     {error && (
-                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-300">
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-500">
                             {error}
                         </div>
                     )}
@@ -952,7 +962,7 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                         <User size={16} className="text-blue-400" />
                         <h3 className="font-black text-sm">Edit Admin Account</h3>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]">
+                    <button onClick={onClose} className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]">
                         <X size={16} />
                     </button>
                 </div>
@@ -961,7 +971,7 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                     {error && (
                         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-1">
                             <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Error Saving</span>
-                            <p className="text-[11px] font-medium text-red-300">{error}</p>
+                            <p className="text-[11px] font-medium text-red-500">{error}</p>
                         </div>
                     )}
                     
@@ -970,7 +980,7 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
                             <input
                                 type="text"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
                                 required
@@ -980,7 +990,7 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name <span className="opacity-50">(optional)</span></label>
                             <input
                                 type="text"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={fullName}
                                 onChange={e => setFullName(e.target.value)}
                             />
@@ -989,7 +999,7 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">New Password <span className="opacity-50">(leave blank to keep)</span></label>
                             <input
                                 type="password"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="••••••••"
@@ -1054,7 +1064,7 @@ function CreateSuperadminModal({ onClose, onCreated }: { onClose: () => void; on
                             <p className="text-[10px] text-[var(--text-secondary)] opacity-50">Platform-wide access, cloud-only</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]"><X size={16} /></button>
+                    <button onClick={onClose} className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]"><X size={16} /></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -1082,14 +1092,14 @@ function CreateSuperadminModal({ onClose, onCreated }: { onClose: () => void; on
                                     placeholder="min 6 characters"
                                     className="pos-input w-full pr-10"
                                 />
-                                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-white transition-colors">
+                                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
                                     {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                                 </button>
                             </div>
                         </div>
                     </div>
                     <div className="flex gap-3 pt-1">
-                        <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-white transition-all">Cancel</button>
+                        <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all">Cancel</button>
                         <button type="submit" disabled={loading} className="flex-1 py-2.5 rounded-xl bg-purple-500 text-white text-sm font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                             {loading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
                             {loading ? 'Creating…' : 'Create'}
@@ -1150,7 +1160,7 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                         <ShieldCheck size={16} className="text-purple-400" />
                         <h3 className="font-black text-sm">Edit Superadmin Profile</h3>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]">
+                    <button onClick={onClose} className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]">
                         <X size={16} />
                     </button>
                 </div>
@@ -1159,7 +1169,7 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                     {error && (
                         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-1">
                             <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Error Saving</span>
-                            <p className="text-[11px] font-medium text-red-300">{error}</p>
+                            <p className="text-[11px] font-medium text-red-500">{error}</p>
                         </div>
                     )}
                     
@@ -1168,7 +1178,7 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
                             <input
                                 type="text"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
                                 required
@@ -1178,7 +1188,7 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name <span className="opacity-50">(optional)</span></label>
                             <input
                                 type="text"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={fullName}
                                 onChange={e => setFullName(e.target.value)}
                             />
@@ -1187,7 +1197,7 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                             <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">New Password <span className="opacity-50">(leave blank to keep)</span></label>
                             <input
                                 type="password"
-                                className="w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="••••••••"
@@ -1257,7 +1267,7 @@ function GlobalUsersModal({ onClose, restaurants, onMoveUser }: {
                             <Users size={20} />
                         </div>
                         <div>
-                            <h3 className="font-black text-sm uppercase tracking-widest text-white">Global User Directory</h3>
+                            <h3 className="font-black text-sm uppercase tracking-widest text-[var(--foreground)]">Global User Directory</h3>
                             <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
                                 Showing {users.length} registered accounts platform-wide
                             </p>
@@ -1270,12 +1280,12 @@ function GlobalUsersModal({ onClose, restaurants, onMoveUser }: {
                             <input 
                                     type="text" 
                                     placeholder="Search users by name, role, or origin..."
-                                className="w-full sm:w-64 bg-black/50 border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-sm text-white focus:border-[var(--accent)] outline-none"
+                                className="w-full sm:w-64 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                             />
                         </div>
-                        <button onClick={onClose} className="p-2.5 hover:bg-white/10 rounded-xl text-[var(--text-secondary)] bg-[var(--bg-base)] border border-[var(--border)] transition-all">
+                        <button onClick={onClose} className="p-2.5 hover:bg-[var(--bg-card)] rounded-xl text-[var(--text-secondary)] bg-[var(--bg-elevated)] border border-[var(--border)] transition-all">
                             <X size={16} />
                         </button>
                     </div>
@@ -1305,9 +1315,9 @@ function GlobalUsersModal({ onClose, restaurants, onMoveUser }: {
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
                                 {filtered.map(u => (
-                                    <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
+                                    <tr key={u.id} className="hover:bg-[var(--bg-elevated)] transition-colors">
                                         <td className="px-6 py-3">
-                                            <p className="font-bold text-white mb-0.5">{u.username}</p>
+                                            <p className="font-bold text-[var(--foreground)] mb-0.5">{u.username}</p>
                                             {u.full_name && <p className="text-[11px] text-[var(--text-secondary)]">{u.full_name}</p>}
                                         </td>
                                         <td className="px-6 py-3">
@@ -1383,12 +1393,12 @@ function MoveUserModal({ user, restaurants, onClose, onMoved }: {
             <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex justify-between items-center">
                     <h3 className="font-black text-xs uppercase tracking-widest">Reassign User</h3>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-[var(--text-secondary)]"> <X size={14} /> </button>
+                    <button onClick={onClose} className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]"> <X size={14} /> </button>
                 </div>
                 <div className="p-6 space-y-4">
                     <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Moving User</p>
-                        <p className="text-sm font-bold text-white">{user.username}</p>
+                        <p className="text-sm font-bold text-[var(--foreground)]">{user.username}</p>
                         <p className="text-[10px] text-[var(--text-secondary)] opacity-60">Currently in: {user.restaurant_name || 'System'}</p>
                     </div>
 
@@ -1397,7 +1407,7 @@ function MoveUserModal({ user, restaurants, onClose, onMoved }: {
                         <select 
                             value={selectedId}
                             onChange={(e) => setSelectedId(e.target.value)}
-                            className="w-full bg-black/40 border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[var(--accent)] appearance-none"
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-[var(--foreground)] outline-none focus:border-[var(--accent)] appearance-none"
                         >
                             <option value="" disabled>Select a business...</option>
                             {restaurants.map(r => (

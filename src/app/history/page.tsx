@@ -17,6 +17,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { call } from '@/lib/api/client';
 import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { printSummaryReport } from '@/lib/reports';
+import { getImageSrc } from '@/lib/image';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'hold';
 
@@ -365,7 +366,7 @@ export default function HistoryPage() {
                                     }`}
                             >
                                 {t(tab.labelKey)}
-                                <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-white/5'}`}>
+                                <span className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] ${filter === tab.id ? 'bg-black/10' : 'bg-[var(--bg-elevated)]'}`}>
                                     {allGroupedOrders.filter(g => tab.id === 'all' || g.status === tab.id).length}
                                 </span>
                             </button>
@@ -429,7 +430,7 @@ export default function HistoryPage() {
                                             <React.Fragment key={g.id}>
                                                 <tr
                                                     onClick={() => toggleRow(g.id)}
-                                                    className={`transition-all hover:bg-white/[0.03] cursor-pointer group ${isExpanded ? 'bg-white/[0.02]' : ''}`}
+                                                    className={`transition-all hover:bg-[var(--bg-elevated)] cursor-pointer group ${isExpanded ? 'bg-[var(--bg-elevated)]' : ''}`}
                                                 >
                                                     <td className="px-4 py-2.5">
                                                         <div className={`w-6 h-6 flex items-center justify-center rounded-lg transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
@@ -477,7 +478,7 @@ export default function HistoryPage() {
                                                 </tr>
 
                                                 {isExpanded && (
-                                                    <tr className="bg-black/30 animate-fade-in border-l-2 border-[var(--accent)]">
+                                                    <tr className="bg-[var(--bg-dark)] animate-fade-in border-l-2 border-[var(--accent)]">
                                                         <td colSpan={7} className="px-5 py-4">
                                                             <div className="space-y-4">
                                                                 <div className="flex items-center justify-between">
@@ -528,14 +529,29 @@ export default function HistoryPage() {
                                                                             {orderDetails[o.id] ? (
                                                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                                                                     {orderDetails[o.id].map(item => (
-                                                                                        <div key={item.id} className="flex items-center justify-between bg-[var(--bg-elevated)] px-3 py-2.5 rounded-lg border border-[var(--border)] transition-all">
+                                                                                        <div key={item.id} className="flex items-center justify-between bg-[var(--bg-dark)] px-3 py-2.5 rounded-lg border border-[var(--border)] transition-all">
                                                                                             <div className="flex items-center gap-3">
-                                                                                                <div className="w-8 h-8 rounded bg-black border border-white/5 flex items-center justify-center font-black text-[var(--accent)] text-xs flex-shrink-0">
-                                                                                                    {item.quantity}x
+                                                                                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center flex-shrink-0">
+                                                                                                    {getImageSrc(item.image_path) ? (
+                                                                                                        <img
+                                                                                                            src={getImageSrc(item.image_path)!}
+                                                                                                            alt={lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
+                                                                                                            className="w-full h-full object-cover"
+                                                                                                        />
+                                                                                                    ) : (
+                                                                                                        <div className="w-full h-full flex items-center justify-center font-black text-[var(--accent)] text-xs">
+                                                                                                            {item.quantity}x
+                                                                                                        </div>
+                                                                                                    )}
                                                                                                 </div>
-                                                                                                <div>
-                                                                                                    <p className="text-xs font-black text-white leading-tight">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
-                                                                                                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{formatUsd(item.price_at_order)} / unit</p>
+                                                                                                <div className="min-w-0">
+                                                                                                    <div className="flex items-center gap-2">
+                                                                                                        <span className="inline-flex items-center justify-center min-w-8 h-6 px-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] font-black text-[var(--accent)] text-[10px] flex-shrink-0">
+                                                                                                            {item.quantity}x
+                                                                                                        </span>
+                                                                                                        <p className="text-xs font-black text-[var(--foreground)] leading-tight truncate">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
+                                                                                                    </div>
+                                                                                                    <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-widest mt-0.5">{formatUsd(item.price_at_order)} / unit</p>
                                                                                                 </div>
                                                                                             </div>
                                                                                             <div className="text-right flex-shrink-0">
@@ -591,7 +607,7 @@ export default function HistoryPage() {
                                 />
 
                                 {/* Header */}
-                                <div className="px-4 pt-4 pb-3 border-b border-dashed border-white/10">
+                                <div className="px-4 pt-4 pb-3 border-b border-dashed border-[var(--border)]">
                                     <div className="flex items-start justify-between mb-2">
                                         <span
                                             className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
@@ -677,7 +693,7 @@ export default function HistoryPage() {
                                 })()}
 
                                 {/* Totals */}
-                                <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-white/10 space-y-1">
+                                <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-[var(--border)] space-y-1">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('total')}</span>
                                         <span

@@ -201,7 +201,7 @@ export default function CheckoutModal({
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border)]">
                     <h2 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">{t('checkout')}</h2>
-                    <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
+                    <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
                         <X size={16} />
                     </button>
                 </div>
@@ -216,7 +216,7 @@ export default function CheckoutModal({
                             {discountCents > 0 && (
                                 <div className="flex items-center justify-between mb-1.5">
                                     <span className="text-sm font-mono text-[var(--text-secondary)] line-through opacity-60">{formatUsd(combinedTotals.totalUsdCents)}</span>
-                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/30 text-yellow-400">-{discountPct}%</span>
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/30 text-yellow-600">-{discountPct}%</span>
                                 </div>
                             )}
                             <div className="text-3xl font-black font-mono text-[var(--foreground)] tracking-tighter leading-none">
@@ -226,7 +226,7 @@ export default function CheckoutModal({
                                 {formatKhr(discountedTotals.totalKhr)}
                             </div>
                             {discountCents > 0 && (
-                                <div className="mt-1.5 text-[10px] font-bold text-yellow-400">
+                                <div className="mt-1.5 text-[10px] font-bold text-yellow-600">
                                     Saving {formatUsd(discountCents)}
                                 </div>
                             )}
@@ -251,7 +251,7 @@ export default function CheckoutModal({
                                             setDiscountPct(v);
                                         }}
                                         placeholder="0"
-                                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-3 py-2 text-sm font-mono font-black text-white focus:border-yellow-400/60 outline-none transition-all"
+                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
                                     />
                                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-black text-[var(--text-secondary)]/50">%</span>
                                 </div>
@@ -262,8 +262,8 @@ export default function CheckoutModal({
                                             onClick={() => setDiscountPct(discountPct === pct ? 0 : pct)}
                                             className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-colors ${
                                                 discountPct === pct
-                                                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
-                                                    : 'bg-white/[0.07] border-white/10 text-[var(--text-secondary)] hover:text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/25'
+                                                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-600'
+                                                    : 'bg-[var(--bg-dark)] border-[var(--border)] text-[var(--text-secondary)] hover:text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500/25'
                                             }`}
                                         >
                                             {pct}%
@@ -313,7 +313,7 @@ export default function CheckoutModal({
                                         placeholder={formatUsdNumeric(discountedTotals.totalUsdCents)}
                                         value={usdInput}
                                         onChange={e => setUsdInput(e.target.value)}
-                                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl pl-8 pr-4 py-3 text-xl font-mono font-black text-white focus:border-[var(--accent-blue)] outline-none transition-all"
+                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-3 text-xl font-mono font-black text-[var(--foreground)] focus:border-[var(--accent-blue)] outline-none transition-all"
                                     />
                                 </div>
                                 {/* Quick denomination buttons */}
@@ -322,7 +322,7 @@ export default function CheckoutModal({
                                         <button
                                             key={v}
                                             onClick={() => setUsdInput(v.toString())}
-                                            className="flex-1 py-1.5 rounded-lg bg-white/[0.07] hover:bg-[var(--accent-blue)]/15 text-xs font-black border border-white/10 hover:border-[var(--accent-blue)]/40 transition-colors text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
+                                            className="flex-1 py-1.5 rounded-lg bg-[var(--bg-dark)] hover:bg-[var(--accent-blue)]/15 text-xs font-black border border-[var(--border)] hover:border-[var(--accent-blue)]/40 transition-colors text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
                                         >
                                             {v}
                                         </button>
@@ -332,14 +332,14 @@ export default function CheckoutModal({
 
                             {changeUsdCents > 0 ? (
                                 <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/25">
-                                    <div className="text-xs font-bold text-green-400">{t('change')}</div>
-                                    <div className="text-xl font-black font-mono text-green-300">{formatUsd(changeUsdCents)}</div>
+                                    <div className="text-xs font-bold text-green-600">{t('change')}</div>
+                                    <div className="text-xl font-black font-mono text-green-700">{formatUsd(changeUsdCents)}</div>
                                 </div>
                             ) : remainingUsdCents > 0 && usdInputCents > 0 ? (
                                 <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/25">
-                                    <div className="text-xs font-bold text-orange-400">Remaining via {method.toUpperCase()}</div>
-                                    <div className="text-xl font-black font-mono text-orange-300">{formatUsd(remainingUsdCents)}</div>
-                                    <div className="text-xs font-mono text-orange-400/70 mt-0.5">{formatKhr(remainingKhr)}</div>
+                                    <div className="text-xs font-bold text-orange-600">Remaining via {method.toUpperCase()}</div>
+                                    <div className="text-xl font-black font-mono text-orange-700">{formatUsd(remainingUsdCents)}</div>
+                                    <div className="text-xs font-mono text-orange-600/70 mt-0.5">{formatKhr(remainingKhr)}</div>
                                 </div>
                             ) : null}
                         </div>
@@ -348,7 +348,7 @@ export default function CheckoutModal({
                             <button
                                 onClick={handlePreviewPrint}
                                 disabled={loading}
-                                className="w-14 h-14 rounded-xl flex items-center justify-center bg-white/[0.07] border border-white/10 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-all active:scale-[0.95]"
+                                className="w-14 h-14 rounded-xl flex items-center justify-center bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-all active:scale-[0.95]"
                                 title="Print Preview"
                             >
                                 <Printer size={20} />

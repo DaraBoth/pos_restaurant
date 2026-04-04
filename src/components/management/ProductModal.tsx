@@ -140,7 +140,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     </label>
                     <div className="relative">
                         {imagePath && getImageSrc(imagePath) ? (
-                            <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden border border-white/20 group">
+                            <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden border border-[var(--border)] group">
                                 <img
                                     src={getImageSrc(imagePath)!}
                                     alt="Product"
@@ -171,7 +171,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploadingImage}
-                                className="w-full aspect-[3/2] rounded-xl border-2 border-dashed border-white/20 hover:border-white/40 bg-white/[0.03] hover:bg-white/[0.06] transition-all flex flex-col items-center justify-center gap-2 text-white/40 hover:text-white/70"
+                                className="w-full aspect-[3/2] rounded-xl border-2 border-dashed border-[var(--border)] hover:border-[var(--accent)]/40 bg-[var(--bg-elevated)] hover:bg-[var(--bg-dark)] transition-all flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)] hover:text-[var(--foreground)]"
                             >
                                 {uploadingImage ? (
                                     <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -206,7 +206,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         value={name}
                         onChange={e => setName(e.target.value)}
                         placeholder="e.g. Fried Rice"
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
                     />
                 </div>
 
@@ -219,7 +219,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
                         placeholder="បាយឆា"
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold khmer placeholder:text-white/30 focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold khmer placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
                     />
                 </div>
 
@@ -230,7 +230,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                             {t('price')}
                         </label>
                         <div className="relative">
-                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-white/50">$</span>
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--text-secondary)]">$</span>
                             <input
                                 type="number"
                                 required
@@ -239,7 +239,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                 value={priceUsd}
                                 onChange={e => setPriceUsd(e.target.value)}
                                 onBlur={() => setPriceUsd(v => parseFloat(v || '0').toFixed(2))}
-                                className="w-full bg-white/[0.07] border border-white/20 rounded-xl pl-7 pr-4 py-3 text-white font-mono font-bold focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-7 pr-4 py-3 text-[var(--foreground)] font-mono font-bold focus:border-[var(--accent)] outline-none transition-all"
                             />
                         </div>
                     </div>
@@ -253,10 +253,12 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     <select
                         value={categoryId}
                         onChange={e => setCategoryId(e.target.value)}
-                        className="w-full bg-white/[0.07] border border-white/20 rounded-xl px-4 py-3 text-white font-semibold focus:border-[var(--accent)] focus:bg-white/[0.09] outline-none transition-all appearance-none cursor-pointer"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold focus:border-[var(--accent)] outline-none transition-all appearance-none cursor-pointer"
                     >
                         {categories.map(cat => (
-                            <option key={cat.id} value={cat.id} className="bg-[#1e2229] text-white">{cat.name}</option>
+                            <option key={cat.id} value={cat.id} className="bg-[var(--bg-elevated)] text-[var(--foreground)]">
+                                {'\u00a0\u00a0\u00a0'.repeat(cat.depth || 0)}{(cat.depth || 0) > 0 ? '└ ' : ''}{cat.name}
+                            </option>
                         ))}
                     </select>
                 </div>
@@ -280,12 +282,12 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     
                     <div className="space-y-3">
                         {ingredients.length === 0 && (
-                            <div className="text-center py-4 border-2 border-dashed border-white/5 rounded-xl">
-                                <p className="text-[10px] text-white/20 uppercase tracking-widest font-bold">No ingredients linked</p>
+                            <div className="text-center py-4 border-2 border-dashed border-[var(--border)] rounded-xl">
+                                <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-widest font-bold opacity-40">No ingredients linked</p>
                             </div>
                         )}
                         {ingredients.map((ing, idx) => (
-                            <div key={idx} className="flex flex-col gap-2 p-3 bg-white/[0.03] border border-white/10 rounded-xl animate-in fade-in slide-in-from-top-1">
+                            <div key={idx} className="flex flex-col gap-2 p-3 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl animate-in fade-in slide-in-from-top-1">
                                 <div className="flex items-center gap-2">
                                     <select
                                         value={ing.inventory_item_id}
@@ -294,11 +296,11 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                             newIngs[idx].inventory_item_id = e.target.value;
                                             setIngredients(newIngs);
                                         }}
-                                        className="flex-1 bg-white/[0.07] border border-white/20 rounded-lg px-3 py-2 text-xs text-white font-semibold outline-none focus:border-emerald-500"
+                                        className="flex-1 bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] font-semibold outline-none focus:border-emerald-500"
                                     >
                                         <option value="">-- Select Material --</option>
                                         {materials.map(m => (
-                                            <option key={m.id} value={m.id} className="bg-[#1e2229]">{m.name} ({m.unit_label})</option>
+                                            <option key={m.id} value={m.id} className="bg-[var(--bg-elevated)]">{m.name} ({m.unit_label})</option>
                                         ))}
                                     </select>
                                     <button
@@ -322,7 +324,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                                 setIngredients(newIngs);
                                             }}
                                             placeholder="Usage Amount"
-                                            className="w-full bg-white/[0.07] border border-white/20 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-white/20 outline-none focus:border-emerald-500"
+                                            className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] font-mono placeholder:text-[var(--text-secondary)]/40 outline-none focus:border-emerald-500"
                                         />
                                     </div>
                                     <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest min-w-[40px]">
@@ -335,8 +337,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                 </div>
 
                 {/* Availability toggle */}
-                <div className="flex items-center justify-between px-4 py-3 bg-white/[0.04] border border-white/10 rounded-xl">
-                    <span className="text-sm font-semibold text-white/80">{t('available')}</span>
+                <div className="flex items-center justify-between px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">{t('available')}</span>
                     <label className="flex items-center gap-3 cursor-pointer">
                         <input
                             type="checkbox"
@@ -347,7 +349,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         <div className={`w-11 h-6 rounded-full relative transition-colors duration-200 ${isAvailable ? 'bg-green-500' : 'bg-white/20'}`}>
                             <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isAvailable ? 'translate-x-5' : 'translate-x-0'}`} />
                         </div>
-                        <span className={`text-sm font-bold w-20 ${isAvailable ? 'text-green-400' : 'text-white/40'}`}>
+                        <span className={`text-sm font-bold w-20 ${isAvailable ? 'text-green-600' : 'text-[var(--text-secondary)]'}`}>
                             {isAvailable ? t('available') : t('unavailable')}
                         </span>
                     </label>
@@ -358,7 +360,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3.5 rounded-xl text-sm font-bold text-white/60 hover:text-white border border-white/15 hover:border-white/30 hover:bg-white/5 transition-all"
+                        className="flex-1 py-3.5 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-all"
                     >
                         {t('cancel')}
                     </button>

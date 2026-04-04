@@ -68,7 +68,7 @@ export default function InventoryView() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
-                        <BoxesIcon size={20} className="text-emerald-400" />
+                        <BoxesIcon size={20} className="text-emerald-600" />
                     </div>
                     <div>
                         <h1 className="text-base font-black text-[var(--foreground)] leading-none uppercase tracking-tight">
@@ -103,27 +103,27 @@ export default function InventoryView() {
 
             {/* Stats row */}
             <div className="grid grid-cols-4 gap-3">
-                <div className="pos-card p-4 bg-white/[0.02]">
+                <div className="pos-card p-4 bg-[var(--bg-card)]">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Total Items</p>
                     <p className="text-2xl font-black text-[var(--foreground)] font-mono">{items.length}</p>
                 </div>
                 <button 
                     onClick={() => setShowLowOnly(!showLowOnly)}
-                    className={`pos-card p-4 text-left transition-all border ${showLowOnly ? 'bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/20' : 'bg-white/[0.02] border-amber-500/10'}`}
+                    className={`pos-card p-4 text-left transition-all border ${showLowOnly ? 'bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/20' : 'bg-[var(--bg-card)] border-amber-500/10'}`}
                 >
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-1 flex items-center gap-1.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5">
                         <AlertTriangle size={12} />
                         Low Stock
                     </p>
-                    <p className="text-2xl font-black text-amber-400 font-mono">{lowStockCount}</p>
+                    <p className="text-2xl font-black text-amber-600 font-mono">{lowStockCount}</p>
                 </button>
-                <div className="pos-card p-4 bg-white/[0.02] border-red-500/10">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Out of Stock</p>
-                    <p className="text-2xl font-black text-red-400 font-mono">{outOfStockCount}</p>
+                <div className="pos-card p-4 bg-[var(--bg-card)] border-red-500/10">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Out of Stock</p>
+                    <p className="text-2xl font-black text-red-500 font-mono">{outOfStockCount}</p>
                 </div>
-                <div className="pos-card p-4 bg-white/[0.02] border-emerald-500/10">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">Stock Health</p>
-                    <p className="text-2xl font-black text-emerald-400 font-mono">
+                <div className="pos-card p-4 bg-[var(--bg-card)] border-emerald-500/10">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Stock Health</p>
+                    <p className="text-2xl font-black text-emerald-600 font-mono">
                         {items.length ? Math.round(((items.length - lowStockCount) / items.length) * 100) : 100}%
                     </p>
                 </div>
@@ -134,7 +134,7 @@ export default function InventoryView() {
                 <div className="overflow-x-auto container-snap">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-white/[0.02]">
+                            <tr className="bg-[var(--bg-elevated)]">
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">
                                     Ingredient & Unit
                                 </th>
@@ -159,13 +159,13 @@ export default function InventoryView() {
                                 const pct = item.stock_pct || 0;
                                 
                                 return (
-                                    <tr key={item.id} className="hover:bg-white/[0.02] group transition-colors">
+                                    <tr key={item.id} className="hover:bg-[var(--bg-elevated)] group transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-sm ${
-                                                    isOut ? 'bg-red-500/10 border-red-500/20 text-red-400' :
-                                                    isLow ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                                                    'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                                    isOut ? 'bg-red-500/10 border-red-500/20 text-red-500' :
+                                                    isLow ? 'bg-amber-500/10 border-amber-500/20 text-amber-600' :
+                                                    'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
                                                 }`}>
                                                     <Package size={16} />
                                                 </div>
@@ -174,21 +174,21 @@ export default function InventoryView() {
                                                         {lang === 'km' ? (item.khmer_name || item.name) : item.name}
                                                     </p>
                                                     <p className="text-[10px] text-[var(--text-secondary)] mt-1 font-black uppercase tracking-widest">
-                                                        Unit: <span className="text-white/60">{item.unit_label}</span>
+                                                        Unit: <span className="text-[var(--foreground)]/60">{item.unit_label}</span>
                                                     </p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className={`font-mono font-black text-lg ${
-                                                isOut ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-emerald-400'
+                                                isOut ? 'text-red-500' : isLow ? 'text-amber-600' : 'text-emerald-600'
                                             }`}>
                                                 {item.stock_qty.toLocaleString()}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
-                                                <div className="w-full h-1.5 bg-white/[0.05] rounded-full overflow-hidden border border-white/5">
+                                                <div className="w-full h-1.5 bg-[var(--bg-dark)] rounded-full overflow-hidden border border-[var(--border)]">
                                                     <div 
                                                         className={`h-full transition-all duration-1000 ${
                                                             isOut ? 'bg-red-500' : isLow ? 'bg-amber-500' : 'bg-emerald-500'
@@ -196,28 +196,28 @@ export default function InventoryView() {
                                                         style={{ width: `${Math.min(100, pct)}%` }}
                                                     />
                                                 </div>
-                                                <span className="text-[10px] font-black font-mono text-white/40 uppercase tracking-tighter">
+                                                <span className="text-[10px] font-black font-mono text-[var(--text-secondary)] uppercase tracking-tighter opacity-70">
                                                     {pct.toFixed(0)}% Capacity
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <p className="text-xs font-mono font-bold text-white/60">
+                                            <p className="text-xs font-mono font-bold text-[var(--foreground)]/70">
                                                 ${item.cost_per_unit.toFixed(2)}
                                             </p>
-                                            <p className="text-[8px] text-white/30 uppercase font-black">per {item.unit_label}</p>
+                                            <p className="text-[8px] text-[var(--text-secondary)] uppercase font-black opacity-70">per {item.unit_label}</p>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => { setSelectedItem(item); setIsModalOpen(true); }}
-                                                    className="p-2 rounded-lg bg-white/[0.05] hover:bg-emerald-500/20 text-white/40 hover:text-emerald-400 border border-transparent hover:border-emerald-500/30 transition-all"
+                                                    className="p-2 rounded-lg bg-[var(--bg-elevated)] hover:bg-emerald-500/20 text-[var(--text-secondary)] hover:text-emerald-600 border border-transparent hover:border-emerald-500/30 transition-all"
                                                 >
                                                     <Edit2 size={14} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(item.id)}
-                                                    className="p-2 rounded-lg bg-white/[0.05] hover:bg-red-500/20 text-white/40 hover:text-red-400 border border-transparent hover:border-red-500/30 transition-all"
+                                                    className="p-2 rounded-lg bg-[var(--bg-elevated)] hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500 border border-transparent hover:border-red-500/30 transition-all"
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>

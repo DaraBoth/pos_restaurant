@@ -116,11 +116,11 @@ export default function AppUpdater() {
 
     if (state === 'error') {
         return (
-            <div className="fixed right-4 bottom-4 z-[70] w-[360px] rounded-2xl border border-orange-500/30 bg-[#181214] shadow-2xl p-4">
+            <div className="fixed right-4 bottom-4 z-[70] w-[360px] rounded-2xl border border-orange-500/30 bg-[var(--bg-card)] shadow-2xl p-4">
                 <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-black uppercase tracking-widest text-orange-300">Update Check Failed</p>
                     <button
-                        className="p-1 rounded hover:bg-white/10 text-white/70"
+                        className="p-1 rounded hover:bg-[var(--bg-elevated)] text-[var(--foreground)]/70"
                         onClick={() => setState('idle')}
                     >
                         <X size={14} />
@@ -132,13 +132,13 @@ export default function AppUpdater() {
     }
 
     return (
-        <div className="fixed right-4 bottom-4 z-[70] w-[380px] rounded-2xl border border-emerald-500/30 bg-[#10161a] shadow-2xl p-4 space-y-3">
+        <div className="fixed right-4 bottom-4 z-[70] w-[380px] rounded-2xl border border-emerald-500/30 bg-[var(--bg-card)] shadow-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
                 <p className="text-xs font-black uppercase tracking-widest text-emerald-300">
                     {state === 'downloading' ? 'Downloading Update' : 'Update Available'}
                 </p>
                 <button
-                    className="p-1 rounded hover:bg-white/10 text-white/70"
+                    className="p-1 rounded hover:bg-[var(--bg-elevated)] text-[var(--foreground)]/70"
                     onClick={() => {
                         setDismissedVersion(latestVersion);
                         setState('idle');
@@ -150,7 +150,7 @@ export default function AppUpdater() {
                 </button>
             </div>
 
-            <p className="text-sm text-white">
+            <p className="text-sm text-[var(--foreground)]">
                 New version <span className="font-black text-emerald-300">{latestVersion}</span>
                 {' is ready.'}
             </p>

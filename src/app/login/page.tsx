@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useTheme } from '@/providers/ThemeProvider';
 import { login, getSetupStatus } from '@/lib/tauri-commands';
 import { triggerSync } from '@/lib/api/system';
-import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle, Sun, Moon } from 'lucide-react';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -15,6 +16,7 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(false);
     const { setUser } = useAuth();
     const { t, lang, setLang } = useLanguage();
+    const { theme, toggleTheme } = useTheme();
     const router = useRouter();
 
     const handleOpenSupport = async () => {
@@ -103,23 +105,30 @@ export default function LoginPage() {
                 </div>
             </div>
 
-            {/* Right Side: Form (DARK) */}
-            <div className="w-full lg:w-1/2 bg-[#0a0c10] flex flex-col relative">
+            {/* Right Side: Form */}
+            <div className="w-full lg:w-1/2 bg-[var(--background)] flex flex-col relative transition-colors duration-200">
                 {/* Mobile Identity */}
                 <div className="lg:hidden p-8 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white overflow-hidden p-1">
                             <img src="/logo.png" alt="Logo" className="w-full h-full object-contain brightness-0 invert" />
                         </div>
-                        <span className="font-black text-xl tracking-tighter uppercase text-white">Dine<span className="text-emerald-600">OS</span></span>
+                        <span className="font-black text-xl tracking-tighter uppercase text-[var(--foreground)]">Dine<span className="text-emerald-600">OS</span></span>
                     </div>
                 </div>
 
-                {/* Language Switcher */}
-                <div className="absolute top-8 right-8">
+                {/* Top right controls: language + theme */}
+                <div className="absolute top-8 right-8 flex items-center gap-2">
+                    <button
+                        onClick={toggleTheme}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:border-emerald-500/30 transition-all bg-[var(--bg-elevated)] backdrop-blur-md"
+                        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    >
+                        {theme === 'dark' ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-indigo-400" />}
+                    </button>
                     <button
                         onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest text-white/50 hover:text-white border border-white/10 hover:border-emerald-500/30 transition-all bg-white/[0.03] hover:bg-white/[0.08] backdrop-blur-md"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:border-emerald-500/30 transition-all bg-[var(--bg-elevated)] backdrop-blur-md"
                     >
                         <Globe size={14} className={lang === 'en' ? 'text-emerald-400' : 'text-blue-400'} />
                         {lang === 'en' ? 'ភាសាខ្មែរ' : 'English'}
@@ -129,25 +138,25 @@ export default function LoginPage() {
                 {/* Main Form Area */}
                 <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 max-w-[640px] mx-auto w-full">
                     <div className="mb-12">
-                        <h2 className="text-4xl font-black text-white tracking-tight mb-3">Sign In</h2>
-                        <p className="text-white/25 text-sm font-medium tracking-tight mt-3 max-w-md">
+                        <h2 className="text-4xl font-black text-[var(--foreground)] tracking-tight mb-3">Sign In</h2>
+                        <p className="text-[var(--text-secondary)] text-sm font-medium tracking-tight mt-3 max-w-md">
                             {t('firstLoginDesc')}
                         </p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-8">
                         <div className="space-y-3">
-                            <label className="text-[11px] font-black text-white/20 uppercase ml-1">
+                            <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
                                 {t('username')}
                             </label>
                             <div className="relative group">
-                                <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
+                                <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={e => setUsername(e.target.value)}
                                     required
-                                    className="w-full bg-white/[0.02] border border-white/10 focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-white placeholder:text-white/10 outline-none transition-all font-medium"
+                                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
                                     placeholder="Enter username"
                                     autoComplete="username"
                                 />
@@ -155,17 +164,17 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-[11px] font-black text-white/20 uppercase ml-1">
+                            <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
                                 {t('password')}
                             </label>
                             <div className="relative group">
-                                <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
+                                <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     required
-                                    className="w-full bg-white/[0.02] border border-white/10 focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-white placeholder:text-white/10 outline-none transition-all font-medium"
+                                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -180,7 +189,7 @@ export default function LoginPage() {
                                         onChange={e => setRememberMe(e.target.checked)}
                                         className="peer sr-only"
                                     />
-                                    <div className="w-5 h-5 rounded-md border-2 border-white/10 bg-white/5 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all group-hover/check:border-emerald-500/50" />
+                                    <div className="w-5 h-5 rounded-md border-2 border-[var(--border)] bg-[var(--bg-elevated)] peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all group-hover/check:border-emerald-500/50" />
                                     <svg
                                         className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform pointer-events-none"
                                         viewBox="0 0 24 24"
@@ -191,7 +200,7 @@ export default function LoginPage() {
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
                                 </div>
-                                <span className="text-[11px] font-black text-white/40 uppercase tracking-widest group-hover/check:text-white/60 transition-colors">
+                                <span className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest group-hover/check:text-[var(--foreground)] transition-colors">
                                     Remember Me
                                 </span>
                             </label>
@@ -233,7 +242,7 @@ export default function LoginPage() {
                     </form>
 
                     <div className="mt-12 text-center">
-                        <p className="text-white/20 text-sm font-medium">
+                        <p className="text-[var(--text-secondary)] text-sm font-medium">
                             Need help? <span 
                                 onClick={handleOpenSupport}
                                 className="text-emerald-500 font-bold hover:underline cursor-pointer"
@@ -244,7 +253,7 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                <div className="p-8 text-center text-white/10 text-[10px] font-bold uppercase tracking-[0.3em] mt-auto">
+                <div className="p-8 text-center text-[var(--text-secondary)]/30 text-[10px] font-bold uppercase tracking-[0.3em] mt-auto">
                     &copy; 2026 &bull; Copy right by DineOS System
                 </div>
             </div>
