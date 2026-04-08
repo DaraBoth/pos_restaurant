@@ -17,7 +17,7 @@ const STATUS_KEYS = {
 } as const;
 
 export default function FloorPlanView() {
-    const { setTableId, clearOrder, tableId: activeTableId, setTakeout, loadTableSession } = useOrder();
+    const { setTableId, clearOrder, tableId: activeTableId, setTakeout, setDirect, loadTableSession } = useOrder();
     const { t } = useLanguage();
     const { user } = useAuth();
     const [tables, setTables] = useState<FloorTable[]>([]);
@@ -56,6 +56,11 @@ export default function FloorPlanView() {
         // POSPage re-renders because isTakeout changed → shows product grid
     }
 
+    function handleDirectOrder() {
+        clearOrder();
+        setDirect(true);
+    }
+
     const counts = {
         available: tables.filter(t => t.status === 'available').length,
         busy: tables.filter(t => t.status === 'busy').length,
@@ -90,6 +95,15 @@ export default function FloorPlanView() {
                     >
                         <ShoppingBag size={13} strokeWidth={2.5} />
                         <span>{t('takeout')}</span>
+                    </button>
+
+                    {/* Direct Order button */}
+                    <button
+                        onClick={handleDirectOrder}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-[11px] font-bold hover:bg-[var(--accent)]/20 hover:border-[var(--accent)]/50 transition-all active:scale-95"
+                    >
+                        <UtensilsCrossed size={13} strokeWidth={2.5} />
+                        <span>DIRECT</span>
                     </button>
 
                     {/* Legend counts */}

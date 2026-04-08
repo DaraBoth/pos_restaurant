@@ -6,8 +6,8 @@ import { Order, OrderItem, Restaurant } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { printReceipt } from '@/lib/receipt';
-import { 
-    History, RefreshCw, TableProperties, ChevronDown, 
+import {
+    History, RefreshCw, TableProperties, ChevronDown,
     ChevronUp, Download, Calendar, Clock, ReceiptText,
     LayoutList, LayoutGrid, Printer
 } from 'lucide-react';
@@ -28,6 +28,8 @@ export interface GroupedOrder {
     created_at: string;
     total_usd: number;
     total_khr: number;
+    total_vat: number;
+    total_plt: number;
     orders: Order[];
 }
 
@@ -51,9 +53,9 @@ const STATUS_TABS: { id: StatusFilter; labelKey: any }[] = [
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-    completed:       { bg: 'rgba(34,197,94,0.1)',  text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
-    open:            { bg: 'rgba(249,115,22,0.1)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
-    hold:            { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
+    completed: { bg: 'rgba(34,197,94,0.1)', text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
+    open: { bg: 'rgba(249,115,22,0.1)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
+    hold: { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
     pending_payment: { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
 };
 
@@ -68,7 +70,7 @@ export default function HistoryPage() {
     const [orderDetails, setOrderDetails] = useState<Record<string, OrderItem[]>>({});
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
     const loadingItemsRef = useRef<Set<string>>(new Set());
-    
+
     const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -113,12 +115,16 @@ export default function HistoryPage() {
                     created_at: o.created_at,
                     total_usd: 0,
                     total_khr: 0,
+                    total_vat: 0,
+                    total_plt: 0,
                     orders: []
                 });
             }
             const g = map.get(key)!;
             g.total_usd += o.total_usd;
             g.total_khr += o.total_khr;
+            g.total_vat += (o.tax_vat || 0);
+            g.total_plt += (o.tax_plt || 0);
             g.orders.push(o);
             // take earliest date
             if (new Date(o.created_at) < new Date(g.created_at)) {
@@ -140,7 +146,7 @@ export default function HistoryPage() {
 
     useEffect(() => {
         if (viewMode !== 'grid' || filtered.length === 0) return;
-        
+
         const toLoad: Order[] = [];
         filtered.forEach(g => {
             g.orders.forEach(o => {
@@ -167,7 +173,7 @@ export default function HistoryPage() {
             });
             results.forEach(r => loadingItemsRef.current.delete(r.id));
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, filter, orders]);
 
     async function toggleRow(groupId: string) {
@@ -194,7 +200,7 @@ export default function HistoryPage() {
     const handleExport = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         try {
             if (!filtered || filtered.length === 0) {
                 window.alert(t('noMatchingTransactions'));
@@ -225,22 +231,22 @@ export default function HistoryPage() {
             const ws = X.utils.json_to_sheet(exportData);
             const wb = X.utils.book_new();
             X.utils.book_append_sheet(wb, ws, 'Orders');
-            
+
             // Generate Array Buffer
             const excelBuffer = X.write(wb, { bookType: 'xlsx', type: 'array' });
-            
+
             // Convert to regular array for IPC transfer
             const content = Array.from(new Uint8Array(excelBuffer));
             const filename = `Report_${startDate}_to_${endDate}.xlsx`;
-            
+
             // Invoke native Rust bridge to save file
             const savedPath = await call<string>('save_excel_file', { content, filename });
-            
+
             if (savedPath === 'CANCELLED') {
                 console.log('Export cancelled by user.');
                 return;
             }
-            
+
             window.alert('Success! Report saved to:\n' + savedPath);
             console.log('Report saved to:', savedPath);
         } catch (error: any) {
@@ -251,7 +257,7 @@ export default function HistoryPage() {
 
     const handlePrintSummary = () => {
         if (!restaurant || !filtered || filtered.length === 0) return;
-        
+
         let totalUsd = 0;
         let totalKhr = 0;
         filtered.forEach(g => {
@@ -271,7 +277,7 @@ export default function HistoryPage() {
 
     // Stats
     const completed = allGroupedOrders.filter(g => g.status === 'completed');
-    
+
     // Total revenue is just the sum of completed groups
     const totalRevenueCents = completed.reduce((s, g) => s + g.total_usd, 0);
 
@@ -310,7 +316,7 @@ export default function HistoryPage() {
                         </div>
                     </div>
 
-                    <button 
+                    <button
                         onClick={handlePrintSummary}
                         disabled={loading || !filtered?.length}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
@@ -392,361 +398,361 @@ export default function HistoryPage() {
                 </div>
 
                 {viewMode === 'table' ? (
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-2xl relative">
-                    <div className="overflow-x-auto container-snap">
-                        <table className="w-full text-left">
-                            <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border)]">
-                                <tr>
-                                    <th className="px-4 py-2.5 w-12"></th>
-                                    {[t('receiptId'), t('timestamp'), t('tableLabel'), t('orderStatus'), t('totalUsd'), t('totalKhr')].map(h => (
-                                        <th
-                                            key={h}
-                                            className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60"
-                                        >
-                                            {h}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--border)]">
-                                {loading && filtered.length === 0 ? (
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-2xl relative">
+                        <div className="overflow-x-auto container-snap">
+                            <table className="w-full text-left">
+                                <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border)]">
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-16 text-center">
-                                            <RefreshCw size={24} className="animate-spin mx-auto opacity-20" />
-                                        </td>
+                                        <th className="px-4 py-2.5 w-12"></th>
+                                        {[t('receiptId'), t('timestamp'), t('tableLabel'), t('orderStatus'), t('totalUsd'), t('totalKhr')].map(h => (
+                                            <th
+                                                key={h}
+                                                className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60"
+                                            >
+                                                {h}
+                                            </th>
+                                        ))}
                                     </tr>
-                                ) : filtered.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-4 py-16 text-center opacity-30 font-black uppercase tracking-[0.2em] text-xs">
-                                            {t('noMatchingTransactions')}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filtered.map((g) => {
-                                        const isExpanded = expandedRows.includes(g.id);
-                                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['completed'];
-                                        
-                                        return (
-                                            <React.Fragment key={g.id}>
-                                                <tr
-                                                    onClick={() => toggleRow(g.id)}
-                                                    className={`transition-all hover:bg-[var(--bg-elevated)] cursor-pointer group ${isExpanded ? 'bg-[var(--bg-elevated)]' : ''}`}
-                                                >
-                                                    <td className="px-4 py-2.5">
-                                                        <div className={`w-6 h-6 flex items-center justify-center rounded-lg transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
-                                                            {isExpanded ? <ChevronUp size={13} strokeWidth={3} /> : <ChevronDown size={13} strokeWidth={3} />}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 font-mono text-xs font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
-                                                        {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
-                                                    </td>
-                                                    <td className="px-4 py-2.5">
-                                                        <div className="text-xs font-black mb-0.5">{new Date(g.created_at + 'Z').toLocaleDateString()}</div>
-                                                        <div className="text-[10px] font-bold font-mono opacity-40 flex items-center gap-1">
-                                                            <Clock size={10} />
-                                                            {new Date(g.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2.5">
-                                                        {g.table_id ? (
-                                                            <span className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/20 text-[var(--accent)] w-fit uppercase tracking-widest">
-                                                                <TableProperties size={10} />
-                                                                {g.table_id}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">{t('takeout')}</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-2.5">
-                                                        <span
-                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
-                                                            style={{ background: style.bg, color: style.text, borderColor: style.border }}
-                                                        >
-                                                            {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: 'var(--accent)' }}>
-                                                        <div>
-                                                            {formatUsd(g.total_usd)}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 font-mono text-xs opacity-60 font-black">
-                                                        <div>
-                                                            {formatKhr(g.total_khr)}
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[var(--border)]">
+                                    {loading && filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-4 py-16 text-center">
+                                                <RefreshCw size={24} className="animate-spin mx-auto opacity-20" />
+                                            </td>
+                                        </tr>
+                                    ) : filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-4 py-16 text-center opacity-30 font-black uppercase tracking-[0.2em] text-xs">
+                                                {t('noMatchingTransactions')}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filtered.map((g) => {
+                                            const isExpanded = expandedRows.includes(g.id);
+                                            const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['completed'];
 
-                                                {isExpanded && (
-                                                    <tr className="bg-[var(--bg-dark)] animate-fade-in border-l-2 border-[var(--accent)]">
-                                                        <td colSpan={7} className="px-5 py-4">
-                                                            <div className="space-y-4">
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <ReceiptText size={14} className="text-[var(--accent)]" />
-                                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Master Table Receipt</h4>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-4">
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                if (restaurant) {
-                                                                                    const allItems = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
-                                                                                    printReceipt({
-                                                                                        restaurant,
-                                                                                        orderId: g.id,
-                                                                                        tableId: g.table_id || undefined,
-                                                                                        customerName: undefined,
-                                                                                        customerPhone: undefined,
-                                                                                        items: allItems,
-                                                                                        payments: [],
-                                                                                        totals: {
-                                                                                            subtotalCents: g.total_usd,
-                                                                                            vatCents: 0,
-                                                                                            pltCents: 0,
-                                                                                            totalUsdCents: g.total_usd,
-                                                                                            totalKhr: g.total_khr
-                                                                                        }
-                                                                                    });
-                                                                                }
-                                                                            }}
-                                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
-                                                                        >
-                                                                            <ReceiptText size={12} />
-                                                                            Print Master Receipt
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div className="space-y-3">
-                                                                    {g.orders.map((o, index) => (
-                                                                        <div key={o.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3">
-                                                                            <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2 text-[10px] font-black uppercase tracking-widest opacity-60">
-                                                                                <span>{g.table_id ? `Round ${index + 1}` : 'Order Segment'} - #{o.id.split('-')[0].toUpperCase()}</span>
-                                                                                <span>{new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                            </div>
-                                                                            
-                                                                            {orderDetails[o.id] ? (
-                                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                                                                    {orderDetails[o.id].map(item => (
-                                                                                        <div key={item.id} className="flex items-center justify-between bg-[var(--bg-dark)] px-3 py-2.5 rounded-lg border border-[var(--border)] transition-all">
-                                                                                            <div className="flex items-center gap-3">
-                                                                                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center flex-shrink-0">
-                                                                                                    {getImageSrc(item.image_path) ? (
-                                                                                                        <img
-                                                                                                            src={getImageSrc(item.image_path)!}
-                                                                                                            alt={lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
-                                                                                                            className="w-full h-full object-cover"
-                                                                                                        />
-                                                                                                    ) : (
-                                                                                                        <div className="w-full h-full flex items-center justify-center font-black text-[var(--accent)] text-xs">
-                                                                                                            {item.quantity}x
-                                                                                                        </div>
-                                                                                                    )}
-                                                                                                </div>
-                                                                                                <div className="min-w-0">
-                                                                                                    <div className="flex items-center gap-2">
-                                                                                                        <span className="inline-flex items-center justify-center min-w-8 h-6 px-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] font-black text-[var(--accent)] text-[10px] flex-shrink-0">
-                                                                                                            {item.quantity}x
-                                                                                                        </span>
-                                                                                                        <p className="text-xs font-black text-[var(--foreground)] leading-tight truncate">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
-                                                                                                    </div>
-                                                                                                    <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-widest mt-0.5">{formatUsd(item.price_at_order)} / unit</p>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            <div className="text-right flex-shrink-0">
-                                                                                                <p className="text-xs font-black text-[var(--foreground)]">{formatUsd(item.price_at_order * item.quantity)}</p>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="flex items-center justify-center p-4">
-                                                                                    <RefreshCw size={14} className="animate-spin opacity-30" />
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
+                                            return (
+                                                <React.Fragment key={g.id}>
+                                                    <tr
+                                                        onClick={() => toggleRow(g.id)}
+                                                        className={`transition-all hover:bg-[var(--bg-elevated)] cursor-pointer group ${isExpanded ? 'bg-[var(--bg-elevated)]' : ''}`}
+                                                    >
+                                                        <td className="px-4 py-2.5">
+                                                            <div className={`w-6 h-6 flex items-center justify-center rounded-lg transition-all ${isExpanded ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:bg-[var(--accent)]/10 group-hover:text-[var(--accent)]'}`}>
+                                                                {isExpanded ? <ChevronUp size={13} strokeWidth={3} /> : <ChevronDown size={13} strokeWidth={3} />}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono text-xs font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
+                                                            {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
+                                                        </td>
+                                                        <td className="px-4 py-2.5">
+                                                            <div className="text-xs font-black mb-0.5">{new Date(g.created_at + 'Z').toLocaleDateString()}</div>
+                                                            <div className="text-[10px] font-bold font-mono opacity-40 flex items-center gap-1">
+                                                                <Clock size={10} />
+                                                                {new Date(g.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-2.5">
+                                                            {g.table_id ? (
+                                                                <span className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/20 text-[var(--accent)] w-fit uppercase tracking-widest">
+                                                                    <TableProperties size={10} />
+                                                                    {g.table_id}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">{t('takeout')}</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-2.5">
+                                                            <span
+                                                                className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
+                                                                style={{ background: style.bg, color: style.text, borderColor: style.border }}
+                                                            >
+                                                                {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: 'var(--accent)' }}>
+                                                            <div>
+                                                                {formatUsd(g.total_usd)}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono text-xs opacity-60 font-black">
+                                                            <div>
+                                                                {formatKhr(g.total_khr)}
                                                             </div>
                                                         </td>
                                                     </tr>
+
+                                                    {isExpanded && (
+                                                        <tr className="bg-[var(--bg-dark)] animate-fade-in border-l-2 border-[var(--accent)]">
+                                                            <td colSpan={7} className="px-5 py-4">
+                                                                <div className="space-y-4">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <ReceiptText size={14} className="text-[var(--accent)]" />
+                                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Master Table Receipt</h4>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4">
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (restaurant) {
+                                                                                        const allItems = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
+                                                                                        printReceipt({
+                                                                                            restaurant,
+                                                                                            orderId: g.id,
+                                                                                            tableId: g.table_id || undefined,
+                                                                                            customerName: undefined,
+                                                                                            customerPhone: undefined,
+                                                                                            items: allItems,
+                                                                                            payments: [],
+                                                                                            totals: {
+                                                                                                subtotalCents: g.total_usd - g.total_vat - g.total_plt,
+                                                                                                vatCents: g.total_vat,
+                                                                                                pltCents: g.total_plt,
+                                                                                                totalUsdCents: g.total_usd,
+                                                                                                totalKhr: g.total_khr
+                                                                                            }
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
+                                                                            >
+                                                                                <ReceiptText size={12} />
+                                                                                Print Master Receipt
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="space-y-3">
+                                                                        {g.orders.map((o, index) => (
+                                                                            <div key={o.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3">
+                                                                                <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2 text-[10px] font-black uppercase tracking-widest opacity-60">
+                                                                                    <span>{g.table_id ? `Round ${index + 1}` : 'Order Segment'} - #{o.id.split('-')[0].toUpperCase()}</span>
+                                                                                    <span>{new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                </div>
+
+                                                                                {orderDetails[o.id] ? (
+                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                                        {orderDetails[o.id].map(item => (
+                                                                                            <div key={item.id} className="flex items-center justify-between bg-[var(--bg-dark)] px-3 py-2.5 rounded-lg border border-[var(--border)] transition-all">
+                                                                                                <div className="flex items-center gap-3">
+                                                                                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center flex-shrink-0">
+                                                                                                        {getImageSrc(item.image_path) ? (
+                                                                                                            <img
+                                                                                                                src={getImageSrc(item.image_path)!}
+                                                                                                                alt={lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
+                                                                                                                className="w-full h-full object-cover"
+                                                                                                            />
+                                                                                                        ) : (
+                                                                                                            <div className="w-full h-full flex items-center justify-center font-black text-[var(--accent)] text-xs">
+                                                                                                                {item.quantity}x
+                                                                                                            </div>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                    <div className="min-w-0">
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                            <span className="inline-flex items-center justify-center min-w-8 h-6 px-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] font-black text-[var(--accent)] text-[10px] flex-shrink-0">
+                                                                                                                {item.quantity}x
+                                                                                                            </span>
+                                                                                                            <p className="text-xs font-black text-[var(--foreground)] leading-tight truncate">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
+                                                                                                        </div>
+                                                                                                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-widest mt-0.5">{formatUsd(item.price_at_order)} / unit</p>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="text-right flex-shrink-0">
+                                                                                                    <p className="text-xs font-black text-[var(--foreground)]">{formatUsd(item.price_at_order * item.quantity)}</p>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="flex items-center justify-center p-4">
+                                                                                        <RefreshCw size={14} className="animate-spin opacity-30" />
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    /* ── Receipt Grid View ── */
+                    filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-24 gap-3 opacity-30">
+                            <ReceiptText size={36} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('noMatchingTransactions')}</span>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+                            {filtered.map(g => {
+                                const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['completed'];
+                                const items = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
+                                const isLoaded = g.orders.every(o => orderDetails[o.id] !== undefined);
+
+                                const dt = new Date(g.created_at + 'Z');
+                                return (
+                                    <div
+                                        key={g.id}
+                                        className="flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)]/40 transition-all shadow-xl"
+                                    >
+                                        {/* Receipt tape top */}
+                                        <div
+                                            className="h-1.5 w-full"
+                                            style={{ background: `linear-gradient(90deg, ${style.text}55 0%, ${style.text} 50%, ${style.text}55 100%)` }}
+                                        />
+
+                                        {/* Header */}
+                                        <div className="px-4 pt-4 pb-3 border-b border-dashed border-[var(--border)]">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <span
+                                                    className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
+                                                    style={{ background: style.bg, color: style.text, borderColor: style.border }}
+                                                >
+                                                    {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
+                                                </span>
+                                                {g.table_id ? (
+                                                    <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
+                                                        <TableProperties size={9} />
+                                                        {g.table_id}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] font-black opacity-25 uppercase tracking-widest">{t('takeout')}</span>
                                                 )}
-                                            </React.Fragment>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                ) : (
-                /* ── Receipt Grid View ── */
-                filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 gap-3 opacity-30">
-                        <ReceiptText size={36} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('noMatchingTransactions')}</span>
-                    </div>
-                ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
-                    {filtered.map(g => {
-                        const style = STATUS_STYLES[g.status] ?? STATUS_STYLES['completed'];
-                        const items = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
-                        const isLoaded = g.orders.every(o => orderDetails[o.id] !== undefined);
-                        
-                        const dt = new Date(g.created_at + 'Z');
-                        return (
-                            <div
-                                key={g.id}
-                                className="flex flex-col bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden hover:border-[var(--accent)]/40 transition-all shadow-xl"
-                            >
-                                {/* Receipt tape top */}
-                                <div
-                                    className="h-1.5 w-full"
-                                    style={{ background: `linear-gradient(90deg, ${style.text}55 0%, ${style.text} 50%, ${style.text}55 100%)` }}
-                                />
+                                            </div>
+                                            <p className="font-mono text-xs font-black text-[var(--accent)] tracking-widest">
+                                                {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
+                                            </p>
+                                            <div className="flex items-center gap-1.5 mt-1 text-[var(--text-secondary)] opacity-50">
+                                                <Clock size={10} />
+                                                <span className="text-[10px] font-mono font-bold">
+                                                    {dt.toLocaleDateString()} · {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2 text-[9px] font-black opacity-30 uppercase tracking-[0.1em]">
+                                                {g.orders.length} Rounds
+                                            </div>
+                                        </div>
 
-                                {/* Header */}
-                                <div className="px-4 pt-4 pb-3 border-b border-dashed border-[var(--border)]">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <span
-                                            className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
-                                            style={{ background: style.bg, color: style.text, borderColor: style.border }}
-                                        >
-                                            {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
-                                        </span>
-                                        {g.table_id ? (
-                                            <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
-                                                <TableProperties size={9} />
-                                                {g.table_id}
-                                            </span>
-                                        ) : (
-                                            <span className="text-[9px] font-black opacity-25 uppercase tracking-widest">{t('takeout')}</span>
-                                        )}
-                                    </div>
-                                    <p className="font-mono text-xs font-black text-[var(--accent)] tracking-widest">
-                                        {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
-                                    </p>
-                                    <div className="flex items-center gap-1.5 mt-1 text-[var(--text-secondary)] opacity-50">
-                                        <Clock size={10} />
-                                        <span className="text-[10px] font-mono font-bold">
-                                            {dt.toLocaleDateString()} · {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </div>
-                                    <div className="mt-2 text-[9px] font-black opacity-30 uppercase tracking-[0.1em]">
-                                        {g.orders.length} Rounds
-                                    </div>
-                                </div>
-
-                                {/* Items */}
-                                <div className="flex-1 px-4 py-3 space-y-1.5 min-h-[80px]">
-                                    {isLoaded ? (
-                                        items.length === 0 ? (
-                                            <p className="text-[10px] opacity-20 font-black uppercase tracking-widest text-center py-2">{t('emptyOrder')}</p>
-                                        ) : (
-                                            items.slice(0, 10).map((item, idx) => (
-                                                <div key={item.product_id} className="flex flex-col mb-2 last:mb-0">
-                                                    <div className="flex items-start justify-between text-[11px]">
-                                                        <div className="flex items-start gap-2 min-w-0">
-                                                            <span className="font-mono font-black text-[var(--accent)] w-7 text-right flex-shrink-0 mt-0.5">
-                                                                {item.quantity}×
-                                                            </span>
-                                                            <div className="flex flex-col min-w-0">
-                                                                <span className="font-medium truncate text-[var(--foreground)] opacity-90">
-                                                                    {lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
-                                                                </span>
-                                                                <span className="text-[9px] font-mono opacity-40 mt-0.5">
-                                                                    {formatUsd(item.price_at_order)} / unit
+                                        {/* Items */}
+                                        <div className="flex-1 px-4 py-3 space-y-1.5 min-h-[80px]">
+                                            {isLoaded ? (
+                                                items.length === 0 ? (
+                                                    <p className="text-[10px] opacity-20 font-black uppercase tracking-widest text-center py-2">{t('emptyOrder')}</p>
+                                                ) : (
+                                                    items.slice(0, 10).map((item, idx) => (
+                                                        <div key={item.product_id} className="flex flex-col mb-2 last:mb-0">
+                                                            <div className="flex items-start justify-between text-[11px]">
+                                                                <div className="flex items-start gap-2 min-w-0">
+                                                                    <span className="font-mono font-black text-[var(--accent)] w-7 text-right flex-shrink-0 mt-0.5">
+                                                                        {item.quantity}×
+                                                                    </span>
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="font-medium truncate text-[var(--foreground)] opacity-90">
+                                                                            {lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
+                                                                        </span>
+                                                                        <span className="text-[9px] font-mono opacity-40 mt-0.5">
+                                                                            {formatUsd(item.price_at_order)} / unit
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="font-mono font-black text-[var(--foreground)] opacity-90 flex-shrink-0 ml-2 mt-0.5">
+                                                                    {formatUsd(item.price_at_order * item.quantity)}
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <span className="font-mono font-black text-[var(--foreground)] opacity-90 flex-shrink-0 ml-2 mt-0.5">
-                                                            {formatUsd(item.price_at_order * item.quantity)}
-                                                        </span>
-                                                    </div>
+                                                    )).concat(items.length > 10 ? [
+                                                        <div key="more" className="text-center pt-2 text-[9px] font-black uppercase opacity-30">
+                                                            + {items.length - 10} more items
+                                                        </div>
+                                                    ] : [])
+                                                )
+                                            ) : (
+                                                <div className="flex items-center justify-center py-4 opacity-25">
+                                                    <RefreshCw size={16} className="animate-spin" />
                                                 </div>
-                                            )).concat(items.length > 10 ? [
-                                                <div key="more" className="text-center pt-2 text-[9px] font-black uppercase opacity-30">
-                                                    + {items.length - 10} more items
+                                            )}
+                                        </div>
+
+                                        {/* Customer info for HOLD receipts */}
+                                        {(g.status === 'hold' || g.status === 'pending_payment') && (() => {
+                                            const holdOrder = g.orders[0];
+                                            const name = holdOrder?.customer_name;
+                                            const phone = holdOrder?.customer_phone;
+                                            if (!name && !phone) return null;
+                                            return (
+                                                <div className="mx-4 mb-2 px-3 py-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 space-y-1">
+                                                    {name && <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">👤 {name}</p>}
+                                                    {phone && <p className="text-[10px] font-bold text-yellow-300/70 font-mono">📞 {phone}</p>}
                                                 </div>
-                                            ] : [])
-                                        )
-                                    ) : (
-                                        <div className="flex items-center justify-center py-4 opacity-25">
-                                            <RefreshCw size={16} className="animate-spin" />
+                                            );
+                                        })()}
+
+                                        {/* Totals */}
+                                        <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-[var(--border)] space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('total')}</span>
+                                                <span
+                                                    className="font-mono font-black text-sm text-[var(--accent)]"
+                                                >
+                                                    <span>
+                                                        {formatUsd(g.total_usd)}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-25">{t('khr')}</span>
+                                                <span className={`font-mono text-[10px] font-bold opacity-40`}>
+                                                    {formatKhr(g.total_khr)}
+                                                </span>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
 
-                                {/* Customer info for HOLD receipts */}
-                                {(g.status === 'hold' || g.status === 'pending_payment') && (() => {
-                                    const holdOrder = g.orders[0];
-                                    const name = holdOrder?.customer_name;
-                                    const phone = holdOrder?.customer_phone;
-                                    if (!name && !phone) return null;
-                                    return (
-                                        <div className="mx-4 mb-2 px-3 py-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 space-y-1">
-                                            {name && <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">👤 {name}</p>}
-                                            {phone && <p className="text-[10px] font-bold text-yellow-300/70 font-mono">📞 {phone}</p>}
-                                        </div>
-                                    );
-                                })()}
-
-                                {/* Totals */}
-                                <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-[var(--border)] space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('total')}</span>
-                                        <span
-                                            className="font-mono font-black text-sm text-[var(--accent)]"
-                                        >
-                                            <span>
-                                                {formatUsd(g.total_usd)}
-                                            </span>
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-25">{t('khr')}</span>
-                                        <span className={`font-mono text-[10px] font-bold opacity-40`}>
-                                            {formatKhr(g.total_khr)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Print button */}
-                                <div className="px-3 pb-3">
-                                    <button
-                                        onClick={() => {
-                                            if (restaurant && isLoaded) {
-                                                printReceipt({
-                                                    restaurant,
-                                                    orderId: g.id,
-                                                    tableId: g.table_id || undefined,
-                                                    customerName: undefined,
-                                                    customerPhone: undefined,
-                                                    items,
-                                                    payments: [],
-                                                    totals: {
-                                                        subtotalCents: g.total_usd,
-                                                        vatCents: 0,
-                                                        pltCents: 0,
-                                                        totalUsdCents: g.total_usd,
-                                                        totalKhr: g.total_khr
+                                        {/* Print button */}
+                                        <div className="px-3 pb-3">
+                                            <button
+                                                onClick={() => {
+                                                    if (restaurant && isLoaded) {
+                                                        printReceipt({
+                                                            restaurant,
+                                                            orderId: g.id,
+                                                            tableId: g.table_id || undefined,
+                                                            customerName: undefined,
+                                                            customerPhone: undefined,
+                                                            items,
+                                                            payments: [],
+                                                            totals: {
+                                                                subtotalCents: g.total_usd,
+                                                                vatCents: 0,
+                                                                pltCents: 0,
+                                                                totalUsdCents: g.total_usd,
+                                                                totalKhr: g.total_khr
+                                                            }
+                                                        });
                                                     }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isLoaded || !restaurant}
-                                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                        <Printer size={11} strokeWidth={2.5} />
-                                        {t('printReceipt')}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-                ))}
+                                                }}
+                                                disabled={!isLoaded || !restaurant}
+                                                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                <Printer size={11} strokeWidth={2.5} />
+                                                {t('printReceipt')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
             </div>
         </div>
     );

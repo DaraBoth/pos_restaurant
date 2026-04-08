@@ -44,7 +44,7 @@
     "plugins": {
         "updater": {
             "active": true,
-            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0N0JDRUE4ODZDQjA1ODEKUldTQkJjdUdxTTU3aERQMHM1b09aMEYxSjh4V0VqVWEzWUQwZkdkMEhueG5KcC95MVh1RE9JMUcK",
+            "pubkey": "untrusted comment: minisign public key: 847BCEA886CB0581\nRWSBBcuGqM57hDP0s5oOZ0F1J8xWEjUa3YD0fGd0HnxnJp/y1XuDOI1G",
             "endpoints": [
                 "https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json"
             ]

@@ -13,7 +13,7 @@ export const translations = {
         logout: 'Logout',
         firstLoginDesc: 'First login on a new device requires internet access.',
         // Navigation
-        pos: 'POS',
+        pos: 'Table',
         management: 'Management',
         products: 'Products',
         users: 'Users',
@@ -21,6 +21,7 @@ export const translations = {
         settings: 'Settings',
         exchangeRate: 'Exchange Rate',
         floorPlan: 'Tables',
+        buyProduct: 'Product',
         history: 'History',
         analytics: 'Analytics',
         // POS
@@ -261,7 +262,7 @@ export const translations = {
         logout: 'ចាកចេញ',
         firstLoginDesc: 'ការចូលប្រព័ន្ធលើកដំបូងទាមទារអុីនធើណេត។',
         // Navigation
-        pos: 'ប្រព័ន្ធលក់',
+        pos: 'តុ',
         management: 'គ្រប់គ្រង',
         products: 'ផលិតផល',
         users: 'អ្នកប្រើ',
@@ -269,6 +270,7 @@ export const translations = {
         settings: 'ការកំណត់',
         exchangeRate: 'អត្រាប្តូរប្រាក់',
         floorPlan: 'តុ',
+        buyProduct: 'ផលិតផល',
         history: 'ប្រវត្តិ',
         analytics: 'របាយការណ៍',
         // POS

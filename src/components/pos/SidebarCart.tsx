@@ -12,7 +12,7 @@ import { getImageSrc } from '@/lib/image';
 
 export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
     const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
-            localCart, addToLocalCart, updateLocalCartQty, commitLocalCart, exchangeRate } = useOrder();
+        localCart, addToLocalCart, updateLocalCartQty, commitLocalCart, exchangeRate } = useOrder();
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -139,14 +139,14 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         if (!user || !user.restaurant_id) return;
         try {
             const restaurant = await getRestaurant(user.restaurant_id);
-            
+
             let receiptItems = items;
             let receiptTotals = totals;
 
             if (sessionId) {
                 // Fetch all items from all rounds in the session
                 const allItems = await getSessionOrderItems(sessionId, user.restaurant_id!);
-                
+
                 // Group by product_id to combine same items from different rounds
                 const groupedMap = new Map<string, any>();
                 for (const item of allItems) {
@@ -218,7 +218,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     return (
         <>
             <div
-                className="flex-shrink-0 flex flex-col min-h-0 bg-[var(--bg-card)] border-l border-y border-[var(--border)] rounded-l-2xl overflow-hidden"
+                className="flex-shrink-0 flex flex-col min-h-0 bg-[var(--bg-card)] border-l border-y border-[var(--border)] overflow-hidden"
                 style={{ width: 'var(--sidebar-cart-width)', boxShadow: 'inset 0 0 0 1px var(--border)' }}
             >
                 {/* Header */}
@@ -270,7 +270,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             <ChevronLeft size={16} className="text-[var(--text-secondary)] hover:text-white ml-0.5 bg-[var(--bg-dark)]/80 rounded-full" />
                         </button>
 
-                        <div 
+                        <div
                             ref={roundsScrollRef}
                             className="px-2 py-1.5 overflow-x-auto no-scrollbar flex items-center gap-1.5 snap-x"
                         >
@@ -280,11 +280,10 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                     <button
                                         key={round.id}
                                         onClick={() => switchRound(round.id)}
-                                        className={`snap-start flex-shrink-0 px-4 py-3 rounded-xl text-sm font-bold tracking-wide transition-all ${
-                                            isActive
-                                                ? 'bg-[var(--accent-blue)] text-white shadow-sm'
-                                                : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
-                                        }`}
+                                        className={`snap-start flex-shrink-0 px-4 py-3 rounded-xl text-sm font-bold tracking-wide transition-all ${isActive
+                                            ? 'bg-[var(--accent-blue)] text-white shadow-sm'
+                                            : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
+                                            }`}
                                     >
                                         Round {round.round_number}
                                         {isActive && <span className="ml-1.5 opacity-80">(View)</span>}
@@ -299,7 +298,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 New Round
                             </button>
                         </div>
-                        
+
                         <button
                             onClick={() => scrollRounds('right')}
                             className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-[var(--bg-elevated)] to-transparent flex items-center justify-end opacity-0 group-hover/rounds:opacity-100 transition-opacity z-10"
@@ -310,7 +309,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 )}
 
                 {/* Items List */}
-                <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-0 no-scrollbar bg-[var(--bg-dark)]">
+                <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-0 no-scrollbar bg-[var(--bg-dark)] border-l border-[var(--border)]">
                     {/* ── LOCAL CART (before order is placed) ── */}
                     {!orderId && localCart.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center gap-2 opacity-30">
@@ -355,7 +354,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                     <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
                                         {formatUsd(item.priceCents)}
                                     </p>
-                                    <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)] min-h-14">
+                                    <div className="flex items-center gap-1 p-0 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] min-h-10">
                                         <button
                                             onClick={() => updateLocalCartQty(item.productId, item.qty - 1)}
                                             className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
@@ -401,115 +400,115 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         </div>
                     )}
                     {orderId && items.map(item => {
-                            return (
-                                <div
-                                    key={item.id}
-                                    className="rounded-none border bg-[var(--bg-elevated)] border-[var(--border-strong)] transition-colors overflow-hidden"
-                                >
-                                    <div className="flex gap-2.5 p-2.5 items-start">
-                                        {/* Thumbnail */}
-                                        <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
-                                            {getImageSrc(item.image_path) ? (
-                                                <img src={getImageSrc(item.image_path)!} alt={item.product_name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] opacity-30 text-lg font-black">
-                                                    {(item.product_name ?? '?').charAt(0)}
-                                                </div>
-                                            )}
-                                        </div>
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start gap-1 mb-0.5">
-                                                <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
-                                                    {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
-                                                </p>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
-                                                        {formatUsd(item.price_at_order * item.quantity)}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => void handleCommittedQtySet(item.id, '0', item.quantity)}
-                                                        className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                        title="Remove item"
-                                                    >
-                                                        <X size={13} strokeWidth={2.5} />
-                                                    </button>
-                                                </div>
+                        return (
+                            <div
+                                key={item.id}
+                                className="rounded-none border bg-[var(--bg-elevated)] border-[var(--border-strong)] transition-colors overflow-hidden"
+                            >
+                                <div className="flex gap-2.5 p-2.5 items-start">
+                                    {/* Thumbnail */}
+                                    <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
+                                        {getImageSrc(item.image_path) ? (
+                                            <img src={getImageSrc(item.image_path)!} alt={item.product_name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] opacity-30 text-lg font-black">
+                                                {(item.product_name ?? '?').charAt(0)}
                                             </div>
-                                            {item.note && (
-                                                <p className="text-[10px] text-[var(--accent-blue)] italic truncate mb-0.5">
-                                                    {item.note}
-                                                </p>
-                                            )}
-                                            <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
-                                                {formatUsd(item.price_at_order)}
+                                        )}
+                                    </div>
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start gap-1 mb-0.5">
+                                            <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
+                                                {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
                                             </p>
-                                            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-[var(--bg-dark)] border border-[var(--border)] min-h-14">
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
+                                                    {formatUsd(item.price_at_order * item.quantity)}
+                                                </span>
                                                 <button
-                                                    onClick={() => handleQtyChange(item.id, item.quantity, -1)}
-                                                    className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
+                                                    onClick={() => void handleCommittedQtySet(item.id, '0', item.quantity)}
+                                                    className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                    title="Remove item"
                                                 >
-                                                    {item.quantity <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
-                                                </button>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    inputMode="numeric"
-                                                    value={quantityDrafts[item.id] ?? String(item.quantity)}
-                                                    onChange={(e) => setQuantityDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                                    onBlur={(e) => handleCommittedQtySet(item.id, e.target.value, item.quantity)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.currentTarget.blur();
-                                                        }
-                                                        if (e.key === 'Escape') {
-                                                            setQuantityDrafts(prev => ({ ...prev, [item.id]: String(item.quantity) }));
-                                                            e.currentTarget.blur();
-                                                        }
-                                                    }}
-                                                    className="font-bold font-mono text-lg flex-1 min-w-0 text-center text-[var(--foreground)] bg-transparent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                                />
-                                                <button
-                                                    onClick={() => handleQtyChange(item.id, item.quantity, 1)}
-                                                    className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
-                                                >
-                                                    <Plus size={16} />
+                                                    <X size={13} strokeWidth={2.5} />
                                                 </button>
                                             </div>
-                                            {editingNoteId === item.id ? (
-                                                <div className="mt-1.5 flex items-center gap-1">
-                                                    <StickyNote size={10} className="text-[var(--accent-blue)] flex-shrink-0" />
-                                                    <input
-                                                        autoFocus
-                                                        type="text"
-                                                        value={noteInput}
-                                                        onChange={e => setNoteInput(e.target.value)}
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter') handleNoteSave(item.id);
-                                                            if (e.key === 'Escape') setEditingNoteId(null);
-                                                        }}
-                                                        onBlur={() => handleNoteSave(item.id)}
-                                                        placeholder={t('addNote') + '...'}
-                                                        className="flex-1 text-[10px] bg-[var(--bg-dark)] border border-[var(--accent-blue)]/40 rounded-md px-1.5 py-0.5 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => { setEditingNoteId(item.id); setNoteInput(item.note ?? ''); }}
-                                                    className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
-                                                >
-                                                    <Pencil size={9} />
-                                                    {item.note
-                                                        ? <span className="italic text-[var(--accent-blue)] truncate max-w-[120px]">{item.note}</span>
-                                                        : <span>{t('addNote')}</span>
-                                                    }
-                                                </button>
-                                            )}
                                         </div>
+                                        {item.note && (
+                                            <p className="text-[10px] text-[var(--accent-blue)] italic truncate mb-0.5">
+                                                {item.note}
+                                            </p>
+                                        )}
+                                        <p className="text-xs font-mono text-[var(--text-secondary)] mb-2">
+                                            {formatUsd(item.price_at_order)}
+                                        </p>
+                                        <div className="flex items-center gap-1 p-0 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] min-h-10">
+                                            <button
+                                                onClick={() => handleQtyChange(item.id, item.quantity, -1)}
+                                                className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
+                                            >
+                                                {item.quantity <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
+                                            </button>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                inputMode="numeric"
+                                                value={quantityDrafts[item.id] ?? String(item.quantity)}
+                                                onChange={(e) => setQuantityDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                                onBlur={(e) => handleCommittedQtySet(item.id, e.target.value, item.quantity)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.currentTarget.blur();
+                                                    }
+                                                    if (e.key === 'Escape') {
+                                                        setQuantityDrafts(prev => ({ ...prev, [item.id]: String(item.quantity) }));
+                                                        e.currentTarget.blur();
+                                                    }
+                                                }}
+                                                className="font-bold font-mono text-lg flex-1 min-w-0 text-center text-[var(--foreground)] bg-transparent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                            />
+                                            <button
+                                                onClick={() => handleQtyChange(item.id, item.quantity, 1)}
+                                                className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        {editingNoteId === item.id ? (
+                                            <div className="mt-1.5 flex items-center gap-1">
+                                                <StickyNote size={10} className="text-[var(--accent-blue)] flex-shrink-0" />
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={noteInput}
+                                                    onChange={e => setNoteInput(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleNoteSave(item.id);
+                                                        if (e.key === 'Escape') setEditingNoteId(null);
+                                                    }}
+                                                    onBlur={() => handleNoteSave(item.id)}
+                                                    placeholder={t('addNote') + '...'}
+                                                    className="flex-1 text-[10px] bg-[var(--bg-dark)] border border-[var(--accent-blue)]/40 rounded-md px-1.5 py-0.5 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => { setEditingNoteId(item.id); setNoteInput(item.note ?? ''); }}
+                                                className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
+                                            >
+                                                <Pencil size={9} />
+                                                {item.note
+                                                    ? <span className="italic text-[var(--accent-blue)] truncate max-w-[120px]">{item.note}</span>
+                                                    : <span>{t('addNote')}</span>
+                                                }
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                            );
-                        })}
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {/* Footer */}

@@ -776,17 +776,24 @@ pub async fn hold_order(
     };
 
     // 2. Mark order as 'hold' with customer contact info
-    pool.execute(
-        "UPDATE orders SET status = 'hold', customer_name = ?, customer_phone = ?,
-                completed_at = datetime('now'), updated_at = datetime('now')
-         WHERE id = ? AND restaurant_id = ?",
-        params![
-            customer_name.unwrap_or_default(),
-            customer_phone.unwrap_or_default(),
-            order_id.clone(),
-            restaurant_id.clone()
-        ]
-    ).await.map_err(|e| format!("Database error: {}", e))?;
+    let c_name = customer_name.unwrap_or_default();
+    let c_phone = customer_phone.unwrap_or_default();
+
+    if let Some(sid) = session_id.as_deref().filter(|s| !s.is_empty()) {
+        pool.execute(
+            "UPDATE orders SET status = 'hold', customer_name = ?, customer_phone = ?,
+                    completed_at = datetime('now'), updated_at = datetime('now')
+             WHERE session_id = ? AND restaurant_id = ?",
+            params![c_name, c_phone, sid, restaurant_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+    } else {
+        pool.execute(
+            "UPDATE orders SET status = 'hold', customer_name = ?, customer_phone = ?,
+                    completed_at = datetime('now'), updated_at = datetime('now')
+             WHERE id = ? AND restaurant_id = ?",
+            params![c_name, c_phone, order_id, restaurant_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+    }
 
     // 3. Close the table session so the table is released
     if let Some(sid) = session_id.as_deref().filter(|s| !s.is_empty()) {
@@ -956,7 +963,7 @@ pub async fn get_revenue_summary(
     } else { (0, 0) };
 
     let mut open_rows = pool.query(
-        "SELECT COUNT(*) FROM orders WHERE status='open' AND is_deleted=0 AND restaurant_id = ?", 
+        "SELECT COUNT(*) FROM orders WHERE status IN ('open', 'pending_payment') AND is_deleted = 0 AND restaurant_id = ? AND date(created_at) = date('now')", 
         params![restaurant_id]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let open_orders = if let Some(r) = open_rows.next().await.unwrap_or(None) {

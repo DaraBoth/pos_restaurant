@@ -24,6 +24,7 @@ interface OrderContextValue {
     sessionId: string | null;
     rounds: Order[];
     isTakeout: boolean;
+    isDirect: boolean;
     localCart: LocalCartItem[];
     setOrderId: (id: string | null) => void;
     setItems: (items: OrderItem[]) => void;
@@ -32,6 +33,7 @@ interface OrderContextValue {
     setRounds: (rounds: Order[]) => void;
     switchRound: (orderId: string) => Promise<void>;
     setTakeout: (v: boolean) => void;
+    setDirect: (v: boolean) => void;
     refreshRate: () => void;
     clearOrder: () => void;
     loadTableSession: (tId: string) => Promise<void>;
@@ -46,11 +48,11 @@ const EMPTY_TOTALS: OrderTotals = {
 
 const OrderContext = createContext<OrderContextValue>({
     orderId: null, items: [], totals: EMPTY_TOTALS,
-    exchangeRate: 4100, tableId: '', sessionId: null, rounds: [], isTakeout: false,
+    exchangeRate: 4100, tableId: '', sessionId: null, rounds: [], isTakeout: false, isDirect: false,
     localCart: [],
     setOrderId: () => { }, setItems: () => { }, setTableId: () => { },
     setSessionId: () => { }, setRounds: () => { }, switchRound: async () => {},
-    setTakeout: () => { }, refreshRate: () => { }, clearOrder: () => { },
+    setTakeout: () => { }, setDirect: () => { }, refreshRate: () => { }, clearOrder: () => { },
     loadTableSession: async () => {},
     addToLocalCart: async () => { }, updateLocalCartQty: () => { }, commitLocalCart: async () => {},
 });
@@ -63,6 +65,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [rounds, setRounds] = useState<Order[]>([]);
     const [isTakeout, setTakeout] = useState(false);
+    const [isDirect, setDirect] = useState(false);
     const [localCart, setLocalCart] = useState<LocalCartItem[]>([]);
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
@@ -92,6 +95,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         setSessionId(null);
         setRounds([]);
         setTakeout(false);
+        setDirect(false);
         setLocalCart([]);
     }, []);
 
@@ -189,9 +193,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <OrderContext.Provider value={{
-            orderId, items, totals, exchangeRate, tableId, sessionId, rounds, isTakeout,
+            orderId, items, totals, exchangeRate, tableId, sessionId, rounds, isTakeout, isDirect,
             localCart,
-            setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout,
+            setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout, setDirect,
             refreshRate, clearOrder, loadTableSession, switchRound,
             addToLocalCart, updateLocalCartQty, commitLocalCart,
         }}>

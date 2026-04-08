@@ -67,168 +67,146 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
   <meta charset="utf-8" />
   <title>Receipt</title>
   <style>
-    @page {
-      size: 58mm auto;
-      margin: 0;
-    }
+    @page { size: 58mm auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { margin: 0; padding: 0; }
     body {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 10px;
       color: #000;
-      background: #fff;
       width: 58mm;
-      margin: 0;
-      padding: 2mm 1mm;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
+      padding: 4mm 2mm;
     }
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .bold { font-weight: 900; }
 
     /* ── Header ── */
-    .hd { text-align: center; padding-bottom: 6px; }
-    .hd .biz-name { font-size: 15px; font-weight: 900; font-family: Arial, sans-serif; letter-spacing: 0.5px; }
-    .hd .biz-km   { font-size: 12px; font-weight: 700; font-family: Arial, sans-serif; margin-top: 1px; }
-    .hd .addr     { font-size: 10px; margin-top: 3px; line-height: 1.5; }
-    .hd .phone    { font-size: 10px; font-weight: 700; margin-top: 2px; }
+    .hd { text-align: center; padding-bottom: 8px; }
+    .hd .biz-name { font-size: 15px; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
+    .hd .biz-km { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .hd .addr { font-size: 8.5px; line-height: 1.3; }
 
     /* ── Dividers ── */
-    .d-dash  { border: none; border-top: 1px dashed #555; margin: 5px 0; }
-    .d-solid { border: none; border-top: 1.5px solid #000; margin: 5px 0; }
-    .d-eq    { border: none; border-top: 2px solid #000; margin: 4px 0; }
+    .d-dash { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+    .d-double { border: none; border-top: 3px double #000; margin: 6px 0; }
 
     /* ── Meta ── */
-    .meta { font-size: 10px; width: 100%; border-collapse: collapse; }
-    .meta td { padding: 1px 0; vertical-align: top; }
-    .meta td:last-child { text-align: right; }
-    .meta .lbl { font-weight: 900; text-transform: uppercase; }
+    .meta { font-size: 9px; width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    .meta td { padding: 1px 0; }
+    .meta .lbl { font-weight: 700; text-transform: uppercase; font-size: 7.5px; opacity: 0.8; }
+    .meta .val { font-weight: 900; }
 
-    /* ── Items table ── */
-    .items-tbl { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 10px; }
-    .items-tbl thead tr { border-bottom: 1px solid #000; }
-    .items-tbl th { font-weight: 900; text-transform: uppercase; padding: 1px 2px; font-size: 9px; }
-    .items-tbl td { padding: 3px 2px; vertical-align: top; }
-    .items-tbl .item-row:not(:last-child) td { border-bottom: 1px dotted #ccc; }
-    .col-id    { width: 8%;  text-align: center; }
-    .col-name  { width: 42%; }
-    .col-qty   { width: 8%;  text-align: center; }
-    .col-price { width: 20%; text-align: right; }
-    .col-total { width: 22%; text-align: right; font-weight: 700; }
-    .item-km   { font-size: 9px; color: #555; margin-top: 1px; }
-
-    /* ── Totals ── */
-    .totals { font-size: 11px; width: 100%; border-collapse: collapse; }
-    .totals td { padding: 2px 0; }
-    .totals td:last-child { text-align: right; }
-    .totals .row-sub  { color: #444; font-size: 10px; }
-    .totals .row-disc td { font-size: 10px; font-weight: 700; color: #b06000; }
-    .totals .row-grand td { font-size: 14px; font-weight: 900; padding: 4px 0 2px; }
-    .totals .row-khr  td { font-size: 11px; font-weight: 700; color: #222; }
-
-    /* ── Payments ── */
-    .pay-hd  { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555; margin-bottom: 3px; }
-    .pay-tbl { width: 100%; border-collapse: collapse; font-size: 10px; }
-    .pay-tbl td { padding: 1px 0; }
-    .pay-tbl td:last-child { text-align: right; font-weight: 700; }
-    .pay-method { font-weight: 700; text-transform: uppercase; }
-    .pay-cur    { font-weight: 400; text-transform: none; color: #666; }
-
-    /* ── Footer ── */
-    .footer { text-align: center; padding-top: 4px; }
-    .footer .msg   { font-size: 11px; font-weight: 700; line-height: 1.6; font-family: Arial, sans-serif; }
-    .footer .brand { font-size: 8px; color: #aaa; letter-spacing: 0.15em; text-transform: uppercase; margin-top: 6px; }
-
-    @media screen {
-      body { max-width: 250px; padding: 12px 10px; }
-      html { background: #fff; }
+    /* ── Items ── */
+    .items-tbl { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    .items-tbl th { 
+        text-align: left; 
+        font-size: 8px; 
+        font-weight: 900; 
+        padding-bottom: 4px;
+        border-bottom: 1px solid #000;
     }
+    .items-tbl td { padding: 5px 0; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
+    .col-qty { width: 22px; text-align: center; font-weight: 900; }
+    .col-total { width: 55px; text-align: right; font-weight: 900; }
+    .item-nm { font-weight: 700; display: block; }
+    .item-km { font-size: 9.5px; opacity: 0.8; }
+    .item-pr { font-size: 8px; opacity: 0.6; font-family: monospace; }
+
+    /* ── Summary ── */
+    .summary { margin-top: 8px; padding-top: 4px; }
+    .totals { width: 100%; border-collapse: collapse; }
+    .totals td { padding: 2px 0; }
+    .grand-usd { font-size: 14px; font-weight: 900; padding: 6px 0 2px; border-top: 1px dashed #000; }
+    .grand-khr { font-size: 10.5px; font-weight: 900; }
+
+    .footer { text-align: center; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; }
+    .footer .msg { font-size: 10.5px; font-weight: 700; }
+    .footer .brand { font-size: 7px; opacity: 0.4; text-transform: uppercase; margin-top: 8px; }
   </style>
 </head>
 <body>
-
-  <!-- HEADER -->
   <div class="hd">
     <div class="biz-name">${escapeHtml(payload.restaurant.name)}</div>
     ${payload.restaurant.khmer_name ? `<div class="biz-km">${escapeHtml(payload.restaurant.khmer_name)}</div>` : ''}
-    ${payload.restaurant.address || payload.restaurant.address_kh ? `
     <div class="addr">
-      ${payload.restaurant.address ? escapeHtml(payload.restaurant.address) + '<br>' : ''}
-      ${payload.restaurant.address_kh ? escapeHtml(payload.restaurant.address_kh) : ''}
-    </div>` : ''}
-    ${payload.restaurant.phone ? `<div class="phone">TEL: ${escapeHtml(payload.restaurant.phone)}</div>` : ''}
+      ${payload.restaurant.address ? escapeHtml(payload.restaurant.address) : ''}
+      ${payload.restaurant.phone ? `<br>Tel: ${escapeHtml(payload.restaurant.phone)}` : ''}
+    </div>
   </div>
 
-  <hr class="d-dash">
+  <div class="d-dash"></div>
 
-  <!-- ORDER META -->
   <table class="meta">
     <tr>
-      <td><span class="lbl">Order</span> #${escapeHtml(payload.orderId.slice(0, 8).toUpperCase())}</td>
-      <td>${escapeHtml(dateStr)}</td>
+      <td><span class="lbl">Receipt:</span> <span class="val">#${escapeHtml(payload.orderId.slice(0, 8).toUpperCase())}</span></td>
+      <td class="right"><span class="val">${escapeHtml(dateStr)}</span></td>
     </tr>
+    ${payload.tableId ? `
     <tr>
-      <td><span class="lbl">Table</span> ${escapeHtml(payload.tableId || '—')}</td>
-      <td>${escapeHtml(timeStr)}</td>
-    </tr>    ${payload.customerName ? `<tr><td colspan="2"><span class="lbl">Customer</span> ${escapeHtml(payload.customerName)}</td></tr>` : ''}
-    ${payload.customerPhone ? `<tr><td colspan="2"><span class="lbl">Tel</span> ${escapeHtml(payload.customerPhone)}</td></tr>` : ''}  </table>
+      <td><span class="lbl">Table:</span> <span class="val">${escapeHtml(payload.tableId)}</span></td>
+      <td class="right"><span class="val">${escapeHtml(timeStr)}</span></td>
+    </tr>` : `
+    <tr>
+      <td colspan="2"><span class="lbl">Time:</span> <span class="val">${escapeHtml(timeStr)}</span></td>
+    </tr>`}
+  </table>
 
-  <hr class="d-dash">
+  <div class="d-double"></div>
 
-  <!-- ITEMS TABLE -->
   <table class="items-tbl">
     <thead>
       <tr>
-        <th class="col-id">#</th>
-        <th class="col-name">Name</th>
-        <th class="col-qty">Qty</th>
-        <th class="col-price">Price</th>
-        <th class="col-total">Total</th>
+        <th class="col-qty center">QTY</th>
+        <th>DESCRIPTION</th>
+        <th class="col-total right">TOTAL</th>
       </tr>
     </thead>
     <tbody>
-      ${itemRows}
+      ${payload.items.map(item => `
+        <tr>
+          <td class="col-qty center">${item.quantity}</td>
+          <td>
+            <span class="item-nm">${escapeHtml(item.product_name || '')}</span>
+            ${item.product_khmer ? `<span class="item-km">${escapeHtml(item.product_khmer)}</span>` : ''}
+            <span class="item-pr">${formatUsd(item.price_at_order)}</span>
+          </td>
+          <td class="col-total right">${formatUsd(item.price_at_order * item.quantity)}</td>
+        </tr>
+      `).join('')}
     </tbody>
   </table>
 
-  <hr class="d-eq">
-
-  <!-- TOTALS -->
-  <table class="totals">
-    <tr class="row-sub">
-      <td>Subtotal</td>
-      <td>${formatUsd(payload.totals.subtotalCents + (payload.discountCents ?? 0))}</td>
-    </tr>
-    ${payload.discountCents ? `
-    <tr class="row-disc">
-      <td>Discount${payload.discountPct ? ' (' + payload.discountPct + '%)' : ''}</td>
-      <td>-${formatUsd(payload.discountCents)}</td>
-    </tr>` : ''}
-    <tr class="row-grand">
-      <td>TOTAL USD</td>
-      <td>${formatUsd(payload.totals.totalUsdCents)}</td>
-    </tr>
-    <tr class="row-khr">
-      <td>TOTAL KHR</td>
-      <td>${formatKhr(payload.totals.totalKhr)}</td>
-    </tr>
-  </table>
-
-  <hr class="d-dash">
-
-  <!-- PAYMENTS -->
-  <div class="pay-hd">Payment</div>
-  <table class="pay-tbl">
-    ${paymentRows}
-  </table>
-
-  <hr class="d-dash">
-
-  <!-- FOOTER -->
-  <div class="footer">
-    <div class="msg">${footerLines}</div>
-    <div class="brand">Powered by DineOS</div>
+  <div class="summary">
+    <table class="totals">
+      <tr>
+        <td>Subtotal</td>
+        <td class="right">${formatUsd(payload.totals.subtotalCents + (payload.discountCents ?? 0))}</td>
+      </tr>
+      ${payload.discountCents ? `
+      <tr style="font-weight: 900;">
+        <td>Discount${payload.discountPct ? ' (' + payload.discountPct + '%)' : ''}</td>
+        <td class="right">-${formatUsd(payload.discountCents)}</td>
+      </tr>` : ''}
+      ${payload.totals.vatCents ? `
+      <tr>
+        <td>VAT (10%)</td>
+        <td class="right">${formatUsd(payload.totals.vatCents)}</td>
+      </tr>` : ''}
+      <tr>
+        <td class="grand-usd">TOTAL USD</td>
+        <td class="right grand-usd">${formatUsd(payload.totals.totalUsdCents)}</td>
+      </tr>
+      <tr>
+        <td class="grand-khr">TOTAL KHR</td>
+        <td class="right grand-khr">${formatKhr(payload.totals.totalKhr)}</td>
+      </tr>
+    </table>
   </div>
 
+  <div class="footer">
+    <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you for your visit!')}</div>
+    <div class="brand">Powered by DineOS</div>
+  </div>
 </body>
 </html>`;
 }

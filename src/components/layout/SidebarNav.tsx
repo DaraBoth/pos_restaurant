@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ChevronsLeft, ChevronsRight, Sun, Moon } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
@@ -12,11 +12,15 @@ import { UpdateStatus } from '@/components/ui/UpdateStatus';
 import Link from 'next/link';
 
 const NavItem = ({
-    label, icon: Icon, path, pathname, collapsed
-}: { label: string; icon: React.ElementType; path: string; pathname: string; collapsed: boolean }) => {
-    // /pos covers both the floor plan (/pos) and the ordering view (same page, context-driven)
-    const active = path === '/pos' ? pathname.startsWith('/pos') : pathname.startsWith(path);
-    const isExact = active;
+    label, icon: Icon, path, pathname, searchParams, collapsed
+}: { label: string; icon: React.ElementType; path: string; pathname: string; searchParams: string; collapsed: boolean }) => {
+    // Check if the current route matches the exact path (including query params if provided)
+    const active = pathname.startsWith(path.split('?')[0]);
+    
+    // For tabs like "Product" (?mode=direct), we want a more specific match
+    const isExact = path.includes('?') 
+        ? (active && searchParams === '?' + path.split('?')[1])
+        : (active && !searchParams.includes('mode=direct') && !searchParams.includes('mode=table'));
 
     return (
         <Link
@@ -39,6 +43,8 @@ export default function SidebarNav() {
     const { theme, toggleTheme } = useTheme();
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const searchStr = searchParams.toString() ? '?' + searchParams.toString() : '';
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
     const [collapsed, setCollapsed] = useState(false);
 
@@ -101,15 +107,15 @@ export default function SidebarNav() {
                 </div>
             )}
 
-            {/* Navigation */}
             <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
-                <NavItem label={t('pos')} icon={LayoutGrid} path="/pos" pathname={pathname} collapsed={collapsed} />
+                <NavItem label={t('pos')} icon={LayoutGrid} path="/pos?mode=table" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
+                <NavItem label={t('buyProduct')} icon={Store} path="/pos?mode=direct" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 {false && (user?.role === 'admin' || user?.role === 'chef') && (
-                    <NavItem label={t('kitchen')} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} collapsed={collapsed} />
+                    <NavItem label={t('kitchen')} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}
-                <NavItem label={t('history')} icon={History} path="/history" pathname={pathname} collapsed={collapsed} />
+                <NavItem label={t('history')} icon={History} path="/history" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 {(user?.role === 'admin' || user?.role === 'manager') && (
-                    <NavItem label={t('management')} icon={Settings} path="/management" pathname={pathname} collapsed={collapsed} />
+                    <NavItem label={t('management')} icon={Settings} path="/management" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}
             </nav>
 

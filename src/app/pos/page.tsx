@@ -1,6 +1,7 @@
 'use client';
-import { useState, useCallback } from 'react';
-import { TableProperties, ShoppingCart, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { TableProperties, ShoppingCart, ArrowLeft, ShoppingBag, UtensilsCrossed } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
 import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
@@ -11,9 +12,12 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function POSPage() {
+    const router = useRouter();
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isHoldOpen, setIsHoldOpen] = useState(false);
-    const { tableId, isTakeout, items, clearOrder, localCart, orderId, commitLocalCart } = useOrder();
+    const searchParams = useSearchParams();
+    const mode = searchParams.get('mode');
+    const { tableId, isTakeout, isDirect, items, clearOrder, localCart, orderId, commitLocalCart, setDirect, setTakeout, setTableId } = useOrder();
     const { user } = useAuth();
     const { lang, t } = useLanguage();
 
@@ -30,9 +34,19 @@ export default function POSPage() {
         setIsCheckoutOpen(true);
     }, [orderId, localCart, user, commitLocalCart]);
 
+    // Handle mode changes from query param - Toggle view state without clearing data
+    useEffect(() => {
+        if (mode === 'direct' && !isDirect) {
+            setDirect(true);
+            router.replace('/pos', { scroll: false });
+        } else if (mode === 'table' && isDirect) {
+            setDirect(false);
+            router.replace('/pos', { scroll: false });
+        }
+    }, [mode, isDirect, setDirect, router]);
 
-    // No table and not takeout → show floor plan
-    if (!tableId && !isTakeout && localCart.length === 0) {
+    // Show floor plan IF we are in Table mode AND no table is selected
+    if (!isDirect && !tableId && !isTakeout) {
         return <FloorPlanView />;
     }
 
@@ -42,13 +56,15 @@ export default function POSPage() {
                 <header className="flex-shrink-0 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-card)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={clearOrder}
-                                className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
-                                title={t('backToFloorPlan')}
-                            >
-                                <ArrowLeft size={13} strokeWidth={2.5} />
-                            </button>
+                            {!isDirect && (
+                                <button
+                                    onClick={clearOrder}
+                                    className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+                                    title={t('backToFloorPlan')}
+                                >
+                                    <ArrowLeft size={13} strokeWidth={2.5} />
+                                </button>
+                            )}
 
                             {isTakeout ? (
                                 <>
@@ -57,6 +73,16 @@ export default function POSPage() {
                                     </div>
                                     <div>
                                         <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-400 leading-none mb-0.5">{t('takeout')}</p>
+                                        <p className="text-sm font-black text-[var(--foreground)] leading-none">{t('newOrder')}</p>
+                                    </div>
+                                </>
+                            ) : isDirect ? (
+                                <>
+                                    <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center">
+                                        <UtensilsCrossed size={14} className="text-[var(--accent)]" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--accent)] leading-none mb-0.5">DIRECT</p>
                                         <p className="text-sm font-black text-[var(--foreground)] leading-none">{t('newOrder')}</p>
                                     </div>
                                 </>
