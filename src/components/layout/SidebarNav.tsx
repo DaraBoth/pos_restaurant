@@ -4,7 +4,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ChevronsLeft, ChevronsRight, Sun, Moon } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ChevronsLeft, ChevronsRight, Sun, Moon, Download } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
 import { SyncStatus } from '@/components/ui/SyncStatus';
@@ -114,6 +114,7 @@ export default function SidebarNav() {
                     <NavItem label={t('kitchen')} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}
                 <NavItem label={t('history')} icon={History} path="/history" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
+                <NavItem label={t('downloads')} icon={Download} path="/downloads" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 {(user?.role === 'admin' || user?.role === 'manager') && (
                     <NavItem label={t('management')} icon={Settings} path="/management" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}

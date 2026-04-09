@@ -190,6 +190,10 @@ pub fn run() {
             // Kitchen
             commands::kitchen::get_kitchen_orders,
             commands::kitchen::update_kitchen_item_status,
+            // Releases
+            commands::releases::get_app_releases,
+            commands::releases::create_app_release,
+            commands::releases::delete_app_release,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

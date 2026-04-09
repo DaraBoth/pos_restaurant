@@ -24,6 +24,8 @@ export const translations = {
         buyProduct: 'Product',
         history: 'History',
         analytics: 'Analytics',
+        downloads: 'Downloads',
+        downloadsDesc: 'Get the latest DineOS installers',
         // POS
         allCategories: 'All',
         currentOrder: 'Order',
@@ -273,6 +275,8 @@ export const translations = {
         buyProduct: 'ផលិតផល',
         history: 'ប្រវត្តិ',
         analytics: 'របាយការណ៍',
+        downloads: 'ការទាញយក',
+        downloadsDesc: 'ទាញយកកម្មវិធី DineOS ចុងក្រោយ',
         // POS
         allCategories: 'ទាំងអស់',
         currentOrder: 'បញ្ជីទិញ',

@@ -7,3 +7,4 @@ pub mod tables;
 pub mod kitchen;
 pub mod inventory;
 pub mod analytics;
+pub mod releases;

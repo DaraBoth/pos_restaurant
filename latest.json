@@ -5,15 +5,15 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQkJjdUdxTTU3aE43dFlVTkdiYmNUMnE0UFFteVRya1ZMRGZTakFzMXROcGNBOGFjdm5mZ1REL0RrZGtWSm9RN05IdnQraVJIVGZIOG1IQUhCanRpcm45MUZ1YWQwWWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NDUzNjkwCWZpbGU6RGluZU9TXzAuMS4xX3g2NF9lbi1VUy5tc2kKYkswaUcxLzE4czFQYjBqQ2Vod1Q5bjBSM2orK2IvQm1VMzdSTUtLOUhNTjVLTjJwbmxZWi96eXlvS2VrQ2RNK3Z1VVZuUzVCakYwaU5ZQXV4TTZMQ3c9PQo=",
-      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.2_x64_en-US.msi"
+      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.7_x64_en-US.msi"
     },
     "darwin-aarch64": {
       "signature": "",
-      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.2_aarch64.dmg"
+      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.7_aarch64.dmg"
     },
     "darwin-x86_64": {
       "signature": "",
-      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.2_x64.dmg"
+      "url": "https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.7_x64.dmg"
     }
   }
 }

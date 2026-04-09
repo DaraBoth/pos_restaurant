@@ -242,3 +242,14 @@ pub struct InventoryItem {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppRelease {
+    pub id: String,
+    pub version: String,
+    pub release_notes: Option<String>,
+    pub windows_file: Option<String>,
+    pub windows_signature: Option<String>,
+    pub mac_file: Option<String>,
+    pub mac_signature: Option<String>,
+    pub created_at: String,
+}

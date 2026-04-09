@@ -13,6 +13,7 @@ const BAKED_TOKEN: &str = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJp
 // ─── Migration SQL files embedded at compile time ───────────────────────────
 const MIGRATIONS: &[(&str, &str)] = &[
     ("001_baseline", include_str!("migrations/001_baseline.sql")),
+    ("004_app_releases", include_str!("migrations/004_app_releases.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

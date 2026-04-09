@@ -16,7 +16,8 @@ import {
     User, Phone, MapPin, Calendar, ChevronRight,
     X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus, Sun, Moon
 } from 'lucide-react';
-import { updateRestaurantLicense } from '@/lib/api/restaurant';
+import { ManageReleasesModal } from '@/components/super-admin/ManageReleasesModal';
+import { Download } from 'lucide-react';
 // ─── Create Business Modal ────────────────────────────────────────────
 type CreateForm = {
     restaurantName: string;
@@ -533,6 +534,7 @@ export default function SuperAdminPage() {
     const [showGlobalUsers, setShowGlobalUsers] = useState(false);
     const [showCreateSuperadmin, setShowCreateSuperadmin] = useState(false);
     const [movingUser, setMovingUser] = useState<SuperadminUserView | null>(null);
+    const [showReleases, setShowReleases] = useState(false);
 
     useEffect(() => {
         if (user?.role !== 'super_admin') {
@@ -657,6 +659,13 @@ export default function SuperAdminPage() {
                             Global Users
                         </button>
                         <button
+                            onClick={() => setShowReleases(true)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-black text-xs uppercase tracking-widest hover:border-purple-500/50 hover:bg-purple-500/10 transition-all"
+                        >
+                            <Download size={14} className="text-purple-400" />
+                            Manage Releases
+                        </button>
+                        <button
                             onClick={() => setShowCreate(true)}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-[var(--accent)]/20"
                         >
@@ -741,6 +750,11 @@ export default function SuperAdminPage() {
                     restaurants={restaurants}
                     onClose={() => setMovingUser(null)}
                     onMoved={() => { setMovingUser(null); /* Refresh global users if needed, but local state update is better */ }}
+                />
+            )}
+            {showReleases && (
+                <ManageReleasesModal 
+                    onClose={() => setShowReleases(false)} 
                 />
             )}
         </div>
