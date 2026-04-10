@@ -11,6 +11,7 @@ import {
 import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import { stopSync } from '@/lib/api/system';
+import { updateRestaurantLicense } from '@/lib/api/restaurant';
 import {
     ShieldCheck, LogOut, Plus, RefreshCw, Store,
     User, Phone, MapPin, Calendar, ChevronRight,
