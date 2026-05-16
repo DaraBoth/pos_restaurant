@@ -565,8 +565,8 @@ export default function SuperAdminPage() {
         router.replace('/login');
     }
 
-    const totalRestaurants = restaurants.length;
-    const totalWithAdmin   = restaurants.filter(r => r.admin_id).length;
+    const totalRestaurants = restaurants?.length || 0;
+    const totalWithAdmin   = (restaurants || []).filter(r => r.admin_id).length;
 
     return (
         <div className="min-h-screen bg-[var(--background)]">
@@ -681,7 +681,7 @@ export default function SuperAdminPage() {
                     <div className="flex items-center justify-center py-24 opacity-20">
                         <RefreshCw size={32} className="animate-spin" />
                     </div>
-                ) : restaurants.length === 0 ? (
+                ) : (restaurants?.length || 0) === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-30">
                         <Store size={48} strokeWidth={1} />
                         <div className="text-center">

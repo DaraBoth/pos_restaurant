@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS table_sessions (
 CREATE TABLE IF NOT EXISTS orders (
     id              TEXT PRIMARY KEY,
     user_id         TEXT REFERENCES users(id),
-    table_id        TEXT,
+    table_id        TEXT REFERENCES floor_tables(id),
     session_id      TEXT REFERENCES table_sessions(id),
     round_number    INTEGER NOT NULL DEFAULT 1,
     status          TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','completed','cancelled','void')),

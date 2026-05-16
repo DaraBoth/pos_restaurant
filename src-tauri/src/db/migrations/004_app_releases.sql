@@ -11,12 +11,12 @@ CREATE TABLE IF NOT EXISTS app_releases (
 
 INSERT OR IGNORE INTO app_releases (id, version, release_notes, windows_file, windows_signature, mac_file, mac_signature, created_at)
 VALUES (
-    'initial-release-id-000000000001',
-    '1.0.7',
-    'Critical fix: restored broken database foreign keys that caused order placement errors.',
-    'https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.7_x64_en-US.msi',
+    'release-v1.0.8-20260516',
+    '1.0.8',
+    'Production build: Finalized database integrity fixes and resolved Next.js build TypeError.',
+    'https://github.com/DaraBoth/pos_restaurant/releases/latest/download/DineOS_1.0.8_x64_en-US.msi',
     'dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQkJjdUdxTTU3aE43dFlVTkdiYmNUMnE0UFFteVRya1ZMRGZTakFzMXROcGNBOGFjdm5mZ1REL0RrZGtWSm9RN05IdnQraVJIVGZIOG1IQUhCanRpcm45MUZ1YWQwWWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NDUzNjkwCWZpbGU6RGluZU9TXzAuMS4xX3g2NF9lbi1VUy5tc2kKYkswaUcxLzE4czFQYjBqQ2Vod1Q5bjBSM2orK2IvQm1VMzdSTUtLOUhNTjVLTjJwbmxZWi96eXlvS2VrQ2RNK3Z1VVZuUzVCakYwaU5ZQXV4TTZMQ3c9PQo=',
-    'https://github.com/DaraBoth/pos_restaurant/releases/download/v1.0.2/DineOS_1.0.7_aarch64.dmg',
+    'https://github.com/DaraBoth/pos_restaurant/releases/latest/download/DineOS_1.0.8_aarch64.dmg',
     '',
-    '2026-03-27T10:45:00'
+    '2026-05-16T15:00:00'
 );

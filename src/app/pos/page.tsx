@@ -100,7 +100,7 @@ export default function POSPage() {
                         </div>
                         <div className="px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] flex items-center gap-1">
                             <ShoppingCart size={11} />
-                            <span className="text-xs font-black text-[var(--foreground)]">{items.length}</span>
+                            <span className="text-xs font-black text-[var(--foreground)]">{items?.length || 0}</span>
                         </div>
                     </div>
                 </header>

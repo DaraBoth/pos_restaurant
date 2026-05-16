@@ -16,7 +16,7 @@ export default function DownloadsPage() {
     const latest = releases[0];
 
     // Helper to trigger download from Base64 or URL
-    const handleDownload = (fileData: string | undefined, filename: string) => {
+    const handleDownload = async (fileData: string | undefined, filename: string) => {
         if (!fileData) return;
         
         if (fileData.startsWith('data:')) {
@@ -28,8 +28,14 @@ export default function DownloadsPage() {
             link.click();
             document.body.removeChild(link);
         } else if (fileData.startsWith('http')) {
-            // URL download
-            window.open(fileData, '_blank');
+            // URL download - Use Tauri shell if available to open in default browser
+            try {
+                const { open } = await import('@tauri-apps/plugin-shell');
+                await open(fileData);
+            } catch (e) {
+                // Fallback for web environment
+                window.open(fileData, '_blank');
+            }
         }
     };
 
@@ -103,8 +109,9 @@ export default function DownloadsPage() {
                                             <button 
                                                 onClick={() => handleDownload(latest.windows_file, `DineOS_${latest.version}_x64_en-US.msi`)}
                                                 disabled={!latest.windows_file}
-                                                className={`flex flex-col items-start p-5 rounded-3xl border transition-all ${latest.windows_file 
-                                                    ? 'bg-blue-600 hover:bg-blue-500 border-blue-400/30 text-white shadow-xl shadow-blue-600/20 active:scale-[0.98]' 
+                                                title={latest.windows_file ? "Download Windows Installer" : "Not available"}
+                                                className={`flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer ${latest.windows_file 
+                                                    ? 'bg-blue-600 hover:bg-blue-500 border-blue-400/30 text-white shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98]' 
                                                     : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-40 cursor-not-allowed'}`}
                                             >
                                                 <div className="flex items-center justify-between w-full mb-3">
@@ -120,8 +127,9 @@ export default function DownloadsPage() {
                                             <button 
                                                 onClick={() => handleDownload(latest.mac_file, `DineOS_${latest.version}_Universal.dmg`)}
                                                 disabled={!latest.mac_file}
-                                                className={`flex flex-col items-start p-5 rounded-3xl border transition-all ${latest.mac_file 
-                                                    ? 'bg-white hover:bg-neutral-100 border-neutral-300 text-black shadow-xl shadow-white/5 active:scale-[0.98]' 
+                                                title={latest.mac_file ? "Download macOS Installer" : "Not available"}
+                                                className={`flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer ${latest.mac_file 
+                                                    ? 'bg-white hover:bg-neutral-100 border-neutral-300 text-black shadow-xl shadow-white/5 hover:scale-[1.02] active:scale-[0.98]' 
                                                     : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-40 cursor-not-allowed'}`}
                                             >
                                                 <div className="flex items-center justify-between w-full mb-3">

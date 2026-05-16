@@ -242,7 +242,7 @@ async fn ensure_critical_columns(conn: &Connection) {
                 "CREATE TABLE orders (
                     id TEXT PRIMARY KEY,
                     user_id TEXT REFERENCES users(id),
-                    table_id TEXT,
+                    table_id TEXT REFERENCES floor_tables(id),
                     session_id TEXT,
                     round_number INTEGER NOT NULL DEFAULT 1,
                     status TEXT NOT NULL DEFAULT 'open',

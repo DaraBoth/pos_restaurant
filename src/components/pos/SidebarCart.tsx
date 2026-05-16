@@ -130,7 +130,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         }
     }
 
-    const isEmpty = items.length === 0;
+    const isEmpty = (items?.length || 0) === 0;
     const totalQty = items.reduce((s, i) => s + i.quantity, 0);
     const localCartTotalCents = localCart.reduce((s, i) => s + i.priceCents * i.qty, 0);
     const localCartTotalQty = localCart.reduce((s, i) => s + i.qty, 0);
