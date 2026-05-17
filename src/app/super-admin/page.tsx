@@ -18,6 +18,7 @@ import {
     X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus, Sun, Moon
 } from 'lucide-react';
 import { getAppReleases } from '@/lib/api/releases';
+import Link from 'next/link';
 import { Download } from 'lucide-react';
 // ─── Create Business Modal ────────────────────────────────────────────
 type CreateForm = {
@@ -672,13 +673,13 @@ export default function SuperAdminPage() {
                             <Users size={14} className="text-blue-400" />
                             Global Users
                         </button>
-                        <button
-                            onClick={() => router.push('/super-admin/releases')}
+                        <Link
+                            href="/super-admin/releases"
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-black text-xs uppercase tracking-widest hover:border-purple-500/50 hover:bg-purple-500/10 transition-all"
                         >
                             <Download size={14} className="text-purple-400" />
                             Manage Releases
-                        </button>
+                        </Link>
                         <button
                             onClick={() => setShowCreate(true)}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-[var(--accent)]/20"

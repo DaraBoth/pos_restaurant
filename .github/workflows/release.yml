@@ -57,7 +57,7 @@ jobs:
         with:
           args: --target ${{ matrix.rust-target }}
           tagName: v__VERSION__
-          releaseName: "DineOS __VERSION__"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: false
+          releaseName: "DineOS v__VERSION__"
+          releaseBody: "Automated production build for DineOS POS."
+          releaseDraft: true
           prerelease: false
