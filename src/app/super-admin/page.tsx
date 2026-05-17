@@ -17,7 +17,7 @@ import {
     User, Phone, MapPin, Calendar, ChevronRight,
     X, Eye, EyeOff, Building2, AlertTriangle, Check, Pen, Users, Search, ShieldAlert, Trash2, UserPlus, Sun, Moon
 } from 'lucide-react';
-import { ManageReleasesModal } from '@/components/super-admin/ManageReleasesModal';
+import { getAppReleases } from '@/lib/api/releases';
 import { Download } from 'lucide-react';
 // ─── Create Business Modal ────────────────────────────────────────────
 type CreateForm = {
@@ -536,6 +536,7 @@ export default function SuperAdminPage() {
     const [showCreateSuperadmin, setShowCreateSuperadmin] = useState(false);
     const [movingUser, setMovingUser] = useState<SuperadminUserView | null>(null);
     const [showReleases, setShowReleases] = useState(false);
+    const [latestVersion, setLatestVersion] = useState('v1.0');
 
     useEffect(() => {
         if (user?.role !== 'super_admin') {
@@ -543,7 +544,19 @@ export default function SuperAdminPage() {
             return;
         }
         load();
+        fetchLatestVersion();
     }, []);
+
+    async function fetchLatestVersion() {
+        try {
+            const releases = await getAppReleases();
+            if (releases.length > 0) {
+                setLatestVersion(`v${releases[0].version}`);
+            }
+        } catch (e) {
+            console.error('[Dashboard] Version fetch skip', e);
+        }
+    }
 
     async function load() {
         setLoading(true);
@@ -630,7 +643,7 @@ export default function SuperAdminPage() {
                         { label: 'Total Restaurants', value: totalRestaurants, color: 'var(--accent)' },
                         { label: 'Active Clients',    value: totalWithAdmin,   color: '#3b82f6'        },
                         { label: 'No Admin Yet',      value: totalRestaurants - totalWithAdmin, color: '#f59e0b' },
-                        { label: 'Platform Version',  value: 'v1.0',           color: '#a78bfa'        },
+                        { label: 'Platform Version',  value: latestVersion,           color: '#a78bfa'        },
                     ].map(stat => (
                         <div key={stat.label} className="pos-card px-4 py-3 space-y-1">
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-50">{stat.label}</p>
@@ -660,7 +673,7 @@ export default function SuperAdminPage() {
                             Global Users
                         </button>
                         <button
-                            onClick={() => setShowReleases(true)}
+                            onClick={() => router.push('/super-admin/releases')}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-black text-xs uppercase tracking-widest hover:border-purple-500/50 hover:bg-purple-500/10 transition-all"
                         >
                             <Download size={14} className="text-purple-400" />
@@ -751,11 +764,6 @@ export default function SuperAdminPage() {
                     restaurants={restaurants}
                     onClose={() => setMovingUser(null)}
                     onMoved={() => { setMovingUser(null); /* Refresh global users if needed, but local state update is better */ }}
-                />
-            )}
-            {showReleases && (
-                <ManageReleasesModal 
-                    onClose={() => setShowReleases(false)} 
                 />
             )}
         </div>

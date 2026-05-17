@@ -1,52 +1,52 @@
 {
-    "$schema": "https://schema.tauri.app/config/2",
-    "productName": "DineOS",
-    "version": "1.0.9",
-    "identifier": "com.dineos.pos",
-    "build": {
-        "beforeDevCommand": "pnpm dev",
-        "devUrl": "http://localhost:3000",
-        "beforeBuildCommand": "pnpm build",
-        "frontendDist": "../out"
-    },
-    "app": {
-        "withGlobalTauri": false,
-        "windows": [
-            {
-                "title": "DineOS — POS System",
-                "width": 1280,
-                "height": 800,
-                "minWidth": 1024,
-                "minHeight": 640,
-                "resizable": true,
-                "fullscreen": false,
-                "decorations": true
-            }
-        ],
-        "security": {
-            "csp": null
-        }
-    },
-    "bundle": {
-        "active": true,
-        "createUpdaterArtifacts": "v1Compatible",
-        "targets": "all",
-        "publisher": "GuoErrOS",
-        "icon": [
-            "icons/32x32.png",
-            "icons/128x128.png",
-            "icons/128x128@2x.png",
-            "icons/icon.icns",
-            "icons/icon.ico"
-        ]
-    },
-    "plugins": {
-        "updater": {
-            "active": true,
-            "pubkey": "RWSpqEVMLoZaTuiAF1GN/5n+u5E6i16XWtchtgStnq/xuDylLa5vZhKq",
-            "endpoints": [
-                "https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json"
-            ]
-        }
-    }
+    "$schema":  "https://schema.tauri.app/config/2",
+    "productName":  "DineOS",
+    "version":  "1.0.10",
+    "identifier":  "com.dineos.pos",
+    "build":  {
+                  "beforeDevCommand":  "pnpm dev",
+                  "devUrl":  "http://localhost:3000",
+                  "beforeBuildCommand":  "pnpm build",
+                  "frontendDist":  "../out"
+              },
+    "app":  {
+                "withGlobalTauri":  false,
+                "windows":  [
+                                {
+                                    "title":  "DineOS - POS System",
+                                    "width":  1280,
+                                    "height":  800,
+                                    "minWidth":  1024,
+                                    "minHeight":  640,
+                                    "resizable":  true,
+                                    "fullscreen":  false,
+                                    "decorations":  true
+                                }
+                            ],
+                "security":  {
+                                 "csp":  null
+                             }
+            },
+    "bundle":  {
+                   "active":  true,
+                   "createUpdaterArtifacts":  true,
+                   "targets":  "all",
+                   "publisher":  "GuoErrOS",
+                   "icon":  [
+                                "icons/32x32.png",
+                                "icons/128x128.png",
+                                "icons/128x128@2x.png",
+                                "icons/icon.icns",
+                                "icons/icon.ico"
+                            ]
+               },
+    "plugins":  {
+                    "updater":  {
+                                    "active":  true,
+                                    "pubkey":  "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRFNUE4NjJFNEM0NUE4QTkKUldTcHFFVk1Mb1phVHVpQUYxR04vNW4rdTVFNmkxNlhXdGNodGdTdG5xL3h1RHlsTGE1dlpoS3E=",
+                                    "endpoints":  [
+                                                      "https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json"
+                                                  ]
+                                }
+                }
 }

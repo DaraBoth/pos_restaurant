@@ -10,18 +10,32 @@ pub async fn get_app_releases(
     remote: State<'_, RemoteDb>,
 ) -> Result<Vec<AppRelease>, String> {
     // Cloud overrides local in terms of latest app versions
-    let conn: &Connection = match remote.0.as_ref() {
-        Some(r) => r,
-        None => &*pool,
+    // We try remote first, but fallback to local if remote fails (e.g. stream not found)
+    let rows_result = if let Some(remote_conn) = remote.0.as_ref() {
+        match remote_conn.query(
+            "SELECT id, version, release_notes, windows_file, windows_signature, mac_file, mac_signature, created_at 
+             FROM app_releases ORDER BY created_at DESC",
+            ()
+        ).await {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                eprintln!("[Releases] Remote query failed, falling back to local: {}", e);
+                pool.query(
+                    "SELECT id, version, release_notes, windows_file, windows_signature, mac_file, mac_signature, created_at 
+                     FROM app_releases ORDER BY created_at DESC",
+                    ()
+                ).await
+            }
+        }
+    } else {
+        pool.query(
+            "SELECT id, version, release_notes, windows_file, windows_signature, mac_file, mac_signature, created_at 
+             FROM app_releases ORDER BY created_at DESC",
+            ()
+        ).await
     };
 
-    let mut rows = conn.query(
-        "SELECT id, version, release_notes, windows_file, windows_signature, mac_file, mac_signature, created_at 
-         FROM app_releases ORDER BY created_at DESC",
-        ()
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+    let mut rows = rows_result.map_err(|e| format!("Database error: {}", e))?;
 
     let mut releases = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {

@@ -588,8 +588,19 @@ pub async fn list_all_restaurants(
          WHERE r.is_deleted = 0
          ORDER BY r.created_at DESC";
 
-    let mut rows = conn.query(QUERY, ())
-        .await.map_err(|e| format!("Database error: {}", e))?;
+    let rows_result = if let Some(remote_conn) = remote.0.as_ref() {
+        match remote_conn.query(QUERY, ()).await {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                eprintln!("[Auth] Remote list_all_restaurants failed, fallback to local: {}", e);
+                pool.query(QUERY, ()).await
+            }
+        }
+    } else {
+        pool.query(QUERY, ()).await
+    };
+
+    let mut rows = rows_result.map_err(|e| format!("Database error: {}", e))?;
 
     let mut list = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -820,15 +831,27 @@ pub async fn superadmin_get_all_users(
         None => &*pool,
     };
 
-    let mut rows = conn.query(
+    const QUERY: &str =
         "SELECT u.id, u.restaurant_id, r.name, u.username, u.role, u.full_name, u.created_at
          FROM users u
          LEFT JOIN restaurants r ON u.restaurant_id = r.id AND r.is_deleted = 0
          WHERE u.is_deleted = 0
            AND u.role != 'super_admin'
-         ORDER BY r.name, u.role, u.username",
-        ()
-    ).await.map_err(|e| format!("Database error: {}", e))?;
+         ORDER BY r.name, u.role, u.username";
+
+    let rows_result = if let Some(remote_conn) = remote.0.as_ref() {
+        match remote_conn.query(QUERY, ()).await {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                eprintln!("[Auth] Remote superadmin_get_all_users failed, fallback to local: {}", e);
+                pool.query(QUERY, ()).await
+            }
+        }
+    } else {
+        pool.query(QUERY, ()).await
+    };
+
+    let mut rows = rows_result.map_err(|e| format!("Database error: {}", e))?;
 
     let mut list = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
