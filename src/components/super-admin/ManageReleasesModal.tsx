@@ -76,16 +76,32 @@ export function ManageReleasesModal({ onClose }: { onClose: () => void }) {
     const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setForm(prev => ({ ...prev, [k]: e.target.value }));
 
+    const [fileStatus, setFileStatus] = useState<{ windows?: string, mac?: string }>({});
+
     // File input handlers to read as Base64.
     const handleFile = (os: 'windows' | 'mac', e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Turso/LibSQL row limit is usually 32MB. 
+        // 30MB MSI -> ~40MB Base64, might hit limits on free tier or slow down sync.
+        if (file.size > 30 * 1024 * 1024) {
+            alert("File is too large (>30MB). Please use an external URL or a smaller installer to ensure reliable cloud sync.");
+            e.target.value = '';
+            return;
+        }
+
+        setFileStatus(prev => ({ ...prev, [os]: 'Processing...' }));
 
         const reader = new FileReader();
         reader.onload = (ev) => {
             const b64 = ev.target?.result as string;
             if (os === 'windows') setForm(prev => ({ ...prev, windowsFile: b64 }));
             else setForm(prev => ({ ...prev, macFile: b64 }));
+            setFileStatus(prev => ({ ...prev, [os]: `Ready (${(file.size / 1024 / 1024).toFixed(1)} MB)` }));
+        };
+        reader.onerror = () => {
+            setFileStatus(prev => ({ ...prev, [os]: 'Error reading file' }));
         };
         reader.readAsDataURL(file);
     };
@@ -152,8 +168,10 @@ export function ManageReleasesModal({ onClose }: { onClose: () => void }) {
                                 <h3 className="font-medium text-sm text-[var(--text-main)]">Windows Installer (.msi)</h3>
                                 <input type="file" accept=".msi" onChange={(e) => handleFile('windows', e)} className="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--accent)]/10 file:text-[var(--accent)] hover:file:bg-[var(--accent)]/20" />
                                 
-                                {form.windowsFile && (
-                                    <div className="text-xs text-green-500">File attached!</div>
+                                {fileStatus.windows && (
+                                    <div className={`text-[10px] font-black uppercase tracking-tighter ${fileStatus.windows.includes('Ready') ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                        {fileStatus.windows}
+                                    </div>
                                 )}
                                 
                                 <input value={form.windowsSignature} onChange={update('windowsSignature')} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-main)] border border-[var(--border)] text-[var(--text-main)] placeholder:text-[var(--text-muted)] text-xs font-mono" placeholder="Tauri updater signature (from .msi.zip.sig)" />
@@ -163,8 +181,10 @@ export function ManageReleasesModal({ onClose }: { onClose: () => void }) {
                                 <h3 className="font-medium text-sm text-[var(--text-main)]">macOS Installer (.dmg)</h3>
                                 <input type="file" accept=".dmg" onChange={(e) => handleFile('mac', e)} className="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--accent)]/10 file:text-[var(--accent)] hover:file:bg-[var(--accent)]/20" />
                                 
-                                {form.macFile && (
-                                    <div className="text-xs text-green-500">File attached!</div>
+                                {fileStatus.mac && (
+                                    <div className={`text-[10px] font-black uppercase tracking-tighter ${fileStatus.mac.includes('Ready') ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                        {fileStatus.mac}
+                                    </div>
                                 )}
                                 
                                 <input value={form.macSignature} onChange={update('macSignature')} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-main)] border border-[var(--border)] text-[var(--text-main)] placeholder:text-[var(--text-muted)] text-xs font-mono" placeholder="Tauri updater signature (from .app.tar.gz.sig)" />
@@ -211,8 +231,8 @@ export function ManageReleasesModal({ onClose }: { onClose: () => void }) {
                                                 </p>
                                             )}
                                             <div className="flex gap-2">
-                                                {r.windows_file && <span className="px-2 py-1 bg-blue-500/10 text-blue-500 text-xs rounded-md font-medium border border-blue-500/20">Windows ({r.windows_file.startsWith('http') ? 'External' : 'Internal'})</span>}
-                                                {r.mac_file && <span className="px-2 py-1 bg-gray-500/10 text-gray-500 text-xs rounded-md font-medium border border-gray-500/20">macOS ({r.mac_file.startsWith('http') ? 'External' : 'Internal'})</span>}
+                                                {r.windows_file && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 text-[9px] font-black uppercase tracking-widest border border-blue-500/20">Win ({r.windows_file.startsWith('data:') ? 'Internal' : 'External'})</span>}
+                                                {r.mac_file && <span className="px-2 py-1 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-widest border border-purple-500/20">Mac ({r.mac_file.startsWith('data:') ? 'Internal' : 'External'})</span>}
                                             </div>
                                         </div>
                                     ))}

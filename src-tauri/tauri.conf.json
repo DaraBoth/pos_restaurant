@@ -13,7 +13,7 @@
         "withGlobalTauri": false,
         "windows": [
             {
-                "title": "DineOS \u00e2\u20ac\u201d POS System",
+                "title": "DineOS — POS System",
                 "width": 1280,
                 "height": 800,
                 "minWidth": 1024,
