@@ -2,7 +2,6 @@
     "$schema": "https://schema.tauri.app/config/2",
     "productName": "DineOS",
     "version": "1.0.9",
-
     "identifier": "com.dineos.pos",
     "build": {
         "beforeDevCommand": "pnpm dev",
@@ -14,7 +13,7 @@
         "withGlobalTauri": false,
         "windows": [
             {
-                "title": "DineOS — POS System",
+                "title": "DineOS \u00e2\u20ac\u201d POS System",
                 "width": 1280,
                 "height": 800,
                 "minWidth": 1024,
@@ -44,7 +43,7 @@
     "plugins": {
         "updater": {
             "active": true,
-            "pubkey": "RWRsgTIp0uVnsFVtJ5rUd4FbYHW5WdMyHUyckMwRRi/5ZtLrqb+cV8NE",
+            "pubkey": "RWSpqEVMLoZaTuiAF1GN/5n+u5E6i16XWtchtgStnq/xuDylLa5vZhKq",
             "endpoints": [
                 "https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json"
             ]
