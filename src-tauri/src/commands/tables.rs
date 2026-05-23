@@ -23,11 +23,12 @@ pub async fn get_tables(
                     WHERE o.table_id = ft.name AND o.status = 'open' AND o.is_deleted = 0 AND o.restaurant_id = ft.restaurant_id
                 ) THEN 'busy'
                 ELSE 'available'
-            END AS status
+            END AS status,
+            COALESCE(ft.zone, 'Main') AS zone
          FROM floor_tables ft
          WHERE ft.is_deleted = 0
            AND (ft.restaurant_id = ?1 OR ?1 IS NULL)
-         ORDER BY ft.name";
+         ORDER BY ft.zone, ft.name";
 
     let mut rows = pool.query(sql, params![restaurant_id])
         .await
@@ -40,6 +41,7 @@ pub async fn get_tables(
             name: row.get::<String>(1).unwrap_or_default(),
             seat_count: row.get::<i64>(2).unwrap_or(4),
             status: row.get::<String>(3).unwrap_or_default(),
+            zone: row.get::<String>(4).unwrap_or_else(|_| "Main".to_string()),
         });
     }
 
@@ -50,11 +52,13 @@ pub async fn get_tables(
 pub async fn create_table(
     name: String,
     seat_count: Option<i64>,
+    zone: Option<String>,
     restaurant_id: Option<String>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<FloorTable, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let seats = seat_count.unwrap_or(4);
+    let zone_val = zone.unwrap_or_else(|| "Main".to_string());
 
     // Clean up any soft-deleted table with the same name to avoid UNIQUE constraint violation
     if let Some(ref rid) = restaurant_id {
@@ -65,8 +69,8 @@ pub async fn create_table(
     }
 
     pool.execute(
-        "INSERT INTO floor_tables (id, name, status, seat_count, restaurant_id) VALUES (?, ?, 'free', ?, ?)",
-        params![id.clone(), name.clone(), seats, restaurant_id]
+        "INSERT INTO floor_tables (id, name, status, seat_count, zone, restaurant_id) VALUES (?, ?, 'free', ?, ?, ?)",
+        params![id.clone(), name.clone(), seats, zone_val.clone(), restaurant_id]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -76,6 +80,7 @@ pub async fn create_table(
         name,
         status: "available".to_string(),
         seat_count: seats,
+        zone: zone_val,
     })
 }
 

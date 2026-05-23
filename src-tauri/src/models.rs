@@ -9,6 +9,7 @@ pub struct User {
     pub role: String,
     pub full_name: Option<String>,
     pub khmer_name: Option<String>,
+    pub phone: Option<String>,
     pub is_deleted: i64,
     pub created_at: String,
 }
@@ -20,6 +21,7 @@ pub struct UserSession {
     pub role: String,
     pub full_name: Option<String>,
     pub khmer_name: Option<String>,
+    pub phone: Option<String>,
     pub restaurant_id: Option<String>,
 }
 
@@ -79,6 +81,7 @@ pub struct FloorTable {
     pub name: String,
     pub status: String,
     pub seat_count: i64,
+    pub zone: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +102,8 @@ pub struct Restaurant {
     pub is_deleted: i64,
     pub created_at: String,
     pub updated_at: Option<String>,
+    pub business_type: String,
+    pub disable_tables: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +129,8 @@ pub struct RestaurantUpsertInput {
     pub vat_number: Option<String>,
     pub receipt_footer: Option<String>,
     pub logo_path: Option<String>,
+    pub business_type: Option<String>,
+    pub disable_tables: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

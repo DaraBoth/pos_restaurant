@@ -121,6 +121,7 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("orders",      "customer_phone",  "customer_phone TEXT");
     add_col!("floor_tables","seat_count",      "seat_count INTEGER NOT NULL DEFAULT 4");
     add_col!("floor_tables","restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
+    add_col!("floor_tables","zone",            "zone TEXT NOT NULL DEFAULT 'Main'");
     add_col!("categories",   "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("categories",   "parent_id",       "parent_id TEXT");
     add_col!("products",     "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
@@ -137,6 +138,9 @@ async fn ensure_critical_columns(conn: &Connection) {
 
     add_col!("restaurants", "license_expires_at", "license_expires_at TEXT");
     add_col!("restaurants", "license_support_contact", "license_support_contact TEXT");
+    add_col!("restaurants", "business_type", "business_type TEXT NOT NULL DEFAULT 'Restaurant/Pub/Bar'");
+    add_col!("users", "phone", "phone TEXT");
+    add_col!("restaurants", "disable_tables", "disable_tables INTEGER NOT NULL DEFAULT 0");
 
     // Ensure emergency tables exist
     if let Err(e) = conn.execute(

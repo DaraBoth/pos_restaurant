@@ -14,13 +14,14 @@ struct AuthRecord {
     role: String,
     full_name: Option<String>,
     khmer_name: Option<String>,
+    phone: Option<String>,
     created_at: String,
     updated_at: Option<String>,
 }
 
 async fn fetch_auth_record(conn: &Connection, username: &str) -> Result<Option<AuthRecord>, String> {
     let mut rows = conn.query(
-        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, created_at, updated_at
+        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, phone, created_at, updated_at
          FROM users WHERE username = ? AND is_deleted = 0",
         params![username.to_string()]
     )
@@ -39,8 +40,9 @@ async fn fetch_auth_record(conn: &Connection, username: &str) -> Result<Option<A
         role: row.get::<String>(4).unwrap_or_default(),
         full_name: row.get::<String>(5).ok(),
         khmer_name: row.get::<String>(6).ok(),
-        created_at: row.get::<String>(7).unwrap_or_default(),
-        updated_at: row.get::<String>(8).ok(),
+        phone: row.get::<String>(7).ok(),
+        created_at: row.get::<String>(8).unwrap_or_default(),
+        updated_at: row.get::<String>(9).ok(),
     }))
 }
 
@@ -60,6 +62,7 @@ fn to_user_session(record: &AuthRecord) -> UserSession {
         role: record.role.clone(),
         full_name: record.full_name.clone(),
         khmer_name: record.khmer_name.clone(),
+        phone: record.phone.clone(),
         restaurant_id: record.restaurant_id.clone(),
     }
 }
@@ -119,8 +122,8 @@ async fn ensure_remote_superadmin(remote: &Connection) -> Result<(), String> {
 
 async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) -> Result<(), String> {
     local.execute(
-        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, phone, is_deleted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
             restaurant_id = excluded.restaurant_id,
             username = excluded.username,
@@ -128,6 +131,7 @@ async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) ->
             role = excluded.role,
             full_name = excluded.full_name,
             khmer_name = excluded.khmer_name,
+            phone = excluded.phone,
             is_deleted = excluded.is_deleted,
             updated_at = excluded.updated_at",
         params![
@@ -138,6 +142,7 @@ async fn seed_local_user_from_remote(local: &Connection, record: &AuthRecord) ->
             record.role.clone(),
             record.full_name.clone().unwrap_or_default(),
             record.khmer_name.clone().unwrap_or_default(),
+            record.phone.clone().unwrap_or_default(),
             record.created_at.clone(),
             record.updated_at.clone().unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())
         ]
@@ -478,7 +483,7 @@ pub async fn create_user(
 #[tauri::command]
 pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<Vec<User>, String> {
     let mut rows = pool.query(
-        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, is_deleted, created_at
+        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, phone, is_deleted, created_at
          FROM users WHERE is_deleted = 0 AND restaurant_id = ? ORDER BY role, username",
         params![restaurant_id]
     )
@@ -495,8 +500,9 @@ pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) 
             role: row.get::<String>(4).unwrap_or_default(),
             full_name: row.get::<String>(5).ok(),
             khmer_name: row.get::<String>(6).ok(),
-            is_deleted: row.get::<i64>(7).unwrap_or(0),
-            created_at: row.get::<String>(8).unwrap_or_default(),
+            phone: row.get::<String>(7).ok(),
+            is_deleted: row.get::<i64>(8).unwrap_or(0),
+            created_at: row.get::<String>(9).unwrap_or_default(),
         });
     }
 
@@ -521,6 +527,7 @@ pub async fn update_user(
     role: String,
     full_name: Option<String>,
     khmer_name: Option<String>,
+    phone: Option<String>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
@@ -532,12 +539,13 @@ pub async fn update_user(
             .to_string();
 
         pool.execute(
-            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
+            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
             params![
                 hash,
                 role,
                 full_name.unwrap_or_default(),
                 khmer_name.unwrap_or_default(),
+                phone.unwrap_or_default(),
                 id,
                 restaurant_id
             ]
@@ -546,11 +554,12 @@ pub async fn update_user(
         .map_err(|e| format!("Database error: {}", e))?;
     } else {
         pool.execute(
-            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
+            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
             params![
                 role,
                 full_name.unwrap_or_default(),
                 khmer_name.unwrap_or_default(),
+                phone.unwrap_or_default(),
                 id,
                 restaurant_id
             ]
@@ -570,7 +579,7 @@ pub async fn list_all_restaurants(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<Vec<RestaurantSummary>, String> {
-    let conn: &Connection = match remote.0.as_ref() {
+    let _conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
         None => &*pool,
     };
@@ -826,7 +835,7 @@ pub async fn superadmin_get_all_users(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<Vec<SuperadminUserView>, String> {
-    let conn: &Connection = match remote.0.as_ref() {
+    let _conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
         None => &*pool,
     };

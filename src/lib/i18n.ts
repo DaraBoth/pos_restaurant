@@ -14,7 +14,7 @@ export const translations = {
         firstLoginDesc: 'First login on a new device requires internet access.',
         // Navigation
         pos: 'Table',
-        management: 'Management',
+        management: 'Admin Console',
         products: 'Products',
         users: 'Users',
         orders: 'Orders',

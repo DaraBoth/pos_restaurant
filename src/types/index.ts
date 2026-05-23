@@ -9,6 +9,7 @@ export interface UserSession {
     role: 'super_admin' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef';
     full_name?: string;
     khmer_name?: string;
+    phone?: string;
     restaurant_id?: string;
 }
 
@@ -41,6 +42,8 @@ export interface Restaurant {
     logo_path?: string;
     license_expires_at?: string;
     license_support_contact?: string;
+    business_type?: string;
+    disable_tables?: number;
 }
 
 export interface RestaurantLicenseStatus {
@@ -66,6 +69,8 @@ export interface RestaurantInput {
     logo_path?: string;
     license_expires_at?: string;
     license_support_contact?: string;
+    business_type?: string;
+    disable_tables?: number;
 }
 
 export interface SetupStatus {
@@ -117,6 +122,8 @@ export interface FloorTable {
     /** available = green, busy = orange, waiting = amber */
     status: 'available' | 'busy' | 'waiting';
     seat_count: number;
+    /** Zone label e.g. 'Main', 'VIP', 'Garden' */
+    zone: string;
 }
 
 // --------------- Orders ---------------

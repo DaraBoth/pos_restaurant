@@ -18,10 +18,10 @@ export const getUsers = (restaurantId: string) => call<UserSession[]>('get_users
 
 export const updateUser = (
     id: string, password: string | undefined, role: string,
-    restaurantId: string, full_name?: string, khmer_name?: string
+    restaurantId: string, full_name?: string, khmer_name?: string, phone?: string
 ) => call<void>('update_user', { 
     id, password, role, restaurantId, 
-    fullName: full_name, khmerName: khmer_name 
+    fullName: full_name, khmerName: khmer_name, phone
 });
 
 export const deleteUser = (id: string, restaurantId: string) => 

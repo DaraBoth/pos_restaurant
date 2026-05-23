@@ -8,6 +8,7 @@ import { Save, ImagePlus, X, Box, Plus, Trash2 } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 import { getImageSrc } from '@/lib/image';
 import { getInventoryItems } from '@/lib/api/inventory';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -250,17 +251,14 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                         {t('category')}
                     </label>
-                    <select
+                    <CustomSelect
                         value={categoryId}
-                        onChange={e => setCategoryId(e.target.value)}
-                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold focus:border-[var(--accent)] outline-none transition-all appearance-none cursor-pointer"
-                    >
-                        {categories.map(cat => (
-                            <option key={cat.id} value={cat.id} className="bg-[var(--bg-elevated)] text-[var(--foreground)]">
-                                {'\u00a0\u00a0\u00a0'.repeat(cat.depth || 0)}{(cat.depth || 0) > 0 ? '└ ' : ''}{cat.name}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(val) => setCategoryId(val)}
+                        options={categories.map(cat => ({
+                            value: cat.id,
+                            label: `${'\u00a0\u00a0\u00a0'.repeat(cat.depth || 0)}${(cat.depth || 0) > 0 ? '└ ' : ''}${cat.name}`
+                        }))}
+                    />
                 </div>
 
                 {/* Inventory Link */}
@@ -289,20 +287,19 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         {ingredients.map((ing, idx) => (
                             <div key={idx} className="flex flex-col gap-2 p-3 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl animate-in fade-in slide-in-from-top-1">
                                 <div className="flex items-center gap-2">
-                                    <select
+                                    <CustomSelect
                                         value={ing.inventory_item_id}
-                                        onChange={e => {
+                                        onChange={(val) => {
                                             const newIngs = [...ingredients];
-                                            newIngs[idx].inventory_item_id = e.target.value;
+                                            newIngs[idx].inventory_item_id = val;
                                             setIngredients(newIngs);
                                         }}
-                                        className="flex-1 bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] font-semibold outline-none focus:border-emerald-500"
-                                    >
-                                        <option value="">-- Select Material --</option>
-                                        {materials.map(m => (
-                                            <option key={m.id} value={m.id} className="bg-[var(--bg-elevated)]">{m.name} ({m.unit_label})</option>
-                                        ))}
-                                    </select>
+                                        options={[
+                                            { label: '-- Select Material --', value: '' },
+                                            ...materials.map(m => ({ label: `${m.name} (${m.unit_label})`, value: m.id }))
+                                        ]}
+                                        className="flex-1"
+                                    />
                                     <button
                                         type="button"
                                         onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}

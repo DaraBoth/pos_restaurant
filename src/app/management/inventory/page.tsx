@@ -7,7 +7,7 @@ import { call } from '@/lib/tauri-commands';
 import { InventoryItem } from '@/types';
 import { getInventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem, getInventoryLogs } from '@/lib/api/inventory';
 import { formatUsd } from '@/lib/currency';
-
+import { CustomSelect } from '@/components/ui/CustomSelect';
 interface InventoryLog {
     id: string;
     product_id: string;
@@ -337,17 +337,18 @@ export default function InventoryManagement() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2">Unit Type</label>
-                                    <select 
-                                        value={formData.unit_label} onChange={e => setFormData({...formData, unit_label: e.target.value})}
-                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-2xl px-6 py-4 text-[var(--foreground)] focus:border-emerald-500 outline-none"
-                                    >
-                                        <option value="bottle">Bottle</option>
-                                        <option value="can">Can</option>
-                                        <option value="bag">Bag</option>
-                                        <option value="piece">Piece</option>
-                                        <option value="kg">Kg</option>
-                                        <option value="liter">Liter</option>
-                                    </select>
+                                    <CustomSelect 
+                                        value={formData.unit_label} 
+                                        onChange={(val) => setFormData({...formData, unit_label: val})}
+                                        options={[
+                                            { label: 'Bottle', value: 'bottle' },
+                                            { label: 'Can', value: 'can' },
+                                            { label: 'Bag', value: 'bag' },
+                                            { label: 'Piece', value: 'piece' },
+                                            { label: 'Kg', value: 'kg' },
+                                            { label: 'Liter', value: 'liter' }
+                                        ]}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2">Cost / Unit ($)</label>

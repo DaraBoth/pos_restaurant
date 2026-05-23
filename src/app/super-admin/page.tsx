@@ -11,6 +11,7 @@ import {
 import type { RestaurantSummary } from '@/types';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import { stopSync } from '@/lib/api/system';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { updateRestaurantLicense } from '@/lib/api/restaurant';
 import {
     ShieldCheck, LogOut, Plus, RefreshCw, Store,
@@ -888,17 +889,17 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Role</label>
-                        <select
+                        <CustomSelect
                             value={role}
-                            onChange={(event) => setRole(event.target.value)}
-                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
-                        >
-                            <option value="admin">Admin</option>
-                            <option value="manager">Manager</option>
-                            <option value="cashier">Cashier</option>
-                            <option value="waiter">Waiter</option>
-                            <option value="chef">Chef</option>
-                        </select>
+                            onChange={(val) => setRole(val)}
+                            options={[
+                                { label: 'Admin', value: 'admin' },
+                                { label: 'Manager', value: 'manager' },
+                                { label: 'Cashier', value: 'cashier' },
+                                { label: 'Waiter', value: 'waiter' },
+                                { label: 'Chef', value: 'chef' }
+                            ]}
+                        />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name</label>
@@ -1428,16 +1429,14 @@ function MoveUserModal({ user, restaurants, onClose, onMoved }: {
 
                     <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Target Business</label>
-                        <select 
+                        <CustomSelect 
                             value={selectedId}
-                            onChange={(e) => setSelectedId(e.target.value)}
-                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-[var(--foreground)] outline-none focus:border-[var(--accent)] appearance-none"
-                        >
-                            <option value="" disabled>Select a business...</option>
-                            {restaurants.map(r => (
-                                <option key={r.id} value={r.id}>{r.name}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedId(val)}
+                            options={[
+                                { label: 'Select a business...', value: '' },
+                                ...restaurants.map(r => ({ label: r.name, value: r.id }))
+                            ]}
+                        />
                     </div>
 
                     {error && <p className="text-[10px] text-red-400 font-bold">{error}</p>}
