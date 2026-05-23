@@ -15,6 +15,16 @@ export default function DownloadsPage() {
 
     const latest = releases[0];
 
+    const getWinDownloadUrl = (release: AppRelease) => {
+        if (release.windows_file && release.windows_file.trim() !== '') return release.windows_file;
+        return `https://github.com/DaraBoth/pos_restaurant/releases/download/v${release.version}/DineOS_${release.version}_x64_en-US.msi`;
+    };
+
+    const getMacDownloadUrl = (release: AppRelease) => {
+        if (release.mac_file && release.mac_file.trim() !== '') return release.mac_file;
+        return `https://github.com/DaraBoth/pos_restaurant/releases/download/v${release.version}/DineOS_${release.version}_aarch64.dmg`;
+    };
+
     // Helper to trigger download from Base64 or URL
     const handleDownload = async (fileData: string | undefined, filename: string) => {
         if (!fileData) return;
@@ -107,12 +117,9 @@ export default function DownloadsPage() {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             {/* Windows Download */}
                                             <button 
-                                                onClick={() => handleDownload(latest.windows_file, `DineOS_${latest.version}_x64_en-US.msi`)}
-                                                disabled={!latest.windows_file}
-                                                title={latest.windows_file ? "Download Windows Installer" : "Not available"}
-                                                className={`flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer ${latest.windows_file 
-                                                    ? 'bg-blue-600 hover:bg-blue-500 border-blue-400/30 text-white shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98]' 
-                                                    : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-40 cursor-not-allowed'}`}
+                                                onClick={() => handleDownload(getWinDownloadUrl(latest), `DineOS_${latest.version}_x64_en-US.msi`)}
+                                                title="Download Windows Installer"
+                                                className="flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer bg-blue-600 hover:bg-blue-500 border-blue-400/30 text-white shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98]"
                                             >
                                                 <div className="flex items-center justify-between w-full mb-3">
                                                     <Cpu size={24} strokeWidth={1.5} />
@@ -120,17 +127,14 @@ export default function DownloadsPage() {
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-widest opacity-80 mb-0.5">Windows</span>
                                                 <span className="text-lg font-black tracking-tight">Desktop Installer (x64)</span>
-                                                {latest.windows_file?.startsWith('http') && <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> github.com</span>}
+                                                <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> github.com</span>
                                             </button>
 
                                             {/* macOS Download */}
                                             <button 
-                                                onClick={() => handleDownload(latest.mac_file, `DineOS_${latest.version}_Universal.dmg`)}
-                                                disabled={!latest.mac_file}
-                                                title={latest.mac_file ? "Download macOS Installer" : "Not available"}
-                                                className={`flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer ${latest.mac_file 
-                                                    ? 'bg-white hover:bg-neutral-100 border-neutral-300 text-black shadow-xl shadow-white/5 hover:scale-[1.02] active:scale-[0.98]' 
-                                                    : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-40 cursor-not-allowed'}`}
+                                                onClick={() => handleDownload(getMacDownloadUrl(latest), `DineOS_${latest.version}_Universal.dmg`)}
+                                                title="Download macOS Installer"
+                                                className="flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer bg-white hover:bg-neutral-100 border-neutral-300 text-black shadow-xl shadow-white/5 hover:scale-[1.02] active:scale-[0.98]"
                                             >
                                                 <div className="flex items-center justify-between w-full mb-3">
                                                     <HardDrive size={24} strokeWidth={1.5} />
@@ -138,7 +142,7 @@ export default function DownloadsPage() {
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-widest opacity-80 mb-0.5">macOS</span>
                                                 <span className="text-lg font-black tracking-tight">Apple Silicon & Intel</span>
-                                                {latest.mac_file?.startsWith('http') && <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> github.com</span>}
+                                                <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> github.com</span>
                                             </button>
                                         </div>
                                     </div>
@@ -177,13 +181,13 @@ export default function DownloadsPage() {
                                             </div>
                                             <div className="flex gap-2">
                                                <button 
-                                                   onClick={() => handleDownload(r.windows_file, `DineOS_${r.version}_old.msi`)}
+                                                   onClick={() => handleDownload(getWinDownloadUrl(r), `DineOS_${r.version}_old.msi`)}
                                                    className="flex-1 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--bg-hover)] transition-colors"
                                                >
                                                    Windows
                                                </button>
                                                <button 
-                                                   onClick={() => handleDownload(r.mac_file, `DineOS_${r.version}_old.dmg`)}
+                                                   onClick={() => handleDownload(getMacDownloadUrl(r), `DineOS_${r.version}_old.dmg`)}
                                                    className="flex-1 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--bg-hover)] transition-colors"
                                                >
                                                    macOS
