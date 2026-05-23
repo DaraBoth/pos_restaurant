@@ -1,54 +1,51 @@
-# Cambodian Restaurant POS System
+# Welcome to DineOS 🍽️
 
-A high-performance, strictly offline, local-first Point of Sale system built with **Tauri v2**, **Rust**, **SQLite (SQLCipher)**, and **Next.js (React)**.
+**DineOS** is a modern, blazing-fast, and highly reliable Point of Sale (POS) system engineered specifically for restaurants, cafes, and eateries. Designed to streamline your daily operations, DineOS helps you serve customers faster, manage your menu effortlessly, and keep track of your sales—all from a sleek, easy-to-use interface.
 
-## Quick Start (Zero-Config Build)
+---
 
-This project has been configured so that anyone can clone it and run it immediately **without needing to set up a database, configure `.env` files, or manually create tables.** The Rust backend will automatically initialize, encrypt, and migrate the local SQLite database upon launch.
+## 🌟 Why Choose DineOS?
 
-### Prerequisites
+- **Unstoppable Reliability (Offline-First):** Internet went down? No problem. DineOS works seamlessly offline. Your business never stops, and your data syncs securely once you are back online.
+- **Tailored for Cambodia:** Built with local businesses in mind, DineOS natively supports dual-currency transactions (USD and KHR) and complies with local GDT/NBC rounding rules.
+- **Bank-Grade Security:** Your business data and staff credentials are encrypted and stored securely, giving you complete peace of mind.
+- **Always Up-To-Date:** With our seamless auto-update system, your POS will always have the latest features and security improvements without requiring manual installations.
 
-You only need the two standard compiler toolchains for Tauri:
+---
 
-1. **[Node.js](https://nodejs.org/)** (v18 or higher)
-2. **[Rust](https://rustup.rs/)** (v1.75 or higher)
-   * _Windows Users:_ The Rust installer will ask you to install the C++ Build Tools for Visual Studio 2022. Please accept this, as Native desktop apps require it.
+## ✨ Key Features
 
-> **Note:** If you just installed Rust, please **restart your terminal or Visual Studio Code** before continuing so the `cargo` command is recognized.
+### 🛒 Fast & Intuitive Checkout (POS)
+A clean and responsive point-of-sale interface designed for speed. Process orders, apply discounts, and manage tables with just a few taps so your staff can focus on the customer, not the screen.
 
-### Running the App
+### 💵 Dual-Currency & Tax Ready
+* **USD & KHR Support:** Automatically calculates totals and change in both US Dollars and Khmer Riel based on your custom exchange rate.
+* **Tax Calculations:** Built-in auto-calculation for 10% VAT and 3% PLT, keeping your receipts accurate and compliant with local tax regulations.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/DaraBoth/pos_restaurant.git
-   cd pos_restaurant
-   ```
+### 📊 Powerful Dashboard & Analytics
+Keep a pulse on your business. View daily sales summaries, track your best-selling items, and monitor your revenue growth over time through an interactive dashboard.
 
-2. **Install frontend dependencies:**
-   ```bash
-   npm install
-   ```
+### 🛠️ Easy Restaurant Management
+* **Menu Management:** Add, edit, or remove menu items and categories in seconds. Update prices instantly across the system.
+* **Staff & Roles:** Create accounts for your cashiers and managers. Secure logins ensure that sensitive settings (like the Super Admin panel) are restricted to authorized personnel only.
 
-3. **Start the Development Desktop App:**
-   ```bash
-   npm run tauri:dev
-   ```
-   *The very first time you run this, Rust will download and compile all the backend dependencies. This may take 2-5 minutes depending on your internet and CPU speed. Subsequent runs will be nearly instant.*
+### 📜 Order History & Easy Exports
+Never lose track of a transaction. Browse complete order histories, reprint receipts, and track refunds. Need to do accounting? **Export your reports directly to Excel (.xlsx)** with a single click.
 
-### Building an Installer (.msi / .exe)
+### ☁️ Cloud Sync & Local Fallback
+Enjoy the best of both worlds. DineOS backs up your data to the cloud for safety and remote management, but always keeps a lightning-fast local copy so your restaurant can keep operating smoothly regardless of your connection quality.
 
-To package the application into a standalone installer that you can put on a USB drive and install gracefully on the restaurant's tablets:
+---
 
-```bash
-npm run tauri:build
-```
+## 🚀 Getting Started
 
-The installer will be generated in `src-tauri/target/release/bundle/`.
+1. **Log In:** Launch the DineOS app and log in with your provided Admin credentials.
+2. **Setup Your Restaurant:** Navigate to the **Setup** or **Management** tab to add your menu items, categories, and set your daily exchange rate.
+3. **Start Selling:** Head over to the **POS** tab and start taking orders immediately!
 
-## Architecture Details
+---
 
-* **Frontend:** Next.js configured in pure static export mode (`output: 'export'`), styled with TailwindCSS, executing completely offline.
-* **Backend:** Tauri Rust shell handling all OS-level operations and hosting the SQLite driver.
-* **Database:** Embedded SQLite database (`%AppData%/summer/local.db`) transparently encrypted at rest natively using AES-256 (via `sqlx` and `sqlcipher`).
-* **Security:** Passwords are mathematically hashed locally using the memory-hard `Argon2` algorithm.
-* **Calculations:** Dual-currency USD/KHR checkout logic with integrated 10% VAT and 3% PLT auto-calculation. KHR calculations implement the required Base-100 roundings specified by the GDT/NBC.
+## 📞 Support & Assistance
+
+Need help setting up a new tablet or have a question about a feature? Our support team is here for you. 
+*If you are an administrator and need to re-install the software, the latest Windows installer can be provided by your support representative.*
