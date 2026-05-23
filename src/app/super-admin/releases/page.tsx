@@ -58,8 +58,8 @@ export default function ReleaseManagementPage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (file.size > 30 * 1024 * 1024) {
-            alert("File is too large (>30MB). Please use an external URL for large installers.");
+        if (file.size > 150 * 1024 * 1024) {
+            alert("File is too large (>150MB). Please select a file under 150MB.");
             e.target.value = '';
             return;
         }
