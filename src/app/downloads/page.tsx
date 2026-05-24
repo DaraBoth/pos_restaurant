@@ -16,27 +16,49 @@ export default function DownloadsPage() {
     const latest = releases[0];
 
     const getWinDownloadUrl = (release: AppRelease) => {
-        if (release.windows_file && release.windows_file.trim() !== '') return release.windows_file;
-        return `https://github.com/DaraBoth/pos_restaurant/releases/download/v${release.version}/DineOS_${release.version}_x64_en-US.msi`;
+        return release.windows_file || '';
     };
 
     const getMacDownloadUrl = (release: AppRelease) => {
-        if (release.mac_file && release.mac_file.trim() !== '') return release.mac_file;
-        return `https://github.com/DaraBoth/pos_restaurant/releases/download/v${release.version}/DineOS_${release.version}_aarch64.dmg`;
+        return release.mac_file || '';
     };
 
     // Helper to trigger download from Base64 or URL
     const handleDownload = async (fileData: string | undefined, filename: string) => {
-        if (!fileData) return;
+        if (!fileData || fileData.trim() === '') return;
         
         if (fileData.startsWith('data:')) {
-            // Base64 download
-            const link = document.createElement('a');
-            link.href = fileData;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            try {
+                // Convert Data URI / Base64 to Blob to avoid browser memory issues with massive strings
+                const parts = fileData.split(',');
+                const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+                const bstr = atob(parts[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                }
+                const blob = new Blob([u8arr], { type: mime });
+                const blobUrl = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Clean up the URL object to free memory
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            } catch (err) {
+                console.error('Base64 download failed, falling back to direct data URI:', err);
+                const link = document.createElement('a');
+                link.href = fileData;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         } else if (fileData.startsWith('http')) {
             // URL download - Use Tauri shell if available to open in default browser
             try {
@@ -118,8 +140,11 @@ export default function DownloadsPage() {
                                             {/* Windows Download */}
                                             <button 
                                                 onClick={() => handleDownload(getWinDownloadUrl(latest), `DineOS_${latest.version}_x64_en-US.msi`)}
-                                                title="Download Windows Installer"
-                                                className="flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer bg-blue-600 hover:bg-blue-500 border-blue-400/30 text-white shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98]"
+                                                disabled={!getWinDownloadUrl(latest)}
+                                                title={getWinDownloadUrl(latest) ? "Download Windows Installer" : "Not available"}
+                                                className={`flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer ${getWinDownloadUrl(latest) 
+                                                    ? 'bg-blue-600 hover:bg-blue-500 border-blue-400/30 text-white shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98]' 
+                                                    : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-40 cursor-not-allowed'}`}
                                             >
                                                 <div className="flex items-center justify-between w-full mb-3">
                                                     <Cpu size={24} strokeWidth={1.5} />
@@ -127,14 +152,17 @@ export default function DownloadsPage() {
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-widest opacity-80 mb-0.5">Windows</span>
                                                 <span className="text-lg font-black tracking-tight">Desktop Installer (x64)</span>
-                                                <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> github.com</span>
+                                                {getWinDownloadUrl(latest) && <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> {getWinDownloadUrl(latest).startsWith('data:') ? 'database' : 'external'}</span>}
                                             </button>
 
                                             {/* macOS Download */}
                                             <button 
                                                 onClick={() => handleDownload(getMacDownloadUrl(latest), `DineOS_${latest.version}_Universal.dmg`)}
-                                                title="Download macOS Installer"
-                                                className="flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer bg-white hover:bg-neutral-100 border-neutral-300 text-black shadow-xl shadow-white/5 hover:scale-[1.02] active:scale-[0.98]"
+                                                disabled={!getMacDownloadUrl(latest)}
+                                                title={getMacDownloadUrl(latest) ? "Download macOS Installer" : "Not available"}
+                                                className={`flex flex-col items-start p-6 rounded-3xl border transition-all cursor-pointer ${getMacDownloadUrl(latest) 
+                                                    ? 'bg-white hover:bg-neutral-100 border-neutral-300 text-black shadow-xl shadow-white/5 hover:scale-[1.02] active:scale-[0.98]' 
+                                                    : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-40 cursor-not-allowed'}`}
                                             >
                                                 <div className="flex items-center justify-between w-full mb-3">
                                                     <HardDrive size={24} strokeWidth={1.5} />
@@ -142,7 +170,7 @@ export default function DownloadsPage() {
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-widest opacity-80 mb-0.5">macOS</span>
                                                 <span className="text-lg font-black tracking-tight">Apple Silicon & Intel</span>
-                                                <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> github.com</span>
+                                                {getMacDownloadUrl(latest) && <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1"><ExternalLink size={10} /> {getMacDownloadUrl(latest).startsWith('data:') ? 'database' : 'external'}</span>}
                                             </button>
                                         </div>
                                     </div>
@@ -182,13 +210,19 @@ export default function DownloadsPage() {
                                             <div className="flex gap-2">
                                                <button 
                                                    onClick={() => handleDownload(getWinDownloadUrl(r), `DineOS_${r.version}_old.msi`)}
-                                                   className="flex-1 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--bg-hover)] transition-colors"
+                                                   disabled={!getWinDownloadUrl(r)}
+                                                   className={`flex-1 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all ${getWinDownloadUrl(r)
+                                                       ? 'bg-[var(--bg-elevated)] border-[var(--border)] hover:bg-[var(--bg-hover)] hover:border-[var(--accent)]/30 text-[var(--foreground)] cursor-pointer'
+                                                       : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-30 cursor-not-allowed'}`}
                                                >
                                                    Windows
                                                </button>
                                                <button 
                                                    onClick={() => handleDownload(getMacDownloadUrl(r), `DineOS_${r.version}_old.dmg`)}
-                                                   className="flex-1 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--bg-hover)] transition-colors"
+                                                   disabled={!getMacDownloadUrl(r)}
+                                                   className={`flex-1 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all ${getMacDownloadUrl(r)
+                                                       ? 'bg-[var(--bg-elevated)] border-[var(--border)] hover:bg-[var(--bg-hover)] hover:border-[var(--accent)]/30 text-[var(--foreground)] cursor-pointer'
+                                                       : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] opacity-30 cursor-not-allowed'}`}
                                                >
                                                    macOS
                                                </button>
