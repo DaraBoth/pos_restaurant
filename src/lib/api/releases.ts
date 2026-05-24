@@ -21,7 +21,14 @@ export const createAppRelease = (params: {
     windows_signature?: string;
     mac_file?: string;
     mac_signature?: string;
-}) => call<AppRelease>('create_app_release', params);
+}) => call<AppRelease>('create_app_release', {
+    version: params.version,
+    releaseNotes: params.release_notes,
+    windowsFile: params.windows_file,
+    windowsSignature: params.windows_signature,
+    macFile: params.mac_file,
+    macSignature: params.mac_signature
+});
 
 export const deleteAppRelease = (id: string) => 
     call<void>('delete_app_release', { id });
