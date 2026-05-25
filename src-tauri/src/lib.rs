@@ -194,6 +194,7 @@ pub fn run() {
             commands::releases::get_app_releases,
             commands::releases::create_app_release,
             commands::releases::delete_app_release,
+            commands::releases::download_release_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

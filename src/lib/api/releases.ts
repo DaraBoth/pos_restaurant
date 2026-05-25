@@ -4,15 +4,26 @@ export interface AppRelease {
     id: string;
     version: string;
     release_notes?: string;
+    /** "db" = stored in database, "https://..." = external URL, undefined = not available */
     windows_file?: string;
     windows_signature?: string;
+    /** "db" = stored in database, "https://..." = external URL, undefined = not available */
     mac_file?: string;
     mac_signature?: string;
     created_at: string;
 }
 
-export const getAppReleases = () => 
+export const getAppReleases = () =>
     call<AppRelease[]>('get_app_releases');
+
+/**
+ * Downloads a release file from the database to the user's Downloads folder.
+ * Returns either:
+ *   - An absolute file path (file was written to Downloads directory)
+ *   - A string starting with "url:" (external URL — open in browser)
+ */
+export const downloadReleaseFile = (id: string, platform: 'windows' | 'mac') =>
+    call<string>('download_release_file', { id, platform });
 
 export const createAppRelease = (params: {
     version: string;
@@ -30,5 +41,5 @@ export const createAppRelease = (params: {
     macSignature: params.mac_signature
 });
 
-export const deleteAppRelease = (id: string) => 
+export const deleteAppRelease = (id: string) =>
     call<void>('delete_app_release', { id });
