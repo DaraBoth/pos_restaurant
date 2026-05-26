@@ -10,6 +10,7 @@ import HoldPaymentModal from '@/components/pos/HoldPaymentModal';
 import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 
 export default function POSPage() {
     const router = useRouter();
@@ -20,6 +21,9 @@ export default function POSPage() {
     const { tableId, isTakeout, isDirect, items, clearOrder, localCart, orderId, commitLocalCart, setDirect, setTakeout, setTableId } = useOrder();
     const { user } = useAuth();
     const { lang, t } = useLanguage();
+
+    const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+    const [isLoadingRestaurant, setIsLoadingRestaurant] = useState(true);
 
     // Commit local cart first if no order exists yet (table or takeout), then open checkout
     const handleCheckout = useCallback(async () => {
@@ -34,16 +38,71 @@ export default function POSPage() {
         setIsCheckoutOpen(true);
     }, [orderId, localCart, user, commitLocalCart]);
 
-    // Handle mode changes from query param - Toggle view state without clearing data
+    // Fetch restaurant data to check if tables are disabled
     useEffect(() => {
-        if (mode === 'direct' && !isDirect) {
-            setDirect(true);
-            router.replace('/pos', { scroll: false });
-        } else if (mode === 'table' && isDirect) {
-            setDirect(false);
-            router.replace('/pos', { scroll: false });
+        let isMounted = true;
+        getRestaurant(user?.restaurant_id || undefined)
+            .then(res => {
+                if (isMounted) {
+                    setRestaurant(res);
+                    setIsLoadingRestaurant(false);
+                }
+            })
+            .catch(err => {
+                console.error('Failed to get restaurant:', err);
+                if (isMounted) {
+                    setIsLoadingRestaurant(false);
+                }
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, [user?.restaurant_id]);
+
+    // Handle mode changes and redirects based on restaurant settings
+    useEffect(() => {
+        if (isLoadingRestaurant) return;
+
+        const tablesDisabled = !restaurant || 
+            restaurant.business_type === 'Mart/Accessories Shop/Pharmacy/Bakery' || 
+            (restaurant.business_type === 'Coffee Shop' && restaurant.disable_tables === 1);
+
+        if (tablesDisabled) {
+            // Tables are disabled: MUST use direct mode
+            if (!isDirect) {
+                setDirect(true);
+            }
+            if (mode !== 'direct') {
+                router.replace('/pos?mode=direct', { scroll: false });
+            }
+        } else {
+            // Tables are enabled: use query param, or default to table mode if none specified
+            if (mode === 'direct') {
+                if (!isDirect) {
+                    setDirect(true);
+                }
+            } else { // mode === 'table' or mode is null
+                if (isDirect) {
+                    setDirect(false);
+                }
+                if (mode !== 'table') {
+                    router.replace('/pos?mode=table', { scroll: false });
+                }
+            }
         }
-    }, [mode, isDirect, setDirect, router]);
+    }, [isLoadingRestaurant, restaurant, mode, isDirect, setDirect, router]);
+
+    if (isLoadingRestaurant) {
+        return (
+            <div className="flex items-center justify-center flex-1 h-screen" style={{ background: 'var(--bg-dark)' }}>
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 rounded-full animate-spin mx-auto mb-4"
+                        style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent)' }} />
+                    <p style={{ color: 'var(--text-secondary)' }}>Loading POS...</p>
+                </div>
+            </div>
+        );
+    }
 
     // Show floor plan IF we are in Table mode AND no table is selected
     if (!isDirect && !tableId && !isTakeout) {
