@@ -11,10 +11,19 @@ import { SyncStatus } from '@/components/ui/SyncStatus';
 import { UpdateStatus } from '@/components/ui/UpdateStatus';
 import Link from 'next/link';
 import MySettingsModal from '@/components/layout/MySettingsModal';
+import { useOrder } from '@/providers/OrderProvider';
 
 const NavItem = ({
-    label, icon: Icon, path, pathname, searchParams, collapsed
-}: { label: string; icon: React.ElementType; path: string; pathname: string; searchParams: string; collapsed: boolean }) => {
+    label, icon: Icon, path, pathname, searchParams, collapsed, onClick
+}: { 
+    label: string; 
+    icon: React.ElementType; 
+    path: string; 
+    pathname: string; 
+    searchParams: string; 
+    collapsed: boolean;
+    onClick?: () => void;
+}) => {
     // Check if the current route matches the exact path (including query params if provided)
     const active = pathname.startsWith(path.split('?')[0]);
     
@@ -26,6 +35,7 @@ const NavItem = ({
     return (
         <Link
             href={path}
+            onClick={onClick}
             className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl transition-all group active:scale-95 text-sm ${isExact
                 ? 'bg-[var(--accent-blue)]/15 text-[var(--foreground)] border border-[var(--accent-blue)]/40 font-semibold'
                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] font-medium'
@@ -42,6 +52,7 @@ export default function SidebarNav() {
     const { t, lang, setLang } = useLanguage();
     const { user, setUser } = useAuth();
     const { theme, toggleTheme } = useTheme();
+    const { clearOrder } = useOrder();
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -132,9 +143,9 @@ export default function SidebarNav() {
 
             <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
                 {showTablesTab && (
-                    <NavItem label={t('pos')} icon={LayoutGrid} path="/pos?mode=table" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
+                    <NavItem label={t('pos')} icon={LayoutGrid} path="/pos?mode=table" pathname={pathname} searchParams={searchStr} collapsed={collapsed} onClick={clearOrder} />
                 )}
-                <NavItem label={t('buyProduct')} icon={Store} path="/pos?mode=direct" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
+                <NavItem label={t('buyProduct')} icon={Store} path="/pos?mode=direct" pathname={pathname} searchParams={searchStr} collapsed={collapsed} onClick={clearOrder} />
                 {false && (user?.role === 'admin' || user?.role === 'chef') && (
                     <NavItem label={t('kitchen')} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}
