@@ -181,27 +181,27 @@ export default function AnalyticsPage() {
                         ) : (
                             <div className="space-y-4">
                                 {/* Bar chart */}
-                                <div className="flex items-end gap-1.5 h-48">
-                                    {chartData.map((day, i) => {
-                                        const height = maxRevenue > 0 ? (day.total_usd / maxRevenue) * 100 : 0;
-                                        return (
-                                            <div
-                                                key={day.date}
-                                                className="flex-1 flex flex-col items-center gap-2 group relative"
-                                                title={`${day.date}: ${formatUsd(day.total_usd)} (${day.order_count} ${t('orders')})`}
-                                            >
-                                                <div className="w-full flex flex-col justify-end h-full relative">
-                                                    <div
-                                                        className="w-full rounded-md bg-[var(--accent-blue)]/80 group-hover:bg-[var(--accent-blue)] transition-all relative overflow-hidden shadow-sm"
-                                                        style={{ height: `${Math.max(height, 2)}%`, minHeight: '4px' }}
-                                                    >
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-white/20" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                 <div className="flex gap-1.5 h-48">
+                                     {chartData.map((day, i) => {
+                                         const height = maxRevenue > 0 ? (day.total_usd / maxRevenue) * 100 : 0;
+                                         return (
+                                             <div
+                                                 key={day.date}
+                                                 className="flex-1 h-full flex flex-col items-stretch group relative"
+                                                 title={`${day.date}: ${formatUsd(day.total_usd)} (${day.order_count} ${t('orders')})`}
+                                             >
+                                                 <div className="w-full flex-1 flex flex-col justify-end relative">
+                                                     <div
+                                                         className="w-full rounded-md bg-[var(--accent-blue)]/80 group-hover:bg-[var(--accent-blue)] transition-all relative overflow-hidden shadow-sm"
+                                                         style={{ height: `${Math.max(height, 2)}%`, minHeight: '4px' }}
+                                                     >
+                                                         <div className="absolute top-0 left-0 w-full h-1 bg-white/20" />
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         );
+                                     })}
+                                 </div>
                                 {/* Labels */}
                                 <div className="flex gap-1.5 pt-2">
                                     {chartData.map(day => {
@@ -299,27 +299,27 @@ export default function AnalyticsPage() {
                                     Peak Ordering Hours
                                 </h3>
                             </div>
-                            <div className="flex items-end gap-1.5 h-36 mt-4">
-                                {peakHours.length > 0 ? (() => {
-                                    const maxOrders = Math.max(...peakHours.map(h => h.order_count));
-                                    return peakHours.map(ph => {
-                                        const height = (ph.order_count / maxOrders) * 100;
-                                        return (
-                                            <div key={ph.hour} className="flex-1 flex flex-col items-center gap-2 group relative" title={`${ph.hour} : ${ph.order_count} orders`}>
-                                                <div className="w-full flex flex-col justify-end h-full">
-                                                    <div 
-                                                        className="w-full rounded-md bg-purple-500/50 group-hover:bg-purple-400 transition-colors relative overflow-hidden"
-                                                        style={{ height: `${Math.max(height, 5)}%`, minHeight: '4px' }}
-                                                    >
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-white/30" />
-                                                    </div>
-                                                </div>
-                                                <span className="text-[9px] text-[var(--text-secondary)] font-mono font-bold opacity-60 pt-1">{ph.hour.split(':')[0]}h</span>
-                                            </div>
-                                        )
-                                    });
-                                })() : <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center w-full py-6 opacity-40">No data</div>}
-                            </div>
+                             <div className="flex gap-1.5 h-36 mt-4">
+                                 {peakHours.length > 0 ? (() => {
+                                     const maxOrders = Math.max(...peakHours.map(h => h.order_count));
+                                     return peakHours.map(ph => {
+                                         const height = (ph.order_count / maxOrders) * 100;
+                                         return (
+                                             <div key={ph.hour} className="flex-1 h-full flex flex-col items-center justify-end gap-1 group relative" title={`${ph.hour} : ${ph.order_count} orders`}>
+                                                 <div className="w-full flex-1 flex flex-col justify-end relative">
+                                                     <div 
+                                                         className="w-full rounded-md bg-purple-500/50 group-hover:bg-purple-400 transition-colors relative overflow-hidden"
+                                                         style={{ height: `${Math.max(height, 5)}%`, minHeight: '4px' }}
+                                                     >
+                                                         <div className="absolute top-0 left-0 w-full h-1 bg-white/30" />
+                                                     </div>
+                                                 </div>
+                                                 <span className="text-[9px] text-[var(--text-secondary)] font-mono font-bold opacity-60 pt-1 select-none leading-none">{ph.hour.split(':')[0]}h</span>
+                                             </div>
+                                         )
+                                     });
+                                 })() : <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center w-full py-6 opacity-40">No data</div>}
+                             </div>
                         </div>
 
                         {/* Slow Movers Widget */}

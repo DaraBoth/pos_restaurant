@@ -79,7 +79,7 @@ export default function ExchangeRateManagement() {
 
                     <div className="flex items-baseline gap-3 mb-2 relative z-10">
                         <div className="text-3xl font-black font-mono text-blue-400">
-                            {rate ? formatKhr(rate.rate * 100).replace('៛', '') : '---'}
+                            {rate ? formatKhr(rate.rate).replace('៛', '') : '---'}
                         </div>
                         <span className="text-base font-black text-[var(--text-secondary)]">KHR</span>
                     </div>

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
+import { useRouter } from 'next/navigation';
 
 // ─── Zone colour palette ────────────────────────────────────────────────────
 const ZONE_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -38,6 +39,7 @@ export default function FloorPlanView() {
     const { setTableId, clearOrder, tableId: activeTableId, setTakeout, setDirect, loadTableSession } = useOrder();
     const { t } = useLanguage();
     const { user } = useAuth();
+    const router = useRouter();
 
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
@@ -62,7 +64,10 @@ export default function FloorPlanView() {
     }
 
     const handleTakeout = () => { clearOrder(); setTakeout(true); };
-    const handleDirectOrder = () => { clearOrder(); setDirect(true); };
+    const handleDirectOrder = () => {
+        clearOrder();
+        router.push('/pos?mode=direct');
+    };
 
     // ── Derived state ──────────────────────────────────────────────────────
     const counts = {

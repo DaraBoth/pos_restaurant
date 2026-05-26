@@ -16,7 +16,7 @@ export default function CheckoutModal({
     onClose: () => void;
     onComplete: (payload: ReceiptPrintPayload) => void;
 }) {
-    const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds } = useOrder();
+    const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds, refreshRate } = useOrder();
     const { user } = useAuth();
     const { t } = useLanguage();
 
@@ -27,6 +27,10 @@ export default function CheckoutModal({
 
     const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
     const [combinedTotals, setCombinedTotals] = useState(totals);
+
+    useEffect(() => {
+        refreshRate();
+    }, [refreshRate]);
 
     // Combine all rounds for receipt view
     useEffect(() => {

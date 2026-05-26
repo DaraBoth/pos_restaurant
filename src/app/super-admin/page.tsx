@@ -675,7 +675,7 @@ export default function SuperAdminPage() {
                             Global Users
                         </button>
                         <Link
-                            href="/super-admin/releases"
+                            href="/super-admin/releases/"
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-black text-xs uppercase tracking-widest hover:border-purple-500/50 hover:bg-purple-500/10 transition-all"
                         >
                             <Download size={14} className="text-purple-400" />

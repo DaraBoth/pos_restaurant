@@ -171,7 +171,7 @@ pub async fn get_slow_movers(restaurant_id: String, db: State<'_, Arc<Connection
         FROM products p
         LEFT JOIN order_items oi ON oi.product_id = p.id
         LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', '-30 days')
-        WHERE p.is_available = 1 AND p.restaurant_id = ?
+        WHERE p.is_available = 1 AND p.is_deleted = 0 AND p.restaurant_id = ?
         GROUP BY p.id
         HAVING order_count < 3
         ORDER BY order_count ASC

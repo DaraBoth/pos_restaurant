@@ -885,7 +885,13 @@ pub async fn superadmin_move_user(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
-    let mut rows = pool.query(
+    // Prefer reading from remote (authoritative) — the user may only exist in the cloud.
+    let read_conn: &Connection = match remote.0.as_ref() {
+        Some(r) => r,
+        None => &*pool,
+    };
+
+    let mut rows = read_conn.query(
         "SELECT username, password_hash, role, full_name FROM users WHERE id = ? AND is_deleted = 0",
         params![user_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
@@ -898,13 +904,7 @@ pub async fn superadmin_move_user(
     let role: String = row.get(2).unwrap_or_default();
     let full_name: String = row.get::<String>(3).unwrap_or_default();
 
-    pool.execute(
-        "UPDATE users SET restaurant_id = ?, updated_at = datetime('now') WHERE id = ?",
-        params![new_restaurant_id.clone(), user_id.clone()]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
-
+    // Write to remote (authoritative) first.
     mirror_user_update_to_remote(
         remote.0.as_ref(),
         &user_id,
@@ -915,8 +915,15 @@ pub async fn superadmin_move_user(
         &full_name,
     ).await?;
 
+    // Best-effort local update — ignore FK errors if the restaurant doesn't exist locally.
+    let _ = pool.execute(
+        "UPDATE users SET restaurant_id = ?, updated_at = datetime('now') WHERE id = ?",
+        params![new_restaurant_id, user_id]
+    ).await;
+
     Ok(())
 }
+
 
 #[tauri::command]
 pub async fn superadmin_create_restaurant_user(
@@ -939,29 +946,29 @@ pub async fn superadmin_create_restaurant_user(
     let final_full_name = full_name.unwrap_or_default();
     let final_khmer_name = khmer_name.unwrap_or_default();
 
-    pool.execute(
-        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name)
+    // Write to remote (authoritative cloud DB) first.
+    // The superadmin works cloud-first; the restaurant may not exist in the local DB.
+    if let Some(remote_conn) = remote.0.as_ref() {
+        remote_conn.execute(
+            "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+            params![
+                user_id.clone(),
+                restaurant_id.clone(),
+                username.clone(),
+                hash.clone(),
+                role.clone(),
+                final_full_name.clone(),
+                final_khmer_name.clone()
+            ]
+        ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+    }
+
+    // Best-effort local insert — ignore FK/unique errors because the restaurant
+    // may only exist in the cloud and not yet been seeded to this local DB.
+    let _ = pool.execute(
+        "INSERT OR IGNORE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name)
          VALUES (?, ?, ?, ?, ?, ?, ?)",
-        params![
-            user_id.clone(),
-            restaurant_id.clone(),
-            username.clone(),
-            hash.clone(),
-            role.clone(),
-            final_full_name.clone(),
-            final_khmer_name.clone()
-        ]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
-
-    let Some(remote_conn) = remote.0.as_ref() else {
-        return Ok(user_id);
-    };
-
-    remote_conn.execute(
-        "INSERT OR REPLACE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         params![
             user_id.clone(),
             restaurant_id,
@@ -971,7 +978,7 @@ pub async fn superadmin_create_restaurant_user(
             final_full_name,
             final_khmer_name
         ]
-    ).await.map_err(|e| format!("Cloud sync error: {}", e))?;
+    ).await;
 
     Ok(user_id)
 }

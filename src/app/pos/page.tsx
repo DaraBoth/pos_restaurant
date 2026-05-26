@@ -18,12 +18,20 @@ export default function POSPage() {
     const [isHoldOpen, setIsHoldOpen] = useState(false);
     const searchParams = useSearchParams();
     const mode = searchParams.get('mode');
-    const { tableId, isTakeout, isDirect, items, clearOrder, localCart, orderId, commitLocalCart, setDirect, setTakeout, setTableId } = useOrder();
+    const { tableId, isTakeout, isDirect, items, clearOrder, localCart, orderId, commitLocalCart, setDirect, setTakeout, setTableId, refreshRate } = useOrder();
     const { user } = useAuth();
     const { lang, t } = useLanguage();
 
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
     const [isLoadingRestaurant, setIsLoadingRestaurant] = useState(true);
+
+    useEffect(() => {
+        refreshRate();
+    }, [refreshRate]);
+
+    const tablesDisabled = !restaurant || 
+        restaurant.business_type === 'Mart/Accessories Shop/Pharmacy/Bakery' || 
+        (restaurant.business_type === 'Coffee Shop' && restaurant.disable_tables === 1);
 
     // Commit local cart first if no order exists yet (table or takeout), then open checkout
     const handleCheckout = useCallback(async () => {
@@ -37,6 +45,13 @@ export default function POSPage() {
         }
         setIsCheckoutOpen(true);
     }, [orderId, localCart, user, commitLocalCart]);
+
+    const handleBack = useCallback(() => {
+        clearOrder();
+        if (!tablesDisabled) {
+            router.push('/pos?mode=table');
+        }
+    }, [clearOrder, tablesDisabled, router]);
 
     // Fetch restaurant data to check if tables are disabled
     useEffect(() => {
@@ -63,10 +78,6 @@ export default function POSPage() {
     useEffect(() => {
         if (isLoadingRestaurant) return;
 
-        const tablesDisabled = !restaurant || 
-            restaurant.business_type === 'Mart/Accessories Shop/Pharmacy/Bakery' || 
-            (restaurant.business_type === 'Coffee Shop' && restaurant.disable_tables === 1);
-
         if (tablesDisabled) {
             // Tables are disabled: MUST use direct mode
             if (!isDirect) {
@@ -90,7 +101,7 @@ export default function POSPage() {
                 }
             }
         }
-    }, [isLoadingRestaurant, restaurant, mode, isDirect, setDirect, router]);
+    }, [isLoadingRestaurant, tablesDisabled, mode, isDirect, setDirect, router]);
 
     if (isLoadingRestaurant) {
         return (
@@ -115,9 +126,9 @@ export default function POSPage() {
                 <header className="flex-shrink-0 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-card)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
-                            {!isDirect && (
+                            {!tablesDisabled && (
                                 <button
-                                    onClick={clearOrder}
+                                    onClick={handleBack}
                                     className="w-7 h-7 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                                     title={t('backToFloorPlan')}
                                 >

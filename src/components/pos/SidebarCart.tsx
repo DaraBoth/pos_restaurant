@@ -3,7 +3,7 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds, getRestaurant, getSessionOrderItems } from '@/lib/tauri-commands';
-import { formatUsd, formatKhr, calculateTotals } from '@/lib/currency';
+import { formatUsd, formatKhr, calculateTotals, roundKhr } from '@/lib/currency';
 import { useEffect, useState, useRef } from 'react';
 import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight, Printer, X } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
@@ -181,7 +181,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                     vatCents: 0,
                     pltCents: 0,
                     totalUsdCents: localCartTotalCents,
-                    totalKhr: localCartTotalCents * 4100 // Approximation or get from provider if available
+                    totalKhr: roundKhr(localCartTotalCents, exchangeRate)
                 };
             }
 

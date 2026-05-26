@@ -33,9 +33,7 @@ pub struct RevenueByDay {
 /// GDT/NBC KHR rounding: if decimal part > 0.5, round up; otherwise round down (truncate)
 fn round_khr(usd_cents: i64, rate: f64) -> i64 {
     let total_khr_float = (usd_cents as f64 / 100.0) * rate;
-    let int_part = total_khr_float.floor() as i64;
-    let frac = total_khr_float - total_khr_float.floor();
-    if frac > 0.5 { int_part + 1 } else { int_part }
+    (total_khr_float / 100.0).round() as i64 * 100
 }
 
 #[tauri::command]

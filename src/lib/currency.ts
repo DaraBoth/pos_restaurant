@@ -3,15 +3,12 @@
 // ============================================================
 
 /**
- * GDT/NBC rounding rule:
- *   - If the KHR decimal part > 0.5 → round up to nearest riel
- *   - Otherwise → round down (truncate)
+ * GDT/NBC rounding rule for POS/Retail:
+ *   - Riel amounts are rounded to the nearest 100 Riel as there are no bills smaller than 100 Riels in general circulation.
  */
 export function roundKhr(usdCents: number, rate: number): number {
     const totalKhrFloat = (usdCents / 100) * rate;
-    const intPart = Math.floor(totalKhrFloat);
-    const frac = totalKhrFloat - intPart;
-    return frac > 0.5 ? intPart + 1 : intPart;
+    return Math.round(totalKhrFloat / 100) * 100;
 }
 
 /** Format USD cents to display string: e.g. 450 → "$4.50" */
