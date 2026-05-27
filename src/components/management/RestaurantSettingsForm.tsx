@@ -22,6 +22,7 @@ const DEFAULT: RestaurantInput = {
     website: '',
     logo_path: '',
     receipt_footer: 'Thank you for your visit!',
+    receipt_width: '80mm',
     license_expires_at: '',
     license_support_contact: '',
     business_type: 'Restaurant/Pub/Bar',
@@ -38,6 +39,7 @@ const SAMPLE_SETUP_INFO: RestaurantInput = {
     vat_number: 'VAT-PP-2026-001',
     website: 'www.voltcoffee.kh',
     receipt_footer: 'Thank you for your visit!\nPlease come again.',
+    receipt_width: '80mm',
     business_type: 'Coffee Shop',
     disable_tables: 0,
 };
@@ -157,6 +159,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         website: restaurant.website || '',
                         logo_path: restaurant.logo_path || '',
                         receipt_footer: restaurant.receipt_footer || DEFAULT.receipt_footer,
+                        receipt_width: restaurant.receipt_width || '80mm',
                         license_expires_at: restaurant.license_expires_at || '',
                         license_support_contact: restaurant.license_support_contact || '',
                         business_type: restaurant.business_type || 'Restaurant/Pub/Bar',
@@ -396,6 +399,23 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                                         </button>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Receipt Paper Size Dropdown */}
+                        <div className="border-b border-[var(--border)] pb-5 space-y-2.5">
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">
+                                Receipt Paper Size
+                            </label>
+                            <div className="max-w-md">
+                                <CustomSelect
+                                    value={info.receipt_width || '80mm'}
+                                    onChange={(val) => saveField('receipt_width', val)}
+                                    options={[
+                                        { label: '80mm (Standard POS / Epson TM-T88)', value: '80mm' },
+                                        { label: '58mm (Small Thermal Printer)', value: '58mm' }
+                                    ]}
+                                />
                             </div>
                         </div>
 

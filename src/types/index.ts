@@ -39,6 +39,7 @@ export interface Restaurant {
     website?: string;
     vat_number?: string;
     receipt_footer?: string;
+    receipt_width?: string;
     logo_path?: string;
     license_expires_at?: string;
     license_support_contact?: string;
@@ -66,6 +67,7 @@ export interface RestaurantInput {
     website?: string;
     vat_number?: string;
     receipt_footer?: string;
+    receipt_width?: string;
     logo_path?: string;
     license_expires_at?: string;
     license_support_contact?: string;

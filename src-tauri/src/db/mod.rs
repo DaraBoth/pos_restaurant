@@ -141,6 +141,7 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("restaurants", "business_type", "business_type TEXT NOT NULL DEFAULT 'Restaurant/Pub/Bar'");
     add_col!("users", "phone", "phone TEXT");
     add_col!("restaurants", "disable_tables", "disable_tables INTEGER NOT NULL DEFAULT 0");
+    add_col!("restaurants", "receipt_width", "receipt_width TEXT NOT NULL DEFAULT '80mm'");
 
     // Ensure emergency tables exist
     if let Err(e) = conn.execute(

@@ -61,20 +61,23 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    const paperWidth = payload.restaurant.receipt_width === '58mm' ? '58mm' : '80mm';
+    const isSmall = paperWidth === '58mm';
+
     return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Receipt</title>
   <style>
-    @page { size: 58mm auto; margin: 0; }
+    @page { size: ${paperWidth} auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', system-ui, sans-serif;
-      font-size: 10px;
+      font-size: ${isSmall ? '10px' : '11.5px'};
       color: #000;
-      width: 58mm;
-      padding: 4mm 2mm;
+      width: ${paperWidth};
+      padding: ${isSmall ? '4mm 2mm' : '6mm 4mm'};
     }
     .center { text-align: center; }
     .right { text-align: right; }
@@ -82,46 +85,46 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 
     /* ── Header ── */
     .hd { text-align: center; padding-bottom: 8px; }
-    .hd .biz-name { font-size: 15px; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
-    .hd .biz-km { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-    .hd .addr { font-size: 8.5px; line-height: 1.3; }
+    .hd .biz-name { font-size: ${isSmall ? '15px' : '18px'}; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
+    .hd .biz-km { font-size: ${isSmall ? '13px' : '16px'}; font-weight: 700; margin-bottom: 4px; }
+    .hd .addr { font-size: ${isSmall ? '8.5px' : '10px'}; line-height: 1.35; }
 
     /* ── Dividers ── */
     .d-dash { border: none; border-top: 1px dashed #000; margin: 6px 0; }
     .d-double { border: none; border-top: 3px double #000; margin: 6px 0; }
 
     /* ── Meta ── */
-    .meta { font-size: 9px; width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    .meta { font-size: ${isSmall ? '9px' : '10.5px'}; width: 100%; border-collapse: collapse; margin-bottom: 4px; }
     .meta td { padding: 1px 0; }
-    .meta .lbl { font-weight: 700; text-transform: uppercase; font-size: 7.5px; opacity: 0.8; }
+    .meta .lbl { font-weight: 700; text-transform: uppercase; font-size: ${isSmall ? '7.5px' : '9px'}; opacity: 0.8; }
     .meta .val { font-weight: 900; }
 
     /* ── Items ── */
     .items-tbl { width: 100%; border-collapse: collapse; margin-top: 4px; }
     .items-tbl th { 
         text-align: left; 
-        font-size: 8px; 
+        font-size: ${isSmall ? '8px' : '9.5px'}; 
         font-weight: 900; 
         padding-bottom: 4px;
         border-bottom: 1px solid #000;
     }
     .items-tbl td { padding: 5px 0; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
     .col-qty { width: 22px; text-align: center; font-weight: 900; }
-    .col-total { width: 55px; text-align: right; font-weight: 900; }
+    .col-total { width: ${isSmall ? '55px' : '75px'}; text-align: right; font-weight: 900; }
     .item-nm { font-weight: 700; display: block; }
-    .item-km { font-size: 9.5px; opacity: 0.8; }
-    .item-pr { font-size: 8px; opacity: 0.6; font-family: monospace; }
+    .item-km { font-size: ${isSmall ? '9.5px' : '11px'}; opacity: 0.8; }
+    .item-pr { font-size: ${isSmall ? '8px' : '9.5px'}; opacity: 0.6; font-family: monospace; }
 
     /* ── Summary ── */
     .summary { margin-top: 8px; padding-top: 4px; }
     .totals { width: 100%; border-collapse: collapse; }
     .totals td { padding: 2px 0; }
-    .grand-usd { font-size: 14px; font-weight: 900; padding: 6px 0 2px; border-top: 1px dashed #000; }
-    .grand-khr { font-size: 10.5px; font-weight: 900; }
+    .grand-usd { font-size: ${isSmall ? '14px' : '17px'}; font-weight: 900; padding: 6px 0 2px; border-top: 1px dashed #000; }
+    .grand-khr { font-size: ${isSmall ? '10.5px' : '12.5px'}; font-weight: 900; }
 
     .footer { text-align: center; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; }
-    .footer .msg { font-size: 10.5px; font-weight: 700; }
-    .footer .brand { font-size: 7px; opacity: 0.4; text-transform: uppercase; margin-top: 8px; }
+    .footer .msg { font-size: ${isSmall ? '10.5px' : '12px'}; font-weight: 700; }
+    .footer .brand { font-size: ${isSmall ? '7px' : '8.5px'}; opacity: 0.4; text-transform: uppercase; margin-top: 8px; }
   </style>
 </head>
 <body>
