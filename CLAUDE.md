@@ -26,7 +26,20 @@ There is no test framework configured. Do not invent test commands.
 
 ### Release / version bump
 
-**Deployment is ONLY done via the release scripts** — do not hand-edit versions, manually tag, or push releases through any other path. Use `release.ps1` (Windows) or `release.sh` (bash); both bump the version in `package.json` AND `src-tauri/tauri.conf.json`, commit, tag `vX.Y.Z`, and push. CI (`.github/workflows/release.yml`) then runs `tauri-action` on Windows + macOS (x86_64 + aarch64) and drafts a GitHub Release. The auto-updater endpoint is hardcoded to `https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json` (`tauri.conf.json`). **Both version fields must stay in sync** — the release scripts are the only supported way to keep them aligned.
+**Deployment is ONLY done via the release scripts** — do not hand-edit versions, manually tag, or push releases through any other path. Use `release.ps1` (Windows) or `release.sh` (bash); both bump the version in `package.json` AND `src-tauri/tauri.conf.json`, commit, tag `vX.Y.Z`, and push. CI (`.github/workflows/release.yml`) then runs `tauri-action` on Windows + macOS (x86_64 + aarch64) and **publishes** a GitHub Release (not a draft — required for auto-update, see below). **Both version fields must stay in sync** — the release scripts are the only supported way to keep them aligned.
+
+### Auto-update
+
+Running installs poll `tauri.conf.json::plugins.updater.endpoints[0]` (`https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json`) every 10 minutes via `src/components/ui/UpdateStatus.tsx` (mounted in the sidebar) using `@tauri-apps/plugin-updater::check()`. When a newer signed bundle is found, the sidebar shows an amber "Update v2.x.x" pill; clicking downloads and `relaunch()`s.
+
+The flow requires three things to all be true; if any breaks, the updater silently returns "no update" and the pill never appears:
+1. **Release is published, not draft.** `releaseDraft: false` in `release.yml`. GitHub's `/releases/latest` redirect resolves only to published releases.
+2. **`latest.json` was uploaded to the release.** `createUpdaterArtifacts: true` in `tauri.conf.json::bundle` + signing-key env vars (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) in the workflow are what make `tauri-action` generate and upload it. If those secrets are missing in GitHub repo settings, the manifest is never produced.
+3. **The bundle is signed with the key matching `pubkey`** in `tauri.conf.json`. The pubkey is baked into every installed binary; bundles signed with a different key are rejected at install time even if downloaded successfully.
+
+Debug a stuck updater by opening the running app's DevTools console — `[Updater]` lines log each check result (and the underlying error on failure). The endpoint URL can also be hit directly in a browser to confirm `latest.json` is reachable.
+
+A `latest.json` file at the repo root is **not** read by anything at runtime — it's just dev-time debug output and is gitignored.
 
 ## Architecture
 

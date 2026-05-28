@@ -59,5 +59,10 @@ jobs:
           tagName: v__VERSION__
           releaseName: "DineOS v__VERSION__"
           releaseBody: "Automated production build for DineOS POS."
-          releaseDraft: true
+          # IMPORTANT: must be `false` so GitHub's /releases/latest endpoint
+          # resolves to this release. The Tauri updater fetches latest.json
+          # from that URL — drafts are invisible to it and the updater
+          # silently 404s, which is what made the auto-update flow look
+          # broken in v2.3.x. See CLAUDE.md "Auto-update" for the full flow.
+          releaseDraft: false
           prerelease: false

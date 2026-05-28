@@ -29,15 +29,23 @@ export function UpdateStatus() {
                 if (cancelled) return;
                 if (update) {
                     const ver = update.version || 'latest';
+                    console.info(`[Updater] new version available: ${ver}`);
                     setLatestVersion(ver);
                     setPendingUpdate(update);
                     if (dismissed !== ver) setState('available');
                 } else {
+                    console.info('[Updater] already on the latest version');
                     setState('idle');
                 }
-            } catch {
-                // silently ignore — no release published yet
-                if (!cancelled) setState('idle');
+            } catch (err) {
+                // Log but don't surface a banner — failures are usually
+                // transient (offline, GitHub rate limit, manifest not yet
+                // uploaded for a brand-new release). Open DevTools to see
+                // exactly why a poll failed.
+                if (!cancelled) {
+                    console.warn('[Updater] check failed:', err);
+                    setState('idle');
+                }
             }
         }
 
@@ -59,7 +67,9 @@ export function UpdateStatus() {
             setState('ready');
             const { relaunch } = await import('@tauri-apps/plugin-process');
             await relaunch();
-        } catch {
+        } catch (err) {
+            // Bring the user back to the "Update v…" pill so they can retry.
+            console.error('[Updater] install failed:', err);
             setState('available');
         }
     }

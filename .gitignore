@@ -29,6 +29,11 @@
 # Claude Code local settings
 .claude/
 
+# Tauri-updater debug artifacts (the real latest.json is uploaded to GitHub
+# Releases by CI; we don't keep a copy in the repo).
+/latest.json
+/latest-release.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
