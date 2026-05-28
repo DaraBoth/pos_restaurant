@@ -63,6 +63,10 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 
     const paperWidth = payload.restaurant.receipt_width === '58mm' ? '58mm' : '80mm';
     const isSmall = paperWidth === '58mm';
+    // Side padding keeps content off the roll edge; bottom padding feeds paper
+    // past the cutter head so the auto-cut doesn't slice the last printed line.
+    const sidePadding = isSmall ? '2mm' : '4mm';
+    const cutterFeed  = isSmall ? '4mm' : '6mm';
 
     return `<!DOCTYPE html>
 <html>
@@ -70,21 +74,24 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
   <meta charset="utf-8" />
   <title>Receipt</title>
   <style>
+    /* size: <width> auto → page width fixed to roll, height shrinks to content. */
     @page { size: ${paperWidth} auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; background: #fff; }
     body {
       font-family: 'Inter', system-ui, sans-serif;
       font-size: ${isSmall ? '10px' : '11.5px'};
       color: #000;
-      width: ${paperWidth};
-      padding: ${isSmall ? '4mm 2mm' : '6mm 4mm'};
+      /* No top padding — start printing flush with the paper top.
+         Bottom padding doubles as cutter clearance. */
+      padding: 0 ${sidePadding} ${cutterFeed};
     }
     .center { text-align: center; }
     .right { text-align: right; }
     .bold { font-weight: 900; }
 
     /* ── Header ── */
-    .hd { text-align: center; padding-bottom: 8px; }
+    .hd { text-align: center; padding-top: 2mm; padding-bottom: 6px; }
     .hd .biz-name { font-size: ${isSmall ? '15px' : '18px'}; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
     .hd .biz-km { font-size: ${isSmall ? '13px' : '16px'}; font-weight: 700; margin-bottom: 4px; }
     .hd .addr { font-size: ${isSmall ? '8.5px' : '10px'}; line-height: 1.35; }
@@ -122,9 +129,9 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     .grand-usd { font-size: ${isSmall ? '14px' : '17px'}; font-weight: 900; padding: 6px 0 2px; border-top: 1px dashed #000; }
     .grand-khr { font-size: ${isSmall ? '10.5px' : '12.5px'}; font-weight: 900; }
 
-    .footer { text-align: center; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; }
+    .footer { text-align: center; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
     .footer .msg { font-size: ${isSmall ? '10.5px' : '12px'}; font-weight: 700; }
-    .footer .brand { font-size: ${isSmall ? '7px' : '8.5px'}; opacity: 0.4; text-transform: uppercase; margin-top: 8px; }
+    .footer .brand { font-size: ${isSmall ? '7px' : '8.5px'}; opacity: 0.4; text-transform: uppercase; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -214,12 +221,36 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 </html>`;
 }
 
+/** Custom event the global ReceiptPrintSheet listens for. */
+export const RECEIPT_PREVIEW_EVENT = 'dineos:receipt-preview';
+
+/**
+ * Default print entry point — opens the slide-out preview sheet, where the
+ * cashier confirms and then triggers the OS print dialog (which lists USB /
+ * LAN / Bluetooth thermal printers configured in Windows / macOS).
+ *
+ * Wiring: <ReceiptPrintSheet /> is mounted once in src/app/layout.tsx and
+ * listens for RECEIPT_PREVIEW_EVENT on the window.
+ */
 export function printReceipt(payload: ReceiptPrintPayload) {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+        new CustomEvent<ReceiptPrintPayload>(RECEIPT_PREVIEW_EVENT, { detail: payload })
+    );
+}
+
+/**
+ * Direct, no-preview print — drops the receipt HTML into a hidden iframe and
+ * fires window.print() immediately. Kept for flows that have already shown a
+ * confirmation (e.g. future kitchen ticket auto-print). Prefer printReceipt()
+ * for cashier-facing checkouts so the user sees what they're about to print.
+ */
+export function printReceiptDirect(payload: ReceiptPrintPayload) {
     if (typeof window === 'undefined') return;
 
     const html = getReceiptHtml(payload);
 
-    // Use a hidden iframe — window.open() is blocked by Tauri's WebView.
+    // window.open() is blocked by Tauri's WebView, so we hide an iframe instead.
     const iframe = document.createElement('iframe');
     iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
     document.body.appendChild(iframe);

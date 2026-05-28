@@ -7,7 +7,7 @@ import { checkoutOrder, checkoutSession, getOrderItems, getRestaurant, PaymentIn
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
 import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag, Printer } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
-import { getReceiptHtml, printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
+import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 
 export default function CheckoutModal({
     onClose,

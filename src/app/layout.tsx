@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import RouteGuard from "@/components/auth/RouteGuard";
 
 import AppShell from "@/components/layout/AppShell";
+import ReceiptPrintSheet from "@/components/pos/ReceiptPrintSheet";
 
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({
               <OrderProvider>
                 <RouteGuard>
                   <AppShell>{children}</AppShell>
+                  <ReceiptPrintSheet />
                 </RouteGuard>
 
               </OrderProvider>
