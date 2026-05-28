@@ -33,12 +33,26 @@ automatically.
 
 `web/app/page.tsx` and `web/app/km/page.tsx` are async Server Components.
 They call `fetchLatestRelease()` from `web/app/_lib/release.ts` at request
-time, which calls the GitHub API with the `GIT_TOKEN` header from
-`process.env.GIT_TOKEN`. The response is cached on Vercel's edge for 10
-minutes (`next: { revalidate: 600 }`), then revalidated in the background
-on the next request. The Client Component (`_components/LandingPage.tsx`)
-receives the parsed release as a prop — it never makes its own fetch and
-never sees the token.
+time, which:
+
+1. **Reads the latest row from Turso `app_releases`** (the same table the
+   in-app `/super-admin/releases` page writes to — single source of truth).
+   Uses `process.env.TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`.
+2. **Falls back to GitHub Releases API** (with `GIT_TOKEN`) if Turso is
+   empty or the query fails, so the site never goes blank even mid-migration.
+
+The Client Component (`_components/LandingPage.tsx`) receives the parsed
+release as a prop — it never makes its own fetch and never sees any token.
+Cached on Vercel's edge for 5 minutes, revalidated in the background on
+the next request.
+
+### Tauri auto-updater manifest
+
+`GET /api/manifest` returns the latest `app_releases` row in the JSON
+shape that `@tauri-apps/plugin-updater` expects. Point the desktop app's
+`src-tauri/tauri.conf.json::plugins.updater.endpoints[0]` at the
+production URL of this route to drive the in-app auto-update from the
+same database table.
 
 ## Push a web-only change
 
