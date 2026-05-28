@@ -27,6 +27,14 @@ export interface RestaurantSummary {
     admin_full_name?: string;
 }
 
+/** Wrapper for list_all_restaurants — names the data source so the
+ *  super-admin UI shows a warning when the cloud query fell back to local. */
+export interface RestaurantListResponse {
+    restaurants: RestaurantSummary[];
+    source: 'remote' | 'local';
+    remote_error?: string;
+}
+
 // --------------- Restaurant ---------------
 export interface Restaurant {
     id: string;

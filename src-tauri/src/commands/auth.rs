@@ -1,10 +1,21 @@
 use tauri::State;
 use libsql::{Connection, params};
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 use crate::db::RemoteDb;
 use crate::models::{User, UserSession, RestaurantSummary};
 use argon2::{Argon2, PasswordHash, PasswordVerifier, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
+
+/// Wrapper that surfaces whether `list_all_restaurants` answered from the cloud
+/// or fell back to local. The super-admin UI shows a warning badge when
+/// `source == "local"` so it never silently displays a stale subset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestaurantListResponse {
+    pub restaurants: Vec<RestaurantSummary>,
+    pub source: String,                // "remote" | "local"
+    pub remote_error: Option<String>,  // populated when the remote attempt failed
+}
 
 struct AuthRecord {
     id: String,
@@ -572,18 +583,17 @@ pub async fn update_user(
 }
 
 /// Lists all restaurants with their primary admin user (for super admin dashboard).
-/// Prefers the remote (cloud) DB so the superadmin sees every restaurant regardless
-/// of which device it was created on. Falls back to local if offline.
+/// Prefers the remote (cloud) DB so the superadmin sees every restaurant
+/// regardless of which device it was created on. Returns a wrapper that names
+/// the source ("remote" vs "local") and surfaces the remote error if any —
+/// the UI shows a warning when source = "local" so the admin doesn't mistake
+/// a sync gap for a true subset of restaurants. (Replaces an earlier silent
+/// fallback that caused dev installs to show only locally-known restaurants.)
 #[tauri::command]
 pub async fn list_all_restaurants(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
-) -> Result<Vec<RestaurantSummary>, String> {
-    let _conn: &Connection = match remote.0.as_ref() {
-        Some(r) => r,
-        None => &*pool,
-    };
-
+) -> Result<RestaurantListResponse, String> {
     const QUERY: &str =
         "SELECT r.id, r.name, r.khmer_name, r.address, r.phone, r.license_expires_at, r.license_support_contact, r.created_at,
                 u.id, u.username, u.full_name
@@ -597,23 +607,28 @@ pub async fn list_all_restaurants(
          WHERE r.is_deleted = 0
          ORDER BY r.created_at DESC";
 
-    let rows_result = if let Some(remote_conn) = remote.0.as_ref() {
+    let (rows_result, source, remote_error) = if let Some(remote_conn) = remote.0.as_ref() {
         match remote_conn.query(QUERY, ()).await {
-            Ok(r) => Ok(r),
+            Ok(r) => (Ok(r), "remote".to_string(), None),
             Err(e) => {
-                eprintln!("[Auth] Remote list_all_restaurants failed, fallback to local: {}", e);
-                pool.query(QUERY, ()).await
+                let msg = e.to_string();
+                eprintln!("[Auth] Remote list_all_restaurants failed, fallback to local: {}", msg);
+                (pool.query(QUERY, ()).await, "local".to_string(), Some(msg))
             }
         }
     } else {
-        pool.query(QUERY, ()).await
+        (
+            pool.query(QUERY, ()).await,
+            "local".to_string(),
+            Some("No remote connection configured — running offline.".to_string()),
+        )
     };
 
     let mut rows = rows_result.map_err(|e| format!("Database error: {}", e))?;
 
-    let mut list = Vec::new();
+    let mut restaurants = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
-        list.push(RestaurantSummary {
+        restaurants.push(RestaurantSummary {
             id: row.get::<String>(0).unwrap_or_default(),
             name: row.get::<String>(1).unwrap_or_default(),
             khmer_name: row.get::<String>(2).ok(),
@@ -627,7 +642,7 @@ pub async fn list_all_restaurants(
             admin_full_name: row.get::<String>(10).ok(),
         });
     }
-    Ok(list)
+    Ok(RestaurantListResponse { restaurants, source, remote_error })
 }
 
 /// Creates a new restaurant and its owner admin account atomically.

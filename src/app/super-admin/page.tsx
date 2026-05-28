@@ -528,6 +528,8 @@ export default function SuperAdminPage() {
     const { theme, toggleTheme } = useTheme();
 
     const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
+    const [restaurantsSource, setRestaurantsSource] = useState<'remote' | 'local'>('remote');
+    const [remoteError, setRemoteError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [selected, setSelected] = useState<RestaurantSummary | null>(null);
@@ -564,9 +566,11 @@ export default function SuperAdminPage() {
         setLoading(true);
         try {
             const data = await listAllRestaurants();
-            setRestaurants(data);
+            setRestaurants(data.restaurants);
+            setRestaurantsSource(data.source);
+            setRemoteError(data.remote_error ?? null);
             // Keep the open drawer in sync with fresh data
-            setSelected(prev => prev ? (data.find(r => r.id === prev.id) ?? prev) : null);
+            setSelected(prev => prev ? (data.restaurants.find(r => r.id === prev.id) ?? prev) : null);
         } catch (e) {
             console.error(e);
         } finally {
@@ -639,6 +643,22 @@ export default function SuperAdminPage() {
             </header>
 
             <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+                {/* ── Local-fallback warning ── */}
+                {restaurantsSource === 'local' && (
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-start gap-3">
+                        <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="space-y-0.5 text-sm">
+                            <p className="font-black text-amber-300 uppercase tracking-widest text-xs">
+                                Showing local copy — cloud unavailable
+                            </p>
+                            <p className="text-[12px] text-amber-200/80 leading-relaxed">
+                                This list is from this device&apos;s offline copy. Restaurants created on
+                                other devices may be missing. {remoteError ? <span className="opacity-70">({remoteError})</span> : null}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── Stats row ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[

@@ -350,6 +350,98 @@ async fn ensure_critical_columns(conn: &Connection) {
         let _ = conn.execute("INSERT OR IGNORE INTO _migrations (id) VALUES ('003_fix_broken_order_fks')", ()).await;
         println!("[DB] order_items and payments foreign keys restored ✓");
     }
+
+    // ── Migration 005: Drop the lingering orders.session_id FK ─────────────
+    // The 001 baseline created `orders.session_id` with `REFERENCES table_sessions(id)`.
+    // Migration 002 only rebuilt the table when the status CHECK constraint was
+    // present, so installs that hit a different path can still carry the FK.
+    // That FK fires during INSERT INTO orders for fresh sessions in the table
+    // flow ("Insert orders error: FOREIGN KEY constraint failed" with a
+    // session_id that was just inserted into table_sessions) — reproduced by
+    // a Cambodia user on v2.3.x. Idempotent: only runs when the FK is still
+    // there, recorded in _migrations either way so it never re-runs.
+    let needs_session_fk_drop = {
+        let mut r = conn.query(
+            "SELECT 1 FROM _migrations WHERE id = '005_orders_drop_session_fk'",
+            ()
+        ).await;
+        match r {
+            Ok(ref mut rows) => rows.next().await.ok().flatten().is_none(),
+            Err(_) => false,
+        }
+    };
+    if needs_session_fk_drop {
+        let has_session_fk = {
+            let mut r = conn.query(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'",
+                ()
+            ).await;
+            match r {
+                Ok(ref mut rows) => {
+                    if let Ok(Some(row)) = rows.next().await {
+                        let sql = row.get::<String>(0).unwrap_or_default().to_uppercase();
+                        // Look for SESSION_ID followed by REFERENCES within a short window
+                        if let Some(idx) = sql.find("SESSION_ID") {
+                            let end = (idx + 80).min(sql.len());
+                            sql[idx..end].contains("REFERENCES")
+                        } else { false }
+                    } else { false }
+                }
+                Err(_) => false,
+            }
+        };
+        if has_session_fk {
+            println!("[DB] Migration 005: dropping orders.session_id FK…");
+            let stmts = [
+                "ALTER TABLE orders RENAME TO _orders_old_005",
+                "CREATE TABLE orders (
+                    id              TEXT PRIMARY KEY,
+                    user_id         TEXT REFERENCES users(id),
+                    table_id        TEXT,
+                    session_id      TEXT,
+                    round_number    INTEGER NOT NULL DEFAULT 1,
+                    status          TEXT NOT NULL DEFAULT 'open',
+                    total_usd       INTEGER NOT NULL DEFAULT 0,
+                    total_khr       INTEGER NOT NULL DEFAULT 0,
+                    tax_vat         INTEGER NOT NULL DEFAULT 0,
+                    tax_plt         INTEGER NOT NULL DEFAULT 0,
+                    bakong_bill_number TEXT,
+                    notes           TEXT,
+                    customer_name   TEXT,
+                    customer_phone  TEXT,
+                    is_deleted      INTEGER NOT NULL DEFAULT 0,
+                    restaurant_id   TEXT REFERENCES restaurants(id),
+                    created_at      TEXT DEFAULT (datetime('now')),
+                    updated_at      TEXT DEFAULT (datetime('now')),
+                    completed_at    TEXT
+                )",
+                "INSERT INTO orders (id, user_id, table_id, session_id, round_number,
+                    status, total_usd, total_khr, tax_vat, tax_plt, bakong_bill_number,
+                    notes, customer_name, customer_phone, is_deleted, restaurant_id,
+                    created_at, updated_at, completed_at)
+                 SELECT id, user_id, table_id, session_id, round_number,
+                    status, total_usd, total_khr, tax_vat, tax_plt, bakong_bill_number,
+                    notes, customer_name, customer_phone, is_deleted, restaurant_id,
+                    created_at, updated_at, completed_at FROM _orders_old_005",
+                "DROP TABLE _orders_old_005",
+            ];
+            let mut ok = true;
+            for stmt in stmts {
+                if let Err(e) = conn.execute(stmt, ()).await {
+                    eprintln!("[DB] Migration 005 error: {} — SQL: {}", e, &stmt[..stmt.len().min(120)]);
+                    ok = false;
+                    break;
+                }
+            }
+            if ok {
+                println!("[DB] Migration 005: orders.session_id FK dropped ✓");
+            }
+        }
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO _migrations (id) VALUES ('005_orders_drop_session_fk')",
+            ()
+        ).await;
+    }
 }
 
 // ─── Public structs exposed to lib.rs ───────────────────────────────────────

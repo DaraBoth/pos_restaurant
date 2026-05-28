@@ -1,5 +1,5 @@
 import { call } from './client';
-import type { UserSession, RestaurantSummary } from '@/types';
+import type { UserSession, RestaurantListResponse } from '@/types';
 
 export const login = (username: string, password: string) =>
     call<UserSession>('login', { username, password });
@@ -28,7 +28,7 @@ export const deleteUser = (id: string, restaurantId: string) =>
     call<void>('delete_user', { id, restaurantId });
 
 export const listAllRestaurants = () =>
-    call<RestaurantSummary[]>('list_all_restaurants');
+    call<RestaurantListResponse>('list_all_restaurants');
 
 export const createRestaurantWithAdmin = (params: {
     restaurantName: string;

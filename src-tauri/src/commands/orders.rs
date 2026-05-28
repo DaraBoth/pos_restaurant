@@ -43,6 +43,38 @@ pub async fn create_order(
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
+    // ── Pre-flight: verify FK targets exist locally ────────────────────────
+    // The orders table has FKs on user_id → users(id) and restaurant_id →
+    // restaurants(id). If either row hasn't been synced to this device yet
+    // (first login on a new install, partial sync, stale session in
+    // localStorage), the INSERT later in this function fails with a
+    // generic "FOREIGN KEY constraint failed" that the cashier can't act on.
+    // Surface a clear, actionable message before we get there.
+    {
+        let mut u_check = pool.query(
+            "SELECT 1 FROM users WHERE id = ?",
+            params![user_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+        if u_check.next().await.map_err(|e| e.to_string())?.is_none() {
+            return Err(format!(
+                "Cannot place order: your user account (id={}) is not on this device yet. Wait for initial sync to finish, then log out and back in. If this persists, contact support.",
+                user_id
+            ));
+        }
+    }
+    {
+        let mut r_check = pool.query(
+            "SELECT 1 FROM restaurants WHERE id = ?",
+            params![restaurant_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+        if r_check.next().await.map_err(|e| e.to_string())?.is_none() {
+            return Err(format!(
+                "Cannot place order: restaurant (id={}) is not on this device yet. Wait for sync to finish, then retry.",
+                restaurant_id
+            ));
+        }
+    }
+
     let mut session_id = None;
     let mut round_number = 1;
 
