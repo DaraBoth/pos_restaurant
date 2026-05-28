@@ -4,16 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
-    Download, Github, ShieldCheck, WifiOff, Coins, Languages,
+    Download, ShieldCheck, WifiOff, Coins, Languages,
     Receipt, RefreshCw, Apple, Monitor, ChevronRight, Tag,
 } from 'lucide-react';
 import type { LandingContent, FeatureId, ShotId } from '@/app/_content/types';
 
-const REPO_OWNER = 'DaraBoth';
-const REPO_NAME = 'pos_restaurant';
-const RELEASES_API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
-const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
-const REPO_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}`;
+// Release feed is fetched in-place so the page never has to be rebuilt when
+// a new desktop version ships. The endpoint is an implementation detail —
+// we surface only the resolved download URLs and version number to the UI.
+const RELEASES_API =
+    'https://api.github.com/repos/DaraBoth/pos_restaurant/releases/latest';
 
 interface GithubAsset {
     name: string;
@@ -78,7 +78,6 @@ const FEATURE_ICONS: Record<FeatureId, { icon: typeof WifiOff; accent: string }>
     'dual-currency': { icon: Coins,      accent: 'text-yellow-400' },
     'bilingual':     { icon: Languages,  accent: 'text-blue-400' },
     'thermal':       { icon: Receipt,    accent: 'text-purple-400' },
-    'auto-update':   { icon: RefreshCw,  accent: 'text-pink-400' },
     'secure':        { icon: ShieldCheck, accent: 'text-cyan-400' },
 };
 
@@ -139,10 +138,6 @@ export default function LandingPage({ content: t }: { content: LandingContent })
                         >
                             {t.altLangLabel}
                         </Link>
-                        <a href={REPO_PAGE} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-white transition-colors">
-                            <Github size={15} />
-                            <span className="hidden sm:inline">GitHub</span>
-                        </a>
                     </div>
                 </div>
             </nav>
@@ -183,7 +178,7 @@ export default function LandingPage({ content: t }: { content: LandingContent })
 
                     {publishedAt && (
                         <p className="text-xs text-[var(--text-secondary)]/60 mt-5">
-                            {t.heroReleasedPrefix}{publishedAt}{t.heroReleasedSuffix}
+                            {t.heroReleasedPrefix}{publishedAt}
                         </p>
                     )}
                 </div>
@@ -289,9 +284,13 @@ export default function LandingPage({ content: t }: { content: LandingContent })
                         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 max-w-xl mx-auto text-center">
                             <p className="text-amber-300 font-black mb-2">{t.downloadError}</p>
                             <p className="text-sm text-amber-200/80 mb-4">{error}</p>
-                            <a href={RELEASES_PAGE} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-sm font-bold transition-colors">
-                                {t.downloadOpenReleases} <ChevronRight size={14} />
-                            </a>
+                            <button
+                                type="button"
+                                onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-sm font-bold transition-colors"
+                            >
+                                {t.downloadRetry} <ChevronRight size={14} />
+                            </button>
                         </div>
                     )}
 
@@ -303,34 +302,17 @@ export default function LandingPage({ content: t }: { content: LandingContent })
                         </div>
                     )}
 
-                    {release?.html_url && (
-                        <div className="text-center mt-10">
-                            <a href={release.html_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-white transition-colors">
-                                {t.downloadWhatsNew} v{version} <ChevronRight size={14} />
-                            </a>
-                        </div>
-                    )}
                 </div>
             </section>
 
             {/* ── Footer ── */}
             <footer className="border-t border-[var(--border)]">
-                <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-2.5">
-                        <Image src="/logo.png" alt="DineOS logo" width={28} height={28} className="w-7 h-7 rounded-lg object-cover" />
-                        <span className="text-sm font-black tracking-tight">DineOS</span>
-                        <span className="text-xs text-[var(--text-secondary)]/60 ml-2">
-                            © {new Date().getFullYear()} · {t.footerBuiltIn}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-5 text-sm text-[var(--text-secondary)]">
-                        <a href={REPO_PAGE} target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1.5">
-                            <Github size={14} /> {t.footerSource}
-                        </a>
-                        <a href={RELEASES_PAGE} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
-                            {t.footerReleases}
-                        </a>
-                    </div>
+                <div className="max-w-6xl mx-auto px-6 py-10 flex items-center justify-center gap-3 text-center">
+                    <Image src="/logo.png" alt="DineOS logo" width={28} height={28} className="w-7 h-7 rounded-lg object-cover" />
+                    <span className="text-sm font-black tracking-tight">DineOS</span>
+                    <span className="text-xs text-[var(--text-secondary)]/60">
+                        © {new Date().getFullYear()} · {t.footerBuiltIn}
+                    </span>
                 </div>
             </footer>
         </main>
@@ -360,9 +342,13 @@ function PrimaryDownloadButton({
     }
     if (error) {
         return (
-            <a href={RELEASES_PAGE} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-white/5 border border-[var(--border)] text-sm font-black tracking-widest uppercase hover:bg-white/10 transition-colors">
-                <Github size={16} /> {t.ctaGetOnGithub}
-            </a>
+            <button
+                type="button"
+                onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-white/5 border border-[var(--border)] text-sm font-black tracking-widest uppercase hover:bg-white/10 transition-colors"
+            >
+                <RefreshCw size={16} /> {t.downloadRetry}
+            </button>
         );
     }
 
@@ -385,8 +371,8 @@ function PrimaryDownloadButton({
 
     if (!asset) {
         return (
-            <a href={RELEASES_PAGE} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black tracking-widest uppercase transition-colors">
-                <Github size={16} /> {t.ctaOpenReleases}
+            <a href="#download" className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black tracking-widest uppercase transition-colors">
+                <Download size={16} /> {t.heroAllDownloads}
             </a>
         );
     }

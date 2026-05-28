@@ -11,10 +11,9 @@ export const EN: LandingContent = {
     heroTitleTop: 'Modern POS,',
     heroTitleAccent: 'built for Cambodia.',
     heroSubtitle:
-        "DineOS is an offline-first Point of Sale for restaurants, cafes, and bars. Dual currency USD & KHR, Khmer language, thermal-printer-ready, with automatic cloud backup. Free to download today.",
+        "DineOS is an offline-first Point of Sale for restaurants, cafes, and bars. Dual currency USD & KHR, Khmer language, thermal-printer-ready, with encrypted cloud backup. Free to download today.",
     heroAllDownloads: 'All downloads',
     heroReleasedPrefix: 'Released ',
-    heroReleasedSuffix: ' · Pulled live from GitHub Releases',
 
     featuresEyebrow: 'Why DineOS',
     featuresTitle: 'Built for the floor, not the boardroom.',
@@ -47,12 +46,6 @@ export const EN: LandingContent = {
                 'Works with any USB / LAN / Bluetooth thermal printer (58mm or 80mm). Multiple receipt templates including a Khmer daily-summary report.',
         },
         {
-            id: 'auto-update',
-            title: 'Auto-Update',
-            body:
-                'New features and fixes install themselves on next launch. Signed updates from GitHub Releases — no manual reinstalls.',
-        },
-        {
             id: 'secure',
             title: 'Encrypted & Local-First',
             body:
@@ -76,9 +69,9 @@ export const EN: LandingContent = {
     downloadEyebrow: 'Download',
     downloadTitle: 'Free to install. Free to use.',
     downloadSubtitle:
-        "Pick your platform below. Updates install automatically once it's running.",
-    downloadError: "Couldn't reach GitHub",
-    downloadOpenReleases: 'Open Releases page',
+        'Pick your platform below.',
+    downloadError: "Couldn't load downloads",
+    downloadOpenReleases: 'Try again',
     downloadWindows: {
         title: 'Windows',
         subtitle: 'x64 · MSI installer',
@@ -94,19 +87,15 @@ export const EN: LandingContent = {
         subtitle: 'aarch64 · DMG',
         detail: 'M1 · M2 · M3 · M4',
     },
-    downloadNotInRelease: 'Not in this release',
-    downloadWhatsNew: "See what's new in",
+    downloadNotInRelease: 'Not available yet',
     downloadDownloadVerb: 'Download',
+    downloadRetry: 'Retry',
 
     ctaForWindows: 'Download for Windows',
     ctaForMac: 'Download for macOS',
-    ctaOpenReleases: 'Open Releases',
-    ctaGetOnGithub: 'Get on GitHub',
     ctaLoading: 'Loading…',
 
     footerBuiltIn: 'Built in Cambodia',
-    footerSource: 'Source',
-    footerReleases: 'Releases',
 
     altLangHref: '/km',
     altLangLabel: 'ខ្មែរ',

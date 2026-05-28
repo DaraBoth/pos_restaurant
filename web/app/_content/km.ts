@@ -11,10 +11,9 @@ export const KM: LandingContent = {
     heroTitleTop: 'ប្រព័ន្ធ POS ទំនើប',
     heroTitleAccent: 'សម្រាប់ប្រទេសកម្ពុជា។',
     heroSubtitle:
-        'DineOS គឺជាប្រព័ន្ធ Point of Sale ដែលដំណើរការដោយគ្មានអ៊ីនធើណិត សម្រាប់ភោជនីយដ្ឋាន ហាងកាហ្វេ និងបារ។ គាំទ្រដុល្លារ និងរៀល មានពាក្យខ្មែរ ភ្ជាប់ម៉ាស៊ីនព្រិន្ទប្រភេទ thermal និងបម្រុងទុក Cloud ដោយស្វ័យប្រវត្តិ។ ទាញយកដោយឥតគិតថ្លៃថ្ងៃនេះ។',
+        'DineOS គឺជាប្រព័ន្ធ Point of Sale ដែលដំណើរការដោយគ្មានអ៊ីនធើណិត សម្រាប់ភោជនីយដ្ឋាន ហាងកាហ្វេ និងបារ។ គាំទ្រដុល្លារ និងរៀល មានពាក្យខ្មែរ ភ្ជាប់ម៉ាស៊ីនព្រិន្ទប្រភេទ thermal និងបម្រុងទុក Cloud ដែលអ៊ិនគ្រីប។ ទាញយកដោយឥតគិតថ្លៃថ្ងៃនេះ។',
     heroAllDownloads: 'ទាញយកទាំងអស់',
     heroReleasedPrefix: 'ចេញផ្សាយ ',
-    heroReleasedSuffix: ' · ទាញពី GitHub Releases ផ្ទាល់',
 
     featuresEyebrow: 'ហេតុអ្វីត្រូវប្រើ DineOS',
     featuresTitle: 'បង្កើតសម្រាប់ការងារប្រចាំថ្ងៃ មិនមែនសម្រាប់បន្ទប់ប្រជុំ។',
@@ -47,12 +46,6 @@ export const KM: LandingContent = {
                 'ដំណើរការជាមួយម៉ាស៊ីនព្រិន្ទ thermal គ្រប់ប្រភេទ USB / LAN / Bluetooth (ទំហំ 58mm ឬ 80mm)។ មានគំរូបង្កាន់ដៃច្រើនបែប រួមទាំងរបាយការណ៍លក់ប្រចាំថ្ងៃជាខ្មែរ។',
         },
         {
-            id: 'auto-update',
-            title: 'ធ្វើបច្ចុប្បន្នភាពដោយស្វ័យប្រវត្តិ',
-            body:
-                'មុខងារថ្មី និងការជួសជុលនឹងដំឡើងដោយស្វ័យប្រវត្តិនៅពេលបើកប្រើលើកក្រោយ។ ការធ្វើបច្ចុប្បន្នភាពមានហត្ថលេខាពី GitHub Releases — មិនត្រូវដំឡើងឡើងវិញដោយដៃឡើយ។',
-        },
-        {
             id: 'secure',
             title: 'អ៊ិនគ្រីប និងរក្សាទុកក្នុងឧបករណ៍',
             body:
@@ -76,9 +69,9 @@ export const KM: LandingContent = {
     downloadEyebrow: 'ទាញយក',
     downloadTitle: 'ដំឡើងដោយឥតគិតថ្លៃ។ ប្រើដោយឥតគិតថ្លៃ។',
     downloadSubtitle:
-        'ជ្រើសប្រព័ន្ធប្រតិបត្តិការរបស់អ្នកខាងក្រោម។ ការធ្វើបច្ចុប្បន្នភាពនឹងដំឡើងដោយស្វ័យប្រវត្តិពេលដំណើរការ។',
-    downloadError: 'មិនអាចភ្ជាប់ GitHub បាន',
-    downloadOpenReleases: 'បើកទំព័រ Releases',
+        'ជ្រើសប្រព័ន្ធប្រតិបត្តិការរបស់អ្នកខាងក្រោម។',
+    downloadError: 'មិនអាចផ្ទុកការទាញយកបាន',
+    downloadOpenReleases: 'សាកល្បងម្តងទៀត',
     downloadWindows: {
         title: 'Windows',
         subtitle: 'x64 · MSI installer',
@@ -94,19 +87,15 @@ export const KM: LandingContent = {
         subtitle: 'aarch64 · DMG',
         detail: 'M1 · M2 · M3 · M4',
     },
-    downloadNotInRelease: 'មិនមានក្នុងកំណែនេះ',
-    downloadWhatsNew: 'មើលអ្វីថ្មីនៅ',
+    downloadNotInRelease: 'មិនទាន់មាន',
     downloadDownloadVerb: 'ទាញយក',
+    downloadRetry: 'សាកម្តងទៀត',
 
     ctaForWindows: 'ទាញយកសម្រាប់ Windows',
     ctaForMac: 'ទាញយកសម្រាប់ macOS',
-    ctaOpenReleases: 'បើក Releases',
-    ctaGetOnGithub: 'ទាញយកនៅលើ GitHub',
     ctaLoading: 'កំពុងផ្ទុក…',
 
     footerBuiltIn: 'ផលិតនៅប្រទេសកម្ពុជា',
-    footerSource: 'កូដប្រភព',
-    footerReleases: 'Releases',
 
     altLangHref: '/',
     altLangLabel: 'English',

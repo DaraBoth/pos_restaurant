@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     openGraph: {
         title: "DineOS — Modern POS for Cambodian Restaurants",
         description:
-            "Offline-first POS for restaurants & cafes. USD + KHR, Khmer, thermal receipts, auto-update.",
+            "Offline-first POS for restaurants & cafes. USD + KHR, Khmer, thermal receipts, encrypted local-first.",
         type: "website",
         siteName: "DineOS",
         images: [{ url: "/favicon_io/android-chrome-512x512.png", width: 512, height: 512, alt: "DineOS" }],
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "DineOS — Modern POS for Cambodian Restaurants",
         description:
-            "Offline-first POS for restaurants & cafes. USD + KHR, Khmer, thermal receipts, auto-update.",
+            "Offline-first POS for restaurants & cafes. USD + KHR, Khmer, thermal receipts, encrypted local-first.",
         images: ["/favicon_io/android-chrome-512x512.png"],
     },
 };

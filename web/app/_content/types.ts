@@ -7,7 +7,6 @@ export type FeatureId =
     | 'dual-currency'
     | 'bilingual'
     | 'thermal'
-    | 'auto-update'
     | 'secure';
 
 export interface FeatureContent {
@@ -44,13 +43,12 @@ export interface LandingContent {
     heroSubtitle: string;
     heroAllDownloads: string;
     heroReleasedPrefix: string;          // "Released " / "ចេញផ្សាយ "
-    heroReleasedSuffix: string;          // " · Pulled live from GitHub Releases"
 
     // Features section
     featuresEyebrow: string;
     featuresTitle: string;
     featuresSubtitle: string;
-    features: FeatureContent[];          // exactly 6 entries, fixed order: offline, dual-currency, bilingual, thermal, auto-update, secure
+    features: FeatureContent[];          // exactly 5 entries, fixed order: offline, dual-currency, bilingual, thermal, secure
 
     // Screenshots section
     shotsEyebrow: string;
@@ -68,20 +66,16 @@ export interface LandingContent {
     downloadMacIntel: DownloadCardContent;
     downloadMacArm: DownloadCardContent;
     downloadNotInRelease: string;
-    downloadWhatsNew: string;            // "See what's new in" / "មើល​អ្វី​ថ្មី​នៅ"
     downloadDownloadVerb: string;        // "Download" CTA on each card
+    downloadRetry: string;               // generic retry label shown when fetch fails
 
     // Primary hero CTA labels
     ctaForWindows: string;
     ctaForMac: string;
-    ctaOpenReleases: string;
-    ctaGetOnGithub: string;
     ctaLoading: string;
 
     // Footer
     footerBuiltIn: string;               // "Built in Cambodia"
-    footerSource: string;
-    footerReleases: string;
 
     // Language switcher
     altLangHref: '/' | '/km';
