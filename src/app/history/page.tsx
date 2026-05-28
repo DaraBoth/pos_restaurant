@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getOrders, getOrderItems } from '@/lib/api/orders';
+import { getOrders, getOrderItems, deleteOrderHistory } from '@/lib/api/orders';
 import { getRestaurant } from '@/lib/api/restaurant';
 import { Order, OrderItem, Restaurant } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
@@ -9,7 +9,7 @@ import { printReceipt } from '@/lib/receipt';
 import {
     History, RefreshCw, TableProperties, ChevronDown,
     ChevronUp, Download, Calendar, Clock, ReceiptText,
-    LayoutList, LayoutGrid, Printer
+    LayoutList, LayoutGrid, Printer, Trash2
 } from 'lucide-react';
 // Dynamic import for XLSX to avoid bundling issues
 let XLSX_MODULE: any = null;
@@ -101,6 +101,25 @@ export default function HistoryPage() {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleDeleteGroup(group: GroupedOrder) {
+        if (!user) return;
+        const confirmMsg = t('confirmDeleteHistory') || 'Are you sure you want to permanently delete this order history? This will remove it from both local and cloud databases and sync across all devices.';
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            // A table order session has session_id, whereas takeout has just order_id
+            const hasSession = group.orders.some(o => !!o.session_id);
+            const sessionId = hasSession ? group.id : null;
+            const orderId = !hasSession ? group.id : null;
+
+            await deleteOrderHistory(sessionId, orderId, user.role, restaurantId || '');
+            loadOrders();
+        } catch (e: any) {
+            console.error('Failed to delete history', e);
+            window.alert((t('error') || 'Error') + ': ' + (e.message || e));
         }
     }
 
@@ -507,6 +526,18 @@ export default function HistoryPage() {
                                                                             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Master Table Receipt</h4>
                                                                         </div>
                                                                         <div className="flex items-center gap-4">
+                                                                            {user && ['admin', 'manager', 'super_admin'].includes(user.role) && (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleDeleteGroup(g);
+                                                                                    }}
+                                                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/10 border border-red-600/30 text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+                                                                                >
+                                                                                    <Trash2 size={12} />
+                                                                                    {t('deleteHistory') || 'Delete Group'}
+                                                                                </button>
+                                                                            )}
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
@@ -732,8 +763,20 @@ export default function HistoryPage() {
                                             </div>
                                         </div>
 
-                                        {/* Print button */}
-                                        <div className="px-3 pb-3">
+                                        {/* Print and Delete buttons */}
+                                        <div className="px-3 pb-3 flex items-center gap-2">
+                                            {user && ['admin', 'manager', 'super_admin'].includes(user.role) && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteGroup(g);
+                                                    }}
+                                                    title={t('deleteHistory') || 'Delete Group'}
+                                                    className="flex-shrink-0 flex items-center justify-center p-2 rounded-xl bg-red-600/10 border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white transition-all h-9 w-9"
+                                                >
+                                                    <Trash2 size={13} strokeWidth={2.5} />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     if (restaurant && isLoaded) {
@@ -756,7 +799,7 @@ export default function HistoryPage() {
                                                     }
                                                 }}
                                                 disabled={!isLoaded || !restaurant}
-                                                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed h-9"
                                             >
                                                 <Printer size={11} strokeWidth={2.5} />
                                                 {t('printReceipt')}

@@ -1057,3 +1057,146 @@ pub async fn save_excel_file(
         Err("CANCELLED".to_string())
     }
 }
+
+#[tauri::command]
+pub async fn delete_order_history(
+    session_id: Option<String>,
+    order_id: Option<String>,
+    role: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, crate::db::RemoteDb>,
+) -> Result<(), String> {
+    // 1. Role validation
+    if !["admin", "manager", "super_admin"].contains(&role.as_str()) {
+        return Err("Permission denied: only admins can delete order history.".to_string());
+    }
+
+    // 2. Identify target order IDs to soft-delete
+    let mut order_ids: Vec<String> = Vec::new();
+
+    if let Some(ref sid) = session_id {
+        if !sid.trim().is_empty() {
+            let mut rows = pool.query(
+                "SELECT id FROM orders WHERE session_id = ? AND restaurant_id = ?",
+                params![sid.clone(), restaurant_id.clone()],
+            ).await.map_err(|e| format!("Database error fetching session orders: {}", e))?;
+            while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+                if let Ok(id) = row.get::<String>(0) {
+                    order_ids.push(id);
+                }
+            }
+        }
+    }
+
+    if order_ids.is_empty() {
+        if let Some(ref oid) = order_id {
+            if !oid.trim().is_empty() {
+                order_ids.push(oid.clone());
+            }
+        }
+    }
+
+    if order_ids.is_empty() {
+        return Err("No valid order_id or session_id provided for deletion.".to_string());
+    }
+
+    // 3. Gather table IDs and session IDs before deleting so we can clean up their statuses
+    let mut table_names = Vec::new();
+    let mut session_ids = Vec::new();
+
+    let order_placeholders = order_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+
+    // Find associated tables
+    {
+        let query_tables_sql = format!(
+            "SELECT DISTINCT table_id FROM orders WHERE id IN ({}) AND table_id IS NOT NULL",
+            order_placeholders
+        );
+        let mut table_rows = pool.query(&query_tables_sql, order_ids.iter().map(|id| libsql::Value::Text(id.clone())).collect::<Vec<_>>()).await.map_err(|e| e.to_string())?;
+        while let Some(row) = table_rows.next().await.map_err(|e| e.to_string())? {
+            if let Ok(table_name) = row.get::<String>(0) {
+                table_names.push(table_name);
+            }
+        }
+    }
+
+    // Find associated sessions
+    {
+        let query_sessions_sql = format!(
+            "SELECT DISTINCT session_id FROM orders WHERE id IN ({}) AND session_id IS NOT NULL",
+            order_placeholders
+        );
+        let mut session_rows = pool.query(&query_sessions_sql, order_ids.iter().map(|id| libsql::Value::Text(id.clone())).collect::<Vec<_>>()).await.map_err(|e| e.to_string())?;
+        while let Some(row) = session_rows.next().await.map_err(|e| e.to_string())? {
+            if let Ok(sid) = row.get::<String>(0) {
+                session_ids.push(sid);
+            }
+        }
+    }
+
+    // 4. Define delete and update statements
+    let update_orders_sql = format!(
+        "UPDATE orders SET is_deleted = 1, updated_at = datetime('now') WHERE id IN ({}) AND restaurant_id = ?",
+        order_placeholders
+    );
+    let update_items_sql = format!(
+        "UPDATE order_items SET is_deleted = 1, updated_at = datetime('now') WHERE order_id IN ({})",
+        order_placeholders
+    );
+    let delete_payments_sql = format!(
+        "DELETE FROM payments WHERE order_id IN ({})",
+        order_placeholders
+    );
+
+    let mut orders_params: Vec<libsql::Value> = order_ids.iter().map(|id| libsql::Value::Text(id.clone())).collect();
+    let items_params = orders_params.clone();
+    let payments_params = orders_params.clone();
+    orders_params.push(libsql::Value::Text(restaurant_id.clone()));
+
+    // 5. Remote write first (Authoritative/Real-time propagation to cloud)
+    if let Some(remote_conn) = remote.0.as_ref() {
+        let _ = remote_conn.execute(&update_orders_sql, orders_params.clone()).await;
+        let _ = remote_conn.execute(&update_items_sql, items_params.clone()).await;
+        let _ = remote_conn.execute(&delete_payments_sql, payments_params.clone()).await;
+    }
+
+    // 6. Local write (Offline-first/Best-effort local database update)
+    pool.execute(&update_orders_sql, orders_params)
+        .await
+        .map_err(|e| format!("Failed to delete orders locally: {}", e))?;
+
+    pool.execute(&update_items_sql, items_params)
+        .await
+        .map_err(|e| format!("Failed to delete order items locally: {}", e))?;
+
+    let _ = pool.execute(&delete_payments_sql, payments_params).await;
+
+    // 7. Post-delete floor table state cleanup
+    for table_name in table_names {
+        let _ = release_table_if_no_open_orders(&table_name, &restaurant_id, &pool).await;
+    }
+
+    // 8. Post-delete session status cleanup
+    for sid in session_ids {
+        let mut count_rows = pool.query(
+            "SELECT COUNT(*) FROM orders WHERE session_id = ? AND is_deleted = 0",
+            params![sid.clone()]
+        ).await.map_err(|e| e.to_string())?;
+
+        let count = if let Some(row) = count_rows.next().await.map_err(|e| e.to_string())? {
+            row.get::<i64>(0).unwrap_or(0)
+        } else { 0 };
+
+        if count == 0 {
+            const UPDATE_SESSION_SQL: &str = "UPDATE table_sessions SET status = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?";
+            if let Some(remote_conn) = remote.0.as_ref() {
+                let _ = remote_conn.execute(UPDATE_SESSION_SQL, params![sid.clone()]).await;
+            }
+            let _ = pool.execute(UPDATE_SESSION_SQL, params![sid]).await;
+        }
+    }
+
+    Ok(())
+}
+

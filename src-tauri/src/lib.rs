@@ -165,6 +165,7 @@ pub fn run() {
             commands::orders::checkout_session,
             commands::orders::hold_order,
             commands::orders::void_order,
+            commands::orders::delete_order_history,
             commands::orders::get_revenue_summary,
             commands::orders::get_revenue_by_period,
             commands::orders::save_excel_file,

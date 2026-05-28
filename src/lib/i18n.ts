@@ -109,6 +109,8 @@ export const translations = {
         compilingDetails: 'Compiling details...',
         totalUsd: 'Total USD',
         totalKhr: 'Total KHR',
+        deleteHistory: 'Delete Order History',
+        confirmDeleteHistory: 'Are you sure you want to permanently delete this order history? This will remove it from both local and cloud databases and sync across all devices.',
         // Analytics
         todayRevenue: "Today's Revenue",
         monthRevenue: 'This Month',
@@ -360,6 +362,8 @@ export const translations = {
         compilingDetails: 'កំពុងទាញទិន្នន័យ...',
         totalUsd: 'សរុប (ដូឡា)',
         totalKhr: 'សរុប (រៀល)',
+        deleteHistory: 'លុបប្រវត្តិបញ្ជាទិញ',
+        confirmDeleteHistory: 'តើអ្នកប្រាកដជាចង់លុបប្រវត្តិបញ្ជាទិញនេះជាអចិន្ត្រៃយ៍មែនទេ? សកម្មភាពនេះនឹងលុបវាចេញពីទិន្នន័យក្នុងស្រុកនិងក្លោដ ហើយនឹងធ្វើសមកាលកម្មនៅគ្រប់ឧបករណ៍ទាំងអស់។',
         // Analytics
         todayRevenue: 'ចំណូលថ្ងៃនេះ',
         monthRevenue: 'ខែនេះ',
