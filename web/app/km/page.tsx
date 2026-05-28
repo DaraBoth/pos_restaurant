@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import LandingPage from '../_components/LandingPage';
 import { KM } from '../_content/km';
+import { fetchLatestRelease } from '../_lib/release';
 
 export const metadata: Metadata = {
     title: 'DineOS — ប្រព័ន្ធ POS ទំនើបសម្រាប់ភោជនីយដ្ឋានកម្ពុជា',
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
     },
 };
 
-export default function Page() {
-    return <LandingPage content={KM} />;
+export default async function Page() {
+    const release = await fetchLatestRelease();
+    return <LandingPage content={KM} initialRelease={release} />;
 }

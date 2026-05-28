@@ -9,12 +9,9 @@ import {
 } from 'lucide-react';
 import type { LandingContent, FeatureId, ShotId } from '@/app/_content/types';
 
-// Release feed is fetched in-place so the page never has to be rebuilt when
-// a new desktop version ships. The endpoint is an implementation detail —
-// we surface only the resolved download URLs and version number to the UI.
-const RELEASES_API =
-    'https://api.github.com/repos/DaraBoth/pos_restaurant/releases/latest';
-
+// Release data is fetched server-side in app/page.tsx (and app/km/page.tsx)
+// via _lib/release.ts so the GIT_TOKEN never leaves the server. We re-declare
+// the shapes here for prop typing; we never call the API directly.
 interface GithubAsset {
     name: string;
     browser_download_url: string;
@@ -89,26 +86,23 @@ const SHOT_SOURCES: Record<ShotId, string> = {
     management: '/screenshots/admin_updateProduct_slide.png',
 };
 
-export default function LandingPage({ content: t }: { content: LandingContent }) {
-    const [release, setRelease] = useState<GithubRelease | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+interface LandingPageProps {
+    content: LandingContent;
+    /** Latest release fetched server-side. Null when the SSR fetch failed. */
+    initialRelease: GithubRelease | null;
+}
+
+export default function LandingPage({ content: t, initialRelease }: LandingPageProps) {
+    // Server already did the fetch. There's no client-side loading state.
+    const release = initialRelease;
+    const loading = false;
+    const error: string | null = release ? null : 'Could not load downloads from GitHub.';
     const [os, setOs] = useState<DetectedOS>('other');
     const [activeShotId, setActiveShotId] = useState<ShotId>('pos');
     const activeShot = t.screenshots.find(s => s.id === activeShotId) ?? t.screenshots[0];
 
     useEffect(() => {
         setOs(detectOs());
-        const controller = new AbortController();
-        fetch(RELEASES_API, { signal: controller.signal })
-            .then(r => {
-                if (!r.ok) throw new Error(`GitHub responded ${r.status}`);
-                return r.json() as Promise<GithubRelease>;
-            })
-            .then(setRelease)
-            .catch(e => { if (e.name !== 'AbortError') setError(e.message || String(e)); })
-            .finally(() => setLoading(false));
-        return () => controller.abort();
     }, []);
 
     const windows = useMemo(() => (release ? pickWindows(release.assets) : null), [release]);

@@ -17,10 +17,28 @@ pnpm dev        # http://localhost:3001
 1. Create a new Vercel project pointed at this repo.
 2. In **Project Settings → General → Root Directory**, set it to `web`.
 3. Framework Preset: Next.js (auto-detected). Build / Install commands: defaults.
-4. Deploy. No env vars needed.
+4. In **Project Settings → Environment Variables**, add:
+   - **`GIT_TOKEN`** — a GitHub fine-grained personal access token with
+     "Contents: Read-only" scope on the `DaraBoth/pos_restaurant` repo.
+     Apply to **Production**, **Preview**, and **Development**.
+     This is used server-side (never exposed to the browser) to bypass
+     GitHub's 60 req/hr anonymous rate limit. The site still works without
+     it (falls back to anonymous), but token-authenticated gives 5000 req/hr.
+5. Deploy.
 
 After the project is created, every push to the default branch redeploys
 automatically.
+
+### How the release data flows
+
+`web/app/page.tsx` and `web/app/km/page.tsx` are async Server Components.
+They call `fetchLatestRelease()` from `web/app/_lib/release.ts` at request
+time, which calls the GitHub API with the `GIT_TOKEN` header from
+`process.env.GIT_TOKEN`. The response is cached on Vercel's edge for 10
+minutes (`next: { revalidate: 600 }`), then revalidated in the background
+on the next request. The Client Component (`_components/LandingPage.tsx`)
+receives the parsed release as a prop — it never makes its own fetch and
+never sees the token.
 
 ## Push a web-only change
 
