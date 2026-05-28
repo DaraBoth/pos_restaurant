@@ -612,8 +612,28 @@ pub async fn list_all_restaurants(
             Ok(r) => (Ok(r), "remote".to_string(), None),
             Err(e) => {
                 let msg = e.to_string();
-                eprintln!("[Auth] Remote list_all_restaurants failed, fallback to local: {}", msg);
-                (pool.query(QUERY, ()).await, "local".to_string(), Some(msg))
+                if msg.contains("stream not found") || msg.contains("stream error") || msg.contains("Hrana") {
+                    println!("[Auth] Hrana stream expired. Attempting remote reconnection on-the-fly…");
+                    if let Some(new_conn) = crate::db::reconnect_remote().await {
+                        match new_conn.query(QUERY, ()).await {
+                            Ok(r) => {
+                                println!("[Auth] Remote reconnection query succeeded ✓");
+                                (Ok(r), "remote".to_string(), None)
+                            }
+                            Err(e2) => {
+                                let msg2 = e2.to_string();
+                                eprintln!("[Auth] Remote list_all_restaurants failed after reconnection: {}", msg2);
+                                (pool.query(QUERY, ()).await, "local".to_string(), Some(msg2))
+                            }
+                        }
+                    } else {
+                        eprintln!("[Auth] Reconnection failed, fallback to local: {}", msg);
+                        (pool.query(QUERY, ()).await, "local".to_string(), Some(msg))
+                    }
+                } else {
+                    eprintln!("[Auth] Remote list_all_restaurants failed, fallback to local: {}", msg);
+                    (pool.query(QUERY, ()).await, "local".to_string(), Some(msg))
+                }
             }
         }
     } else {

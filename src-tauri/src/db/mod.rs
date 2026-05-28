@@ -449,6 +449,28 @@ async fn ensure_critical_columns(conn: &Connection) {
 /// Wraps the optional Turso remote connection used ONLY for per-restaurant sync.
 pub struct RemoteDb(pub Option<Arc<Connection>>);
 
+/// Dynamically creates a new remote connection to the cloud on-the-fly (e.g. if the primary Hrana stream expires).
+pub async fn reconnect_remote() -> Option<Arc<Connection>> {
+    let url   = std::env::var("DATABASE_URL").ok().filter(|s| !s.is_empty())
+        .unwrap_or_else(|| BAKED_URL.to_string());
+    let token = std::env::var("AUTH_TOKEN").ok().filter(|s| !s.is_empty())
+        .unwrap_or_else(|| BAKED_TOKEN.to_string());
+
+    if url.is_empty() || token.is_empty() {
+        return None;
+    }
+
+    match Builder::new_remote(url, token).build().await {
+        Ok(db) => {
+            match db.connect() {
+                Ok(conn) => Some(Arc::new(conn)),
+                Err(_) => None,
+            }
+        }
+        Err(_) => None,
+    }
+}
+
 // ─── Debug Helpers ─────────────────────────────────────────────────────────
 
 async fn log_schema_info(conn: &Connection) {
