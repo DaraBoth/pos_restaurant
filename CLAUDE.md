@@ -30,7 +30,7 @@ There is no test framework configured. Do not invent test commands.
 
 ### Auto-update
 
-Running installs poll `tauri.conf.json::plugins.updater.endpoints[0]` (`https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json`) every 10 minutes via `src/components/ui/UpdateStatus.tsx` (mounted in the sidebar) using `@tauri-apps/plugin-updater::check()`. When a newer signed bundle is found, the sidebar shows an amber "Update v2.x.x" pill; clicking downloads and `relaunch()`s.
+Running installs poll `tauri.conf.json::plugins.updater.endpoints[0]` (`https://github.com/DaraBoth/pos_restaurant/releases/latest/download/latest.json`) every 10 minutes via `src/components/ui/UpdateStatus.tsx` (mounted in the sidebar) using `@tauri-apps/plugin-updater::check()`. The UX is a four-step state machine in that one component: amber "Update v2.x.x" pill → click → blue "Downloading…" pill with progress → modal "Update Ready, Restart now or Later?" → user picks. "Restart now" calls `@tauri-apps/plugin-process::relaunch()`. "Later" drops to a green "Restart for v2.x.x" pill in the sidebar; the binary is already swapped on disk by `downloadAndInstall`, so a normal app close + open picks up the new version even without clicking the pill.
 
 The flow requires three things to all be true; if any breaks, the updater silently returns "no update" and the pill never appears:
 1. **Release is published, not draft.** `releaseDraft: false` in `release.yml`. GitHub's `/releases/latest` redirect resolves only to published releases.
