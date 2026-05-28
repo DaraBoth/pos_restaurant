@@ -221,22 +221,63 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 </html>`;
 }
 
-/** Custom event the global ReceiptPrintSheet listens for. */
-export const RECEIPT_PREVIEW_EVENT = 'dineos:receipt-preview';
+/**
+ * One renderable template inside a print job. The cashier picks one from the
+ * tab row in the slide sheet when a job carries more than one option.
+ */
+export interface ThermalPrintTemplate {
+    id: string;          // stable key, persisted in localStorage so the last choice sticks
+    label: string;       // shown in the tab row (e.g. "Default", "ខ្មែរ")
+    html: string;        // pre-rendered template HTML
+}
 
 /**
- * Default print entry point — opens the slide-out preview sheet, where the
- * cashier confirms and then triggers the OS print dialog (which lists USB /
- * LAN / Bluetooth thermal printers configured in Windows / macOS).
+ * Generic thermal-print job consumed by the global ReceiptPrintSheet.
+ * Any feature that wants to print to the thermal printer (order receipt,
+ * sales summary, kitchen ticket…) renders its own HTML and dispatches one
+ * of these — the sheet stays purely presentational.
+ */
+export interface ThermalPrintJob {
+    templates: ThermalPrintTemplate[];
+    paperWidth: '58mm' | '80mm';
+    title: string;            // header line in the sheet (e.g. "Receipt", "Sales Summary")
+    subtitle?: string;        // small line under the title (e.g. "#A1B2C3D4", date range)
+    defaultTemplateId?: string; // fallback if the user has no remembered choice
+    /**
+     * localStorage key used to remember which template the cashier picked
+     * across sessions. Two different doc kinds (receipt / summary) use
+     * different keys so they don't share state.
+     */
+    rememberKey?: string;
+}
+
+export const THERMAL_PRINT_EVENT = 'dineos:thermal-print';
+
+/** Low-level dispatcher — any new print kind (kitchen ticket, void slip, …) calls this. */
+export function dispatchThermalPrint(job: ThermalPrintJob) {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent<ThermalPrintJob>(THERMAL_PRINT_EVENT, { detail: job }));
+}
+
+/**
+ * Default print entry point for order receipts — opens the slide-out preview
+ * sheet, where the cashier confirms and then triggers the OS print dialog
+ * (which lists USB / LAN / Bluetooth thermal printers configured in the OS).
  *
  * Wiring: <ReceiptPrintSheet /> is mounted once in src/app/layout.tsx and
- * listens for RECEIPT_PREVIEW_EVENT on the window.
+ * listens for THERMAL_PRINT_EVENT on the window.
  */
 export function printReceipt(payload: ReceiptPrintPayload) {
     if (typeof window === 'undefined') return;
-    window.dispatchEvent(
-        new CustomEvent<ReceiptPrintPayload>(RECEIPT_PREVIEW_EVENT, { detail: payload })
-    );
+    dispatchThermalPrint({
+        templates: [
+            { id: 'default', label: 'Default', html: getReceiptHtml(payload) },
+        ],
+        paperWidth: payload.restaurant.receipt_width === '58mm' ? '58mm' : '80mm',
+        title: 'Receipt',
+        subtitle: `#${payload.orderId.slice(0, 8).toUpperCase()}`,
+        rememberKey: 'dineos.template.receipt',
+    });
 }
 
 /**

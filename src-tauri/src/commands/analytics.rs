@@ -164,6 +164,53 @@ pub async fn get_peak_hours(period: String, restaurant_id: String, db: State<'_,
     Ok(results)
 }
 
+/// Top products sold within an inclusive date range (yyyy-MM-dd, local time).
+/// Used by the History page's Sales Summary print — queried fresh each time
+/// rather than reusing the page's lazy-loaded order items.
+#[tauri::command]
+pub async fn get_top_products_in_range(
+    start_date: String,
+    end_date: String,
+    restaurant_id: String,
+    limit: i64,
+    db: State<'_, Arc<Connection>>,
+) -> Result<Vec<TopProduct>, String> {
+    let query = r#"
+        SELECT p.id,
+               COALESCE(p.name, oi.product_name, '') as name,
+               COALESCE(SUM(oi.quantity), 0) as qty,
+               COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as revenue
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE o.status = 'completed'
+          AND o.is_deleted = 0
+          AND oi.is_deleted = 0
+          AND o.restaurant_id = ?
+          AND date(o.created_at, 'localtime') BETWEEN ? AND ?
+        GROUP BY oi.product_id
+        ORDER BY qty DESC
+        LIMIT ?
+    "#;
+
+    let mut rows = db
+        .query(query, params![restaurant_id, start_date, end_date, limit])
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    let mut results = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        results.push(TopProduct {
+            id: row.get::<String>(0).unwrap_or_default(),
+            name: row.get::<String>(1).unwrap_or_default(),
+            order_count: row.get::<i64>(2).unwrap_or(0),
+            total_revenue: row.get::<i64>(3).unwrap_or(0),
+        });
+    }
+
+    Ok(results)
+}
+
 #[tauri::command]
 pub async fn get_slow_movers(restaurant_id: String, db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
     let query = r#"

@@ -10,6 +10,19 @@ export const getRevenueByPeriod = (period: 'week' | 'month' | '3months' | 'year'
 export const getTopProducts = (period: string, restaurant_id?: string) =>
     call<TopProduct[]>('get_top_products', { period, restaurantId: restaurant_id });
 
+export const getTopProductsInRange = (
+    startDate: string,
+    endDate: string,
+    restaurant_id: string,
+    limit = 5,
+) =>
+    call<TopProduct[]>('get_top_products_in_range', {
+        startDate,
+        endDate,
+        restaurantId: restaurant_id,
+        limit,
+    });
+
 export const getRevenueByCategory = (period: string, restaurant_id?: string) =>
     call<CategoryRevenue[]>('get_revenue_by_category', { period, restaurantId: restaurant_id });
 

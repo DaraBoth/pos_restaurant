@@ -175,6 +175,7 @@ pub fn run() {
             commands::inventory::delete_inventory_item,
             // Analytics
             commands::analytics::get_top_products,
+            commands::analytics::get_top_products_in_range,
             commands::analytics::get_revenue_by_category,
             commands::analytics::get_peak_hours,
             commands::analytics::get_slow_movers,

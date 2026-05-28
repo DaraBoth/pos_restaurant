@@ -16,7 +16,8 @@ let XLSX_MODULE: any = null;
 import { useLanguage } from '@/providers/LanguageProvider';
 import { call } from '@/lib/api/client';
 import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
-import { printSummaryReport } from '@/lib/reports';
+import { printSalesSummary } from '@/lib/reports';
+import { getTopProductsInRange } from '@/lib/api/analytics';
 import { getImageSrc } from '@/lib/image';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'hold';
@@ -255,23 +256,36 @@ export default function HistoryPage() {
         }
     };
 
-    const handlePrintSummary = () => {
+    const handlePrintSummary = async () => {
         if (!restaurant || !filtered || filtered.length === 0) return;
 
-        let totalUsd = 0;
-        let totalKhr = 0;
-        filtered.forEach(g => {
-            totalUsd += g.total_usd;
-            totalKhr += g.total_khr;
-        });
+        // Best-sellers query is scoped to the same date range, fetched fresh —
+        // never reuse the page's lazy-loaded order items, which may be a partial set.
+        let topItems = undefined;
+        if (restaurantId) {
+            try {
+                topItems = await getTopProductsInRange(startDate, endDate, restaurantId, 5);
+            } catch (e) {
+                console.error('Failed to load top items for summary', e);
+            }
+        }
 
-        printSummaryReport({
+        printSalesSummary({
             restaurant,
-            startDate: startDate,
-            endDate: endDate,
-            orders: filtered,
-            totalUsd,
-            totalKhr
+            startDate,
+            endDate,
+            groups: filtered.map(g => ({
+                id: g.id,
+                table_id: g.table_id,
+                status: g.status,
+                created_at: g.created_at,
+                total_usd: g.total_usd,
+                total_khr: g.total_khr,
+                total_vat: g.total_vat,
+                total_plt: g.total_plt,
+            })),
+            cashierName: user?.full_name || user?.username,
+            topItems,
         });
     };
 
