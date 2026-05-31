@@ -1,6 +1,7 @@
 use tauri::State;
 use std::sync::Arc;
 use libsql::{Connection, params};
+use crate::commands::rbac;
 use crate::models::{Order, OrderItem, PaymentInput};
 
 fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
@@ -1062,15 +1063,12 @@ pub async fn save_excel_file(
 pub async fn delete_order_history(
     session_id: Option<String>,
     order_id: Option<String>,
-    role: String,
     restaurant_id: String,
+    actor_user_id: String,
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, crate::db::RemoteDb>,
 ) -> Result<(), String> {
-    // 1. Role validation
-    if !["admin", "manager", "super_admin"].contains(&role.as_str()) {
-        return Err("Permission denied: only admins can delete order history.".to_string());
-    }
+    let actor_role = rbac::require_delete_permission(&pool, &actor_user_id, &restaurant_id).await?;
 
     // 2. Identify target order IDs to soft-delete
     let mut order_ids: Vec<String> = Vec::new();
@@ -1145,7 +1143,7 @@ pub async fn delete_order_history(
         order_placeholders
     );
     let delete_payments_sql = format!(
-        "DELETE FROM payments WHERE order_id IN ({})",
+        "UPDATE payments SET is_deleted = 1, updated_at = datetime('now') WHERE order_id IN ({})",
         order_placeholders
     );
 
@@ -1195,6 +1193,19 @@ pub async fn delete_order_history(
             }
             let _ = pool.execute(UPDATE_SESSION_SQL, params![sid]).await;
         }
+    }
+
+    for oid in order_ids {
+        rbac::write_audit_log(
+            &pool,
+            &restaurant_id,
+            &actor_user_id,
+            &actor_role,
+            "delete",
+            "order",
+            &oid,
+            None,
+        ).await;
     }
 
     Ok(())

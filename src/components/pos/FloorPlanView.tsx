@@ -101,7 +101,7 @@ export default function FloorPlanView() {
         return map;
     }, [filtered]);
 
-    const canManage = user?.role === 'admin' || user?.role === 'manager';
+    const canManage = user?.role === 'admin' || user?.role === 'business_admin';
 
     // ── Shared card renderer ───────────────────────────────────────────────
     function TableCard({ table }: { table: FloorTable }) {

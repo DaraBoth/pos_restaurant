@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { 
     X, User, Monitor, Globe, LogOut, Building2, Check, Edit2, 
-    ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff 
+    ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff, Download 
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
@@ -95,6 +95,11 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
         router.replace('/login');
     }
 
+    function handleOpenDownloads() {
+        onClose();
+        router.push('/downloads');
+    }
+
     async function handleSaveAccount() {
         if (!user) return;
         setSavingAccount(true);
@@ -162,10 +167,9 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
         switch (role) {
             case 'super_admin': return 'Super Administrator';
             case 'admin': return 'System Administrator';
-            case 'manager': return 'Store Manager';
+            case 'business_admin':
+            case 'manager': return 'Business Administrator';
             case 'cashier': return 'Head Cashier';
-            case 'waiter': return 'Guest Server';
-            case 'chef': return 'Head Chef';
             default: return 'Associate';
         }
     };
@@ -176,13 +180,11 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
             case 'super_admin':
             case 'admin':
                 return 'System Administration';
+            case 'business_admin':
             case 'manager':
                 return 'Operations / Management';
             case 'cashier':
-            case 'waiter':
-                return 'Front of House Service';
-            case 'chef':
-                return 'Kitchen Operations';
+                return 'POS Operations';
             default:
                 return 'General Service';
         }
@@ -278,6 +280,12 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                         >
                             <Monitor size={14} /> Display & Language
+                        </button>
+                        <button
+                            onClick={handleOpenDownloads}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]"
+                        >
+                            <Download size={14} /> Downloads
                         </button>
                         
                         {/* Exchange Rate (Admin only) */}

@@ -1,7 +1,7 @@
-import { Restaurant, TopProduct } from '@/types';
+import { DailyReportDetail, Restaurant, TopProduct } from '@/types';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { dispatchThermalPrint } from '@/lib/receipt';
-import { format, parseISO } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 
 export type SalesSummaryTemplate = 'default' | 'khmer';
 
@@ -16,6 +16,12 @@ export interface SalesSummaryGroup {
     total_plt: number;
 }
 
+export interface SalesSummaryAdjustment {
+  date: string;
+  info: string;
+  price_cents: number;
+}
+
 export interface SalesSummaryPayload {
     restaurant: Restaurant;
     startDate: string;
@@ -23,6 +29,7 @@ export interface SalesSummaryPayload {
     groups: SalesSummaryGroup[];
     cashierName?: string;
     topItems?: TopProduct[];
+  adjustments?: SalesSummaryAdjustment[];
 }
 
 function escapeHtml(value: string) {
@@ -35,14 +42,26 @@ function escapeHtml(value: string) {
 }
 
 function parseSqliteTs(ts: string): Date {
-    return parseISO(ts.replace(' ', 'T') + (ts.endsWith('Z') ? '' : 'Z'));
+  const parsed = parseISO(ts.replace(' ', 'T') + (ts.endsWith('Z') ? '' : 'Z'));
+  return isValid(parsed) ? parsed : new Date(0);
 }
 
 function rangeLabel(startDate: string, endDate: string): string {
-    if (startDate === endDate) {
-        return format(parseISO(startDate), 'dd MMM yyyy');
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+
+  if (!isValid(start) || !isValid(end)) {
+    return `${startDate || 'Unknown'} – ${endDate || 'Unknown'}`;
+  }
+
+  if (startDate === endDate) {
+    return format(start, 'dd MMM yyyy');
     }
-    return `${format(parseISO(startDate), 'dd MMM')} – ${format(parseISO(endDate), 'dd MMM yyyy')}`;
+  return `${format(start, 'dd MMM')} – ${format(end, 'dd MMM yyyy')}`;
+}
+
+function formatSafe(date: Date, pattern: string, fallback: string): string {
+  return isValid(date) ? format(date, pattern) : fallback;
 }
 
 interface SummaryLabels {
@@ -55,7 +74,13 @@ interface SummaryLabels {
     open: string;
     hold: string;
     topItemsHeader: string;
+    adjustmentsHeader: string;
     ordersHeader: string;
+    adjDate: string;
+    adjInfo: string;
+    adjPrice: string;
+    adjustmentTotal: string;
+    netCash: string;
     colTime: string;
     colRef: string;
     colTbl: string;
@@ -87,7 +112,13 @@ const LABELS: Record<SalesSummaryTemplate, SummaryLabels> = {
         open: 'Open',
         hold: 'Hold',
         topItemsHeader: 'Top Items',
+        adjustmentsHeader: 'Adjustments',
         ordersHeader: 'Orders',
+        adjDate: 'DATE',
+        adjInfo: 'INFO',
+        adjPrice: 'PRICE',
+        adjustmentTotal: 'Adjustments total',
+        netCash: 'Net cash after expenses',
         colTime: 'TIME',
         colRef: 'REF',
         colTbl: 'TBL',
@@ -117,7 +148,13 @@ const LABELS: Record<SalesSummaryTemplate, SummaryLabels> = {
         open: 'បើក',
         hold: 'ផ្អាក',
         topItemsHeader: '❋ មុខទំនិញ​លក់ដាច់ ❋',
+        adjustmentsHeader: '❋ ការកែតម្រូវ ❋',
         ordersHeader: '❋ បញ្ជី​ការ​លក់ ❋',
+        adjDate: 'កាលបរិច្ឆេទ',
+        adjInfo: 'ព័ត៌មាន',
+        adjPrice: 'តម្លៃ',
+        adjustmentTotal: 'សរុបការកែតម្រូវ',
+        netCash: 'ប្រាក់សុទ្ធក្រោយដកចំណាយ',
         colTime: 'ម៉ោង',
         colRef: 'លេខ',
         colTbl: 'តុ',
@@ -156,7 +193,7 @@ export function getSalesSummaryHtml(
     payload: SalesSummaryPayload,
     template: SalesSummaryTemplate = 'default',
 ): string {
-    const { restaurant, startDate, endDate, groups, cashierName } = payload;
+  const { restaurant, startDate, endDate, groups, cashierName } = payload;
     const L = LABELS[template];
     const isKhmer = template === 'khmer';
 
@@ -171,10 +208,11 @@ export function getSalesSummaryHtml(
     const totalVat        = groups.reduce((s, g) => s + g.total_vat, 0);
     const totalPlt        = groups.reduce((s, g) => s + g.total_plt, 0);
     const subtotalUsd     = totalUsd - totalVat - totalPlt;
+    const adjustments     = (payload.adjustments || []).filter(a => a.info.trim() && a.price_cents > 0);
+    const adjustmentTotalUsd = adjustments.reduce((s, a) => s + a.price_cents, 0);
+    const netCashUsd      = Math.max(totalUsd - adjustmentTotalUsd, 0);
 
     const completed       = groups.filter(g => g.status === 'completed');
-    const openCount       = groups.filter(g => g.status === 'open').length;
-    const holdCount       = groups.filter(g => g.status === 'hold' || g.status === 'pending_payment').length;
     const completedRevenueUsd = completed.reduce((s, g) => s + g.total_usd, 0);
 
     const avgTicketUsd    = totalOrders > 0 ? Math.round(totalUsd / totalOrders) : 0;
@@ -188,7 +226,8 @@ export function getSalesSummaryHtml(
         parseSqliteTs(a.created_at).getTime() - parseSqliteTs(b.created_at).getTime()
     );
     const orderRows = sorted.map(g => {
-        const t = format(parseSqliteTs(g.created_at), 'HH:mm');
+      const createdAt = parseSqliteTs(g.created_at);
+      const t = formatSafe(createdAt, 'HH:mm', '--:--');
         const ref = g.id.split('-')[0].slice(0, 6).toUpperCase();
         const tbl = g.table_id ? escapeHtml(g.table_id) : L.takeoutShort;
         const amt = formatUsd(g.total_usd);
@@ -200,6 +239,15 @@ export function getSalesSummaryHtml(
           <td class="ord-r">${ref}${marker}</td>
           <td class="ord-tbl">${tbl}</td>
           <td class="ord-amt">${amt}</td>
+        </tr>`;
+    }).join('');
+
+    const adjustmentRows = adjustments.map((row) => {
+        const rowDate = row.date ? formatSafe(parseSqliteTs(`${row.date} 00:00:00`), isKhmer ? 'dd/MM' : 'dd MMM', row.date) : '--';
+        return `<tr>
+          <td class="adj-date">${escapeHtml(rowDate)}</td>
+          <td class="adj-info">${escapeHtml(row.info)}</td>
+          <td class="adj-amt">${formatUsd(row.price_cents)}</td>
         </tr>`;
     }).join('');
 
@@ -282,12 +330,6 @@ export function getSalesSummaryHtml(
     .meta .val { font-weight: 900; }
     .right { text-align: right; }
 
-    /* ── Stat grid ── */
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0 6px; }
-    .stat  { padding: 4px 6px; border: 1px solid #000; }
-    .stat .lbl { font-size: ${isSmall ? '7px' : '8px'}; font-weight: 700; opacity: 0.7; ${isKhmer ? '' : 'text-transform: uppercase; letter-spacing: 0.5px;'} }
-    .stat .val { font-size: ${isSmall ? '13px' : '15px'}; font-weight: 900; margin-top: 1px; }
-
     /* ── Section headers ── */
     .section-hd {
       font-size: ${isSmall ? '8px' : '9.5px'};
@@ -315,6 +357,22 @@ export function getSalesSummaryHtml(
     .ord-r   { width: ${isSmall ? '52px' : '62px'}; font-weight: 700; font-family: monospace; }
     .ord-tbl { font-weight: 700; }
     .ord-amt { text-align: right; font-weight: 900; font-family: monospace; }
+
+    /* Adjustment rows */
+    .adj-tbl-w { width: 100%; border-collapse: collapse; margin-top: 2px; }
+    .adj-tbl-w th {
+      text-align: left;
+      font-size: ${isSmall ? '7.5px' : '8.5px'};
+      font-weight: 900;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #000;
+      ${isKhmer ? '' : 'text-transform: uppercase;'}
+      opacity: 0.7;
+    }
+    .adj-tbl-w td { padding: 2.5px 0; vertical-align: top; border-bottom: 1px dotted #ccc; font-size: ${isSmall ? '9px' : '10.5px'}; }
+    .adj-date { width: ${isSmall ? '42px' : '48px'}; font-family: monospace; }
+    .adj-info { font-weight: 700; word-break: break-word; }
+    .adj-amt { text-align: right; font-weight: 900; font-family: monospace; width: ${isSmall ? '56px' : '66px'}; }
 
     /* Top-items columns */
     .top-rank { width: 18px; text-align: center; font-weight: 900; font-family: monospace; }
@@ -358,25 +416,6 @@ export function getSalesSummaryHtml(
 
   <div class="d-double"></div>
 
-  <div class="stats">
-    <div class="stat">
-      <div class="lbl">${L.transactions}</div>
-      <div class="val">${totalOrders}</div>
-    </div>
-    <div class="stat">
-      <div class="lbl">${L.completed}</div>
-      <div class="val">${completed.length}</div>
-    </div>
-    <div class="stat">
-      <div class="lbl">${L.open}</div>
-      <div class="val">${openCount}</div>
-    </div>
-    <div class="stat">
-      <div class="lbl">${L.hold}</div>
-      <div class="val">${holdCount}</div>
-    </div>
-  </div>
-
   ${topItems.length > 0 ? `
   <div class="section-hd">${L.topItemsHeader}</div>
   <table class="ord-tbl-w">
@@ -395,6 +434,22 @@ export function getSalesSummaryHtml(
         <td class="top-qty">${p.order_count}</td>
         <td class="ord-amt">${formatUsd(p.total_revenue)}</td>
       </tr>`).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
+  ${adjustmentRows ? `
+  <div class="section-hd">${L.adjustmentsHeader}</div>
+  <table class="adj-tbl-w">
+    <thead>
+      <tr>
+        <th class="adj-date">${L.adjDate}</th>
+        <th class="adj-info">${L.adjInfo}</th>
+        <th class="adj-amt">${L.adjPrice}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${adjustmentRows || ''}
     </tbody>
   </table>
   ` : ''}
@@ -431,6 +486,10 @@ export function getSalesSummaryHtml(
       <td class="grand-khr">${L.grossKhr}</td>
       <td class="grand-khr right">${formatKhr(totalKhr)}</td>
     </tr>
+    ${adjustmentTotalUsd > 0 ? `
+    <tr><td class="lbl" style="padding-top:6px;">${L.adjustmentTotal}</td><td class="v" style="padding-top:6px;">-${formatUsd(adjustmentTotalUsd)}</td></tr>
+    <tr><td class="lbl">${L.netCash}</td><td class="v">${formatUsd(netCashUsd)}</td></tr>
+    ` : ''}
     ${completed.length !== totalOrders ? `
     <tr><td class="lbl" style="padding-top:6px;">${L.completedOnly}</td><td class="v" style="padding-top:6px;">${formatUsd(completedRevenueUsd)}</td></tr>
     ` : ''}
@@ -464,5 +523,121 @@ export function printSalesSummary(payload: SalesSummaryPayload) {
         subtitle: rangeLabel(payload.startDate, payload.endDate),
         defaultTemplateId: 'default',
         rememberKey: 'dineos.template.summary',
+    });
+}
+
+export function printDailyClosingReport(restaurant: Restaurant, detail: DailyReportDetail) {
+    const report = detail.report;
+    const expenses = detail.expenses || [];
+  const inventoryUsage = detail.inventory_usage || [];
+    const width = restaurant.receipt_width === '58mm' ? '58mm' : '80mm';
+  const estimatedProfitAfterInventory = report.net_profit_usd - (detail.inventory_total_cost_usd || 0);
+
+    const expenseRows = expenses
+        .map((e) => `
+        <tr>
+          <td>${escapeHtml(e.category)}</td>
+          <td>${escapeHtml(e.description)}</td>
+          <td class="right">${formatUsd(e.amount_usd_cents)}</td>
+        </tr>`)
+        .join('');
+
+    const inventoryRows = inventoryUsage
+        .map((row) => `
+        <tr>
+          <td>${escapeHtml(row.inventory_item_name)}</td>
+          <td class="right mono">${row.used_quantity.toFixed(2)} ${escapeHtml(row.unit_label)}</td>
+          <td class="right">${formatUsd(row.total_cost_usd)}</td>
+        </tr>`)
+        .join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Daily Sales Report</title>
+  <style>
+    @page { size: ${width} auto; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, Arial, sans-serif; background: #fff; color: #000; padding: 0 4mm 8mm; font-size: 11px; }
+    .center { text-align: center; }
+    .title { font-weight: 900; font-size: 13px; margin-top: 4px; }
+    .sub { font-size: 10px; opacity: 0.8; }
+    .line { border-top: 1px dashed #000; margin: 6px 0; }
+    .section { font-weight: 900; font-size: 10px; text-transform: uppercase; margin: 5px 0 3px; }
+    .grid { width: 100%; border-collapse: collapse; }
+    .grid td, .grid th { padding: 2px 0; vertical-align: top; }
+    .right { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .notes { white-space: pre-wrap; font-size: 10px; line-height: 1.35; }
+    .footer { margin-top: 8px; text-align: center; font-size: 9px; }
+  </style>
+</head>
+<body>
+  <div class="center title">DineOS POS</div>
+  <div class="center title">Daily Sales Report</div>
+  <div class="line"></div>
+
+  <table class="grid">
+    <tr><td>Date</td><td class="right mono">${escapeHtml(report.report_date)}</td></tr>
+    <tr><td>Cashier</td><td class="right">${escapeHtml(report.cashier_name || '-')}</td></tr>
+  </table>
+
+  <div class="line"></div>
+  <div class="section">Sales Summary</div>
+  <table class="grid">
+    <tr><td>Total Orders</td><td class="right mono">${report.total_orders}</td></tr>
+    <tr><td>Paid Orders</td><td class="right mono">${report.paid_orders}</td></tr>
+    <tr><td>Voided Orders</td><td class="right mono">${report.voided_orders}</td></tr>
+    <tr><td>Total Sales</td><td class="right mono">${formatUsd(report.total_sales_usd)}</td></tr>
+  </table>
+
+  <div class="line"></div>
+  <div class="section">Expense Summary</div>
+  <table class="grid">
+    ${expenseRows || '<tr><td colspan="3" class="sub">No expenses</td></tr>'}
+    <tr><td colspan="2"><b>Total Expenses</b></td><td class="right mono"><b>${formatUsd(report.total_expenses_usd)}</b></td></tr>
+  </table>
+
+  <div class="line"></div>
+  <div class="section">Inventory Usage</div>
+  <table class="grid">
+    ${inventoryRows || '<tr><td colspan="3" class="sub">No linked inventory usage</td></tr>'}
+    <tr><td colspan="2"><b>Total Inventory Cost</b></td><td class="right mono"><b>${formatUsd(detail.inventory_total_cost_usd || 0)}</b></td></tr>
+  </table>
+
+  <div class="line"></div>
+  <div class="section">Profit Summary</div>
+  <table class="grid">
+    <tr><td>Total Sales</td><td class="right mono">${formatUsd(report.total_sales_usd)}</td></tr>
+    <tr><td>Total Expenses</td><td class="right mono">-${formatUsd(report.total_expenses_usd)}</td></tr>
+    <tr><td><b>Operational Profit</b></td><td class="right mono"><b>${formatUsd(report.net_profit_usd)}</b></td></tr>
+    <tr><td>Inventory Usage Cost</td><td class="right mono">-${formatUsd(detail.inventory_total_cost_usd || 0)}</td></tr>
+    <tr><td><b>Estimated Profit After Inventory</b></td><td class="right mono"><b>${formatUsd(estimatedProfitAfterInventory)}</b></td></tr>
+  </table>
+
+  <div class="line"></div>
+  <div class="section">Notes</div>
+  <div class="notes">${escapeHtml(report.notes || '-')}</div>
+
+  <div class="line"></div>
+  <table class="grid">
+    <tr><td>Report Status</td><td class="right"><b>${escapeHtml((report.status || 'closed').toUpperCase())}</b></td></tr>
+    <tr><td>Generated By</td><td class="right">${escapeHtml(report.cashier_name || '-')}</td></tr>
+    <tr><td>Generated Time</td><td class="right mono">${escapeHtml(report.closed_at)}</td></tr>
+  </table>
+
+  <div class="line"></div>
+  <div class="footer">DineOS</div>
+</body>
+</html>`;
+
+    dispatchThermalPrint({
+        templates: [{ id: 'default', label: 'Default', html }],
+        paperWidth: width,
+        title: 'Daily Sales Report',
+        subtitle: report.report_date,
+        defaultTemplateId: 'default',
+        rememberKey: 'dineos.template.daily-close-report',
     });
 }

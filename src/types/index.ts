@@ -6,7 +6,7 @@
 export interface UserSession {
     id: string;
     username: string;
-    role: 'super_admin' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef';
+    role: 'super_admin' | 'admin' | 'business_admin' | 'cashier';
     full_name?: string;
     khmer_name?: string;
     phone?: string;
@@ -19,6 +19,7 @@ export interface RestaurantSummary {
     khmer_name?: string;
     address?: string;
     phone?: string;
+    business_type?: string;
     license_expires_at?: string;
     license_support_contact?: string;
     created_at: string;
@@ -267,4 +268,74 @@ export interface CategoryRevenue {
 export interface PeakHour {
     hour: string;
     order_count: number;
+}
+
+// --------------- Daily Reports ---------------
+export interface DailyReportExpenseInput {
+    date: string;
+    category: string;
+    description: string;
+    amount_usd_cents: number;
+}
+
+export interface DailyReportExpense {
+    id: string;
+    report_id: string;
+    date: string;
+    category: string;
+    description: string;
+    amount_usd_cents: number;
+}
+
+export interface DailyReport {
+    id: string;
+    restaurant_id: string;
+    report_date: string;
+    total_orders: number;
+    paid_orders: number;
+    voided_orders: number;
+    total_sales_usd: number;
+    total_sales_khr: number;
+    total_expenses_usd: number;
+    net_profit_usd: number;
+    notes?: string;
+    status: 'closed' | string;
+    cashier_name?: string;
+    closed_by_user_id?: string;
+    closed_at: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DailyReportPreview {
+    report_date: string;
+    total_orders: number;
+    paid_orders: number;
+    voided_orders: number;
+    total_sales_usd: number;
+    total_sales_khr: number;
+    total_expenses_usd: number;
+    net_profit_usd: number;
+    inventory_total_usage_qty: number;
+    inventory_total_cost_usd: number;
+    inventory_usage: InventoryUsageRow[];
+    is_closed: boolean;
+    existing_report_id?: string;
+}
+
+export interface InventoryUsageRow {
+    inventory_item_id: string;
+    inventory_item_name: string;
+    unit_label: string;
+    used_quantity: number;
+    cost_per_unit: number;
+    total_cost_usd: number;
+}
+
+export interface DailyReportDetail {
+    report: DailyReport;
+    expenses: DailyReportExpense[];
+    inventory_total_usage_qty: number;
+    inventory_total_cost_usd: number;
+    inventory_usage: InventoryUsageRow[];
 }

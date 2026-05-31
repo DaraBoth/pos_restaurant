@@ -14,6 +14,7 @@ const BAKED_TOKEN: &str = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJp
 const MIGRATIONS: &[(&str, &str)] = &[
     ("001_baseline", include_str!("migrations/001_baseline.sql")),
     ("004_app_releases", include_str!("migrations/004_app_releases.sql")),
+    ("005_daily_reports", include_str!("migrations/005_daily_reports.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -135,6 +136,8 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("inventory_logs", "quantity",        "quantity REAL NOT NULL DEFAULT 0");
     add_col!("inventory_logs", "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("inventory_logs", "reason",          "reason TEXT");
+    add_col!("inventory_items", "is_deleted",     "is_deleted INTEGER NOT NULL DEFAULT 0");
+    add_col!("payments", "is_deleted",            "is_deleted INTEGER NOT NULL DEFAULT 0");
 
     add_col!("restaurants", "license_expires_at", "license_expires_at TEXT");
     add_col!("restaurants", "license_support_contact", "license_support_contact TEXT");
@@ -172,6 +175,23 @@ async fn ensure_critical_columns(conn: &Connection) {
         )", (),
     ).await {
         println!("[DB] Note: _sync_state table creation returned: {} (may already exist)", e);
+    }
+
+    if let Err(e) = conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_audit_logs (
+            id TEXT PRIMARY KEY,
+            restaurant_id TEXT REFERENCES restaurants(id),
+            actor_user_id TEXT,
+            actor_role TEXT NOT NULL,
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            metadata_json TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", (),
+    ).await {
+        println!("[DB] Note: app_audit_logs table creation returned: {} (may already exist)", e);
     }
 
     if let Err(e) = conn.execute(

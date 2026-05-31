@@ -15,6 +15,7 @@ import {
 import ProductModal from '@/components/management/ProductModal';
 import CategoryModal from '@/components/management/CategoryModal';
 import { getImageSrc } from '@/lib/image';
+import { canDelete } from '@/lib/permissions';
 
 export default function ProductsManagement() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -48,9 +49,13 @@ export default function ProductsManagement() {
     }
 
     async function handleDeleteProduct(id: string) {
+        if (!canDelete(user?.role) || !user?.id) {
+            alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         if (!confirm('Are you sure you want to delete this product?')) return;
         try {
-            await deleteProduct(id, restaurantId || '');
+            await deleteProduct(id, restaurantId || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
@@ -59,6 +64,10 @@ export default function ProductsManagement() {
     }
 
     async function handleDeleteCategory(id: string) {
+        if (!canDelete(user?.role) || !user?.id) {
+            alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         // Recursively gather this category and all its descendants
         const getDescendantIds = (catId: string): string[] => {
             const children = categories.filter(c => c.parent_id === catId);
@@ -78,7 +87,7 @@ export default function ProductsManagement() {
 
         if (!confirm('Are you sure you want to delete this category?')) return;
         try {
-            await deleteCategory(id, restaurantId || '');
+            await deleteCategory(id, restaurantId || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
@@ -206,12 +215,14 @@ export default function ProductsManagement() {
                                                 >
                                                     <Edit3 size={13} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDeleteProduct(p.id)}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
+                                                {canDelete(user?.role) && (
+                                                    <button
+                                                        onClick={() => handleDeleteProduct(p.id)}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -268,12 +279,14 @@ export default function ProductsManagement() {
                                                 >
                                                     <Edit3 size={13} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDeleteCategory(c.id)}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
+                                                {canDelete(user?.role) && (
+                                                    <button
+                                                        onClick={() => handleDeleteCategory(c.id)}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

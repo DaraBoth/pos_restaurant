@@ -5,6 +5,7 @@ import { getTables, createTable, deleteTable } from '@/lib/tauri-commands';
 import type { FloorTable } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { canDelete } from '@/lib/permissions';
 
 const ZONE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
     Main:    { bg: 'rgba(14,165,233,0.12)',  text: '#38bdf8', border: 'rgba(14,165,233,0.35)'  },
@@ -70,12 +71,16 @@ export default function TablesManagementPage() {
     }
 
     async function handleDelete(table: FloorTable) {
+        if (!canDelete(user?.role) || !user?.id) {
+            setError('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         if (table.status !== 'available') {
             setError(`${t('cannotDeleteActive')}: ${table.name}`);
             return;
         }
         try {
-            await deleteTable(table.id, user?.restaurant_id || '');
+            await deleteTable(table.id, user?.restaurant_id || '', user.id);
             await load();
         } catch (e) {
             setError(t('failedDeleteTable'));
@@ -307,14 +312,16 @@ export default function TablesManagementPage() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleDelete(table)}
-                                                        disabled={isActive}
-                                                        title={isActive ? t('cannotDeleteActive') : t('deleteThisTable')}
-                                                        className="p-1.5 rounded-lg transition-all hover:bg-red-500/10 text-red-500/50 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed"
-                                                    >
-                                                        <Trash2 size={14} strokeWidth={2} />
-                                                    </button>
+                                                    {canDelete(user?.role) && (
+                                                        <button
+                                                            onClick={() => handleDelete(table)}
+                                                            disabled={isActive}
+                                                            title={isActive ? t('cannotDeleteActive') : t('deleteThisTable')}
+                                                            className="p-1.5 rounded-lg transition-all hover:bg-red-500/10 text-red-500/50 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed"
+                                                        >
+                                                            <Trash2 size={14} strokeWidth={2} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             );
                                         })}

@@ -1,6 +1,7 @@
 use tauri::State;
 use std::sync::Arc;
 use libsql::{Connection, params};
+use crate::commands::rbac;
 use crate::models::InventoryItem;
 
 fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
@@ -19,7 +20,7 @@ pub async fn get_inventory_items(
     let mut rows = db.query(
         "SELECT id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at 
          FROM inventory_items 
-         WHERE restaurant_id = ?
+            WHERE restaurant_id = ? AND COALESCE(is_deleted, 0) = 0
          ORDER BY name ASC",
          params![restaurant_id]
     )
@@ -140,10 +141,32 @@ pub async fn update_inventory_item(
 }
 
 #[tauri::command]
-pub async fn delete_inventory_item(db: State<'_, Arc<Connection>>, id: String, restaurant_id: String) -> Result<(), String> {
-    db.execute("DELETE FROM inventory_items WHERE id = ?1 AND restaurant_id = ?2", params![id, restaurant_id])
+pub async fn delete_inventory_item(
+    db: State<'_, Arc<Connection>>,
+    id: String,
+    restaurant_id: String,
+    actor_user_id: String,
+) -> Result<(), String> {
+    let actor_role = rbac::require_delete_permission(&db, &actor_user_id, &restaurant_id).await?;
+
+    db.execute(
+        "UPDATE inventory_items SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?1 AND restaurant_id = ?2",
+        params![id.clone(), restaurant_id.clone()],
+    )
         .await
         .map_err(|e| e.to_string())?;
+
+    rbac::write_audit_log(
+        &db,
+        &restaurant_id,
+        &actor_user_id,
+        &actor_role,
+        "delete",
+        "inventory_item",
+        &id,
+        None,
+    ).await;
+
     Ok(())
 }
 

@@ -8,6 +8,7 @@ import { InventoryItem } from '@/types';
 import { getInventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem, getInventoryLogs } from '@/lib/api/inventory';
 import { formatUsd } from '@/lib/currency';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { canDelete } from '@/lib/permissions';
 interface InventoryLog {
     id: string;
     product_id: string;
@@ -90,9 +91,13 @@ export default function InventoryManagement() {
     };
 
     const handleDeleteMaterial = async (id: string) => {
+        if (!canDelete(user?.role) || !user?.id) {
+            alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         if (confirm("Are you sure you want to delete this material? It cannot be undone and will break existing recipes.")) {
             try {
-                await deleteInventoryItem(id, restaurantId || '');
+                await deleteInventoryItem(id, restaurantId || '', user.id);
                 loadMaterials();
             } catch (err) {
                 console.error(err);

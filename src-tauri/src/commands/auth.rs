@@ -3,6 +3,7 @@ use libsql::{Connection, params};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::db::RemoteDb;
+use crate::commands::rbac;
 use crate::models::{User, UserSession, RestaurantSummary};
 use argon2::{Argon2, PasswordHash, PasswordVerifier, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
@@ -70,7 +71,7 @@ fn to_user_session(record: &AuthRecord) -> UserSession {
     UserSession {
         id: record.id.clone(),
         username: record.username.clone(),
-        role: record.role.clone(),
+        role: rbac::normalize_role_for_session(&record.role),
         full_name: record.full_name.clone(),
         khmer_name: record.khmer_name.clone(),
         phone: record.phone.clone(),
@@ -235,6 +236,7 @@ async fn mirror_restaurant_with_admin_to_remote(
     restaurant_name: &str,
     restaurant_address: &str,
     restaurant_phone: &str,
+    business_type: &str,
     license_expires_at: &str,
     license_support_contact: &str,
     admin_id: &str,
@@ -247,13 +249,14 @@ async fn mirror_restaurant_with_admin_to_remote(
     };
 
     remote.execute(
-        "INSERT OR REPLACE INTO restaurants (id, name, address, phone, receipt_footer, license_expires_at, license_support_contact, updated_at)
-         VALUES (?, ?, ?, ?, 'Thank you for your visit!', ?, ?, datetime('now'))",
+        "INSERT OR REPLACE INTO restaurants (id, name, address, phone, receipt_footer, business_type, license_expires_at, license_support_contact, updated_at)
+         VALUES (?, ?, ?, ?, 'Thank you for your visit!', ?, ?, ?, datetime('now'))",
         params![
             restaurant_id.to_string(),
             restaurant_name.to_string(),
             restaurant_address.to_string(),
             restaurant_phone.to_string(),
+            business_type.to_string(),
             license_expires_at.to_string(),
             license_support_contact.to_string()
         ]
@@ -355,17 +358,22 @@ pub async fn login(
     // ── Local-first check (for returning users who have already logged in once) ──
     // We do this for ALL non-superadmin users regardless of internet state.
     // If local DB errors (e.g. pending migration), we log and fall through gracefully.
+    let mut local_password_mismatch = false;
     if !superadmin_login {
         match fetch_auth_record(&pool, &username).await {
             Ok(Some(local_record)) => {
                 if verify_login_password(&password, &local_record.password_hash).is_ok() {
                     // ✅ Known user, correct password — allow offline login
-                    println!("[Auth] Offline login granted for '{}'", username);
+                    println!("[Auth] Local login granted for '{}'", username);
                     return Ok(to_user_session(&local_record));
                 }
-                // Known user, wrong password — don't fall through to remote,
-                // give them the correct error directly.
-                return Err("Invalid username or password.".to_string());
+                // Known user but password doesn't match local hash.
+                // Don't immediately reject — the password may have been changed via
+                // the superadmin panel (which writes to remote) and the sync hasn't
+                // propagated the new hash to this device yet.
+                // Fall through to remote check below if we are online.
+                println!("[Auth] Local password mismatch for '{}', will try remote.", username);
+                local_password_mismatch = true;
             }
             Ok(None) => {
                 // User not found locally — may be first login on this device.
@@ -385,6 +393,10 @@ pub async fn login(
     let Some(remote_conn) = remote.0.as_ref() else {
         if superadmin_login {
             return Err("Superadmin login requires internet connection and cloud authentication.".to_string());
+        }
+        if local_password_mismatch {
+            // Offline and local hash doesn't match — the user typed the wrong password.
+            return Err("Invalid username or password.".to_string());
         }
         return Err("No local account found on this device. An internet connection is required for first-time login. Please connect and try again.".to_string());
     };
@@ -464,30 +476,62 @@ pub async fn create_user(
     khmer_name: Option<String>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<String, String> {
+    let role = rbac::to_storage_role(&role);
+    if role == "super_admin" {
+        return Err("Permission denied: super_admin is an internal platform role".to_string());
+    }
+
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)
         .map_err(|e| format!("Hash error: {}", e))?
         .to_string();
- 
+
     let id = uuid::Uuid::new_v4().to_string();
+    let final_full_name = full_name.unwrap_or_default();
+    let final_khmer_name = khmer_name.unwrap_or_default();
+
+    // Write to local DB first (with updated_at so the sync daemon can PUSH it to remote)
     pool.execute(
-        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         params![
             id.clone(),
-            restaurant_id,
-            username,
-            hash,
-            role,
-            full_name.unwrap_or_default(),
-            khmer_name.unwrap_or_default()
+            restaurant_id.clone(),
+            username.clone(),
+            hash.clone(),
+            role.clone(),
+            final_full_name.clone(),
+            final_khmer_name.clone()
         ]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
- 
+
+    // Also mirror to remote immediately so the user can log in from any device
+    // right away without waiting for the next 30-second sync cycle.
+    if let Some(remote_conn) = remote.0.as_ref() {
+        if let Err(e) = remote_conn.execute(
+            "INSERT OR IGNORE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+            params![
+                id.clone(),
+                restaurant_id,
+                username,
+                hash,
+                role,
+                final_full_name,
+                final_khmer_name
+            ]
+        ).await {
+            // Non-fatal: the local insert succeeded, and the sync daemon will
+            // push it to remote on the next cycle via the updated_at timestamp.
+            eprintln!("[Auth] Warning: could not mirror new user to remote immediately: {}", e);
+        }
+    }
+
     Ok(id)
 }
 
@@ -508,7 +552,7 @@ pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) 
             restaurant_id: row.get::<String>(1).ok(),
             username: row.get::<String>(2).unwrap_or_default(),
             password_hash: row.get::<String>(3).unwrap_or_default(),
-            role: row.get::<String>(4).unwrap_or_default(),
+            role: rbac::normalize_role_for_session(&row.get::<String>(4).unwrap_or_default()),
             full_name: row.get::<String>(5).ok(),
             khmer_name: row.get::<String>(6).ok(),
             phone: row.get::<String>(7).ok(),
@@ -521,13 +565,39 @@ pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) 
 }
 
 #[tauri::command]
-pub async fn delete_user(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
-    pool.execute(
-        "UPDATE users SET is_deleted = 1, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
-        params![id, restaurant_id]
-    )
-    .await
-    .map_err(|e| format!("Database error: {}", e))?;
+pub async fn delete_user(
+    id: String,
+    restaurant_id: String,
+    actor_user_id: String,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
+) -> Result<(), String> {
+    let actor_role = rbac::require_delete_permission(&pool, &actor_user_id, &restaurant_id).await?;
+
+    const SQL: &str = "UPDATE users SET is_deleted = 1, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?";
+
+    pool.execute(SQL, params![id.clone(), restaurant_id.clone()])
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    // Mirror soft-delete to remote immediately
+    if let Some(remote_conn) = remote.0.as_ref() {
+        if let Err(e) = remote_conn.execute(SQL, params![id.clone(), restaurant_id.clone()]).await {
+            eprintln!("[Auth] Warning: could not mirror user deletion to remote: {}", e);
+        }
+    }
+
+    rbac::write_audit_log(
+        &pool,
+        &restaurant_id,
+        &actor_user_id,
+        &actor_role,
+        "delete",
+        "user",
+        &id,
+        None,
+    ).await;
+
     Ok(())
 }
 
@@ -541,7 +611,17 @@ pub async fn update_user(
     phone: Option<String>,
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
+    let role = rbac::to_storage_role(&role);
+    if role == "super_admin" {
+        return Err("Permission denied: super_admin is an internal platform role".to_string());
+    }
+
+    let final_full_name = full_name.unwrap_or_default();
+    let final_khmer_name = khmer_name.unwrap_or_default();
+    let final_phone = phone.unwrap_or_default();
+
     if let Some(pwd) = password {
         let salt = SaltString::generate(&mut OsRng);
         let hash = Argon2::default()
@@ -549,34 +629,41 @@ pub async fn update_user(
             .map_err(|e| format!("Hash error: {}", e))?
             .to_string();
 
-        pool.execute(
-            "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
-            params![
-                hash,
-                role,
-                full_name.unwrap_or_default(),
-                khmer_name.unwrap_or_default(),
-                phone.unwrap_or_default(),
-                id,
-                restaurant_id
-            ]
-        )
+        const SQL: &str = "UPDATE users SET password_hash = ?, role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?";
+
+        pool.execute(SQL, params![
+            hash.clone(), role.clone(), final_full_name.clone(),
+            final_khmer_name.clone(), final_phone.clone(), id.clone(), restaurant_id.clone()
+        ])
         .await
         .map_err(|e| format!("Database error: {}", e))?;
+
+        // Mirror to remote immediately so password change takes effect on all devices
+        if let Some(remote_conn) = remote.0.as_ref() {
+            if let Err(e) = remote_conn.execute(SQL, params![
+                hash, role, final_full_name, final_khmer_name, final_phone, id, restaurant_id
+            ]).await {
+                eprintln!("[Auth] Warning: could not mirror user update to remote: {}", e);
+            }
+        }
     } else {
-        pool.execute(
-            "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
-            params![
-                role,
-                full_name.unwrap_or_default(),
-                khmer_name.unwrap_or_default(),
-                phone.unwrap_or_default(),
-                id,
-                restaurant_id
-            ]
-        )
+        const SQL: &str = "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?";
+
+        pool.execute(SQL, params![
+            role.clone(), final_full_name.clone(), final_khmer_name.clone(),
+            final_phone.clone(), id.clone(), restaurant_id.clone()
+        ])
         .await
         .map_err(|e| format!("Database error: {}", e))?;
+
+        // Mirror to remote immediately
+        if let Some(remote_conn) = remote.0.as_ref() {
+            if let Err(e) = remote_conn.execute(SQL, params![
+                role, final_full_name, final_khmer_name, final_phone, id, restaurant_id
+            ]).await {
+                eprintln!("[Auth] Warning: could not mirror user update to remote: {}", e);
+            }
+        }
     }
 
     Ok(())
@@ -595,7 +682,7 @@ pub async fn list_all_restaurants(
     remote: State<'_, RemoteDb>,
 ) -> Result<RestaurantListResponse, String> {
     const QUERY: &str =
-        "SELECT r.id, r.name, r.khmer_name, r.address, r.phone, r.license_expires_at, r.license_support_contact, r.created_at,
+        "SELECT r.id, r.name, r.khmer_name, r.address, r.phone, COALESCE(r.business_type, 'Restaurant/Pub/Bar'), r.license_expires_at, r.license_support_contact, r.created_at,
                 u.id, u.username, u.full_name
          FROM restaurants r
          LEFT JOIN users u ON u.id = (
@@ -654,12 +741,13 @@ pub async fn list_all_restaurants(
             khmer_name: row.get::<String>(2).ok(),
             address: row.get::<String>(3).ok(),
             phone: row.get::<String>(4).ok(),
-            license_expires_at: row.get::<String>(5).ok(),
-            license_support_contact: row.get::<String>(6).ok(),
-            created_at: row.get::<String>(7).unwrap_or_default(),
-            admin_id: row.get::<String>(8).ok(),
-            admin_username: row.get::<String>(9).ok(),
-            admin_full_name: row.get::<String>(10).ok(),
+            business_type: row.get::<String>(5).ok(),
+            license_expires_at: row.get::<String>(6).ok(),
+            license_support_contact: row.get::<String>(7).ok(),
+            created_at: row.get::<String>(8).unwrap_or_default(),
+            admin_id: row.get::<String>(9).ok(),
+            admin_username: row.get::<String>(10).ok(),
+            admin_full_name: row.get::<String>(11).ok(),
         });
     }
     Ok(RestaurantListResponse { restaurants, source, remote_error })
@@ -671,6 +759,7 @@ pub async fn create_restaurant_with_admin(
     restaurant_name: String,
     restaurant_address: Option<String>,
     restaurant_phone: Option<String>,
+    business_type: Option<String>,
     license_expires_at: Option<String>,
     license_support_contact: Option<String>,
     admin_username: String,
@@ -690,18 +779,20 @@ pub async fn create_restaurant_with_admin(
 
     let address = restaurant_address.unwrap_or_default();
     let phone = restaurant_phone.unwrap_or_default();
+    let business = business_type.unwrap_or_else(|| "Restaurant/Pub/Bar".to_string());
     let expires_at = license_expires_at.unwrap_or_default();
     let support_contact = license_support_contact.unwrap_or_default();
     let full_name = admin_full_name.unwrap_or_default();
 
     pool.execute(
-        "INSERT INTO restaurants (id, name, address, phone, receipt_footer, license_expires_at, license_support_contact)
-         VALUES (?, ?, ?, ?, 'Thank you for your visit!', ?, ?)",
+        "INSERT INTO restaurants (id, name, address, phone, receipt_footer, business_type, license_expires_at, license_support_contact)
+         VALUES (?, ?, ?, ?, 'Thank you for your visit!', ?, ?, ?)",
         params![
             restaurant_id.clone(),
             restaurant_name.clone(),
             address.clone(),
             phone.clone(),
+            business.clone(),
             expires_at.clone(),
             support_contact.clone()
         ]
@@ -725,6 +816,7 @@ pub async fn create_restaurant_with_admin(
         &restaurant_name,
         &address,
         &phone,
+        &business,
         &expires_at,
         &support_contact,
         &admin_id,
@@ -904,7 +996,7 @@ pub async fn superadmin_get_all_users(
             restaurant_id: row.get(1).ok(),
             restaurant_name: row.get(2).ok(),
             username: row.get(3).unwrap_or_default(),
-            role: row.get(4).unwrap_or_default(),
+            role: rbac::normalize_role_for_session(&row.get::<String>(4).unwrap_or_default()),
             full_name: row.get(5).ok(),
             created_at: row.get(6).unwrap_or_default(),
         });
@@ -971,6 +1063,11 @@ pub async fn superadmin_create_restaurant_user(
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<String, String> {
+    let role = rbac::to_storage_role(&role);
+    if role == "super_admin" {
+        return Err("Permission denied: super_admin is an internal platform role".to_string());
+    }
+
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)
@@ -1076,14 +1173,59 @@ pub async fn create_superadmin_account(
 #[tauri::command]
 pub async fn delete_restaurant(
     restaurant_id: String,
+    actor_user_id: String,
+    actor_role: String,
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
 ) -> Result<(), String> {
+    let mut resolved_actor_role: Option<String> = None;
+
+    // Prefer authoritative cloud role lookup when available.
+    if let Some(remote_conn) = remote.0.as_ref() {
+        if let Ok(mut rows) = remote_conn.query(
+            "SELECT role FROM users WHERE id = ? AND is_deleted = 0",
+            params![actor_user_id.clone()]
+        ).await {
+            if let Ok(Some(row)) = rows.next().await {
+                resolved_actor_role = Some(rbac::normalize_role_for_session(&row.get::<String>(0).unwrap_or_default()));
+            }
+        }
+    }
+
+    // Fallback to local role lookup if cloud role was unavailable.
+    if resolved_actor_role.is_none() {
+        let mut rows = pool.query(
+            "SELECT role FROM users WHERE id = ? AND is_deleted = 0",
+            params![actor_user_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+
+        if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            resolved_actor_role = Some(rbac::normalize_role_for_session(&row.get::<String>(0).unwrap_or_default()));
+        }
+    }
+
+    let effective_actor_role = resolved_actor_role.unwrap_or_else(|| rbac::normalize_role_for_session(&actor_role));
+
+    if !rbac::can_delete(&effective_actor_role) {
+        return Err("Permission denied: only Super Admin and Admin may delete records".to_string());
+    }
+
     purge_restaurant_data(&pool, &restaurant_id).await?;
 
     if let Some(remote_conn) = remote.0.as_ref() {
         purge_restaurant_data(remote_conn, &restaurant_id).await?;
     }
+
+    rbac::write_audit_log(
+        &pool,
+        &restaurant_id,
+        &actor_user_id,
+        &effective_actor_role,
+        "delete",
+        "restaurant",
+        &restaurant_id,
+        None,
+    ).await;
 
     Ok(())
 }

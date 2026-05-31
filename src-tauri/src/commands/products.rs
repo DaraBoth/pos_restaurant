@@ -1,6 +1,7 @@
 use tauri::State;
 use libsql::{Connection, params};
 use std::sync::Arc;
+use crate::commands::rbac;
 use crate::models::{Category, Product};
 
 fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
@@ -260,13 +261,32 @@ pub async fn update_product(
 }
 
 #[tauri::command]
-pub async fn delete_product(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_product(
+    id: String,
+    restaurant_id: String,
+    actor_user_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    let actor_role = rbac::require_delete_permission(&pool, &actor_user_id, &restaurant_id).await?;
+
     pool.execute(
         "UPDATE products SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
-        params![id, restaurant_id]
+        params![id.clone(), restaurant_id.clone()]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    rbac::write_audit_log(
+        &pool,
+        &restaurant_id,
+        &actor_user_id,
+        &actor_role,
+        "delete",
+        "product",
+        &id,
+        None,
+    ).await;
+
     Ok(())
 }
 
@@ -317,13 +337,32 @@ pub async fn update_category(
 }
 
 #[tauri::command]
-pub async fn delete_category(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_category(
+    id: String,
+    restaurant_id: String,
+    actor_user_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    let actor_role = rbac::require_delete_permission(&pool, &actor_user_id, &restaurant_id).await?;
+
     pool.execute(
         "UPDATE categories SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
-        params![id, restaurant_id]
+        params![id.clone(), restaurant_id.clone()]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    rbac::write_audit_log(
+        &pool,
+        &restaurant_id,
+        &actor_user_id,
+        &actor_role,
+        "delete",
+        "category",
+        &id,
+        None,
+    ).await;
+
     Ok(())
 }
 

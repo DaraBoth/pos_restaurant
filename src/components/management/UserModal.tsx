@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { UserSession, createUser, updateUser } from '@/lib/tauri-commands';
 import { Save, Key, Shield } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
+import { roleLabel } from '@/lib/permissions';
 import SidebarDrawer from './SidebarDrawer';
  
 interface UserModalProps {
@@ -16,7 +17,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
     const { user: currentUser } = useAuth();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<'super_admin' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'chef'>('cashier');
+    const [role, setRole] = useState<'admin' | 'business_admin' | 'cashier'>('cashier');
     const [fullName, setFullName] = useState('');
     const [khmerName, setKhmerName] = useState('');
     const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
         if (user) {
             setUsername(user.username);
             setPassword('');
-            setRole(user.role as any);
+            setRole((roleLabel(user.role) as 'admin' | 'business_admin' | 'cashier') || 'cashier');
             setFullName(user.full_name || '');
             setKhmerName(user.khmer_name || '');
         } else {
@@ -135,7 +136,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                 <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Role & Permissions</label>
                     <div className="grid grid-cols-3 gap-2">
-                        {(['admin', 'manager', 'cashier', 'waiter', 'chef'] as const).map((r) => (
+                        {(['admin', 'business_admin', 'cashier'] as const).map((r) => (
                             <button
                                 key={r}
                                 type="button"
@@ -147,7 +148,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 }`}
                             >
                                 <Shield size={14} className={role === r ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
-                                <span className="text-xs font-bold capitalize">{r}</span>
+                                <span className="text-xs font-bold capitalize">{r.replace('_', ' ')}</span>
                             </button>
                         ))}
                     </div>

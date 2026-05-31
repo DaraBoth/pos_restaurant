@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { UserSession } from '@/lib/tauri-commands';
+import { normalizeRole } from '@/lib/permissions';
 
 interface AuthContextValue {
     user: UserSession | null;
@@ -24,7 +25,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const saved = localStorage.getItem('dineos_session');
         if (saved) {
             try {
-                setUserState(JSON.parse(saved));
+                const parsed = JSON.parse(saved) as UserSession;
+                setUserState({ ...parsed, role: normalizeRole(parsed.role) });
             } catch (e) {
                 console.error('Failed to parse saved session', e);
                 localStorage.removeItem('dineos_session');
@@ -34,9 +36,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const setUser = useCallback((u: UserSession | null) => {
-        setUserState(u);
+        const normalized = u ? { ...u, role: normalizeRole(u.role) } : null;
+        setUserState(normalized);
         if (u) {
-            localStorage.setItem('dineos_session', JSON.stringify(u));
+            localStorage.setItem('dineos_session', JSON.stringify(normalized));
         } else {
             localStorage.removeItem('dineos_session');
         }

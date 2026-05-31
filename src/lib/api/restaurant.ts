@@ -11,11 +11,13 @@ export const updateRestaurant = (input: RestaurantInput, restaurantId?: string) 
 export const updateRestaurantLicense = (
     restaurantId: string,
     licenseExpiresAt?: string,
-    licenseSupportContact?: string
+    licenseSupportContact?: string,
+    businessType?: string
 ) => call<void>('update_restaurant_license', {
     restaurantId,
     licenseExpiresAt: licenseExpiresAt || null,
     licenseSupportContact: licenseSupportContact || null,
+    businessType: businessType || null,
 });
 
 export const verifyRestaurantLicense = (restaurantId: string) =>

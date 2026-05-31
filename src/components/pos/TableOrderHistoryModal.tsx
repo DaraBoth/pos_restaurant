@@ -5,7 +5,6 @@ import { X, History, RefreshCw, Receipt } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 import { getSessionRounds, Order } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr } from '@/lib/currency';
-import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
 interface TableOrderHistoryModalProps {
@@ -18,7 +17,6 @@ interface TableOrderHistoryModalProps {
 export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onClose }: TableOrderHistoryModalProps) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
-    const { t } = useLanguage();
     const { user } = useAuth();
 
     useOverlayBehavior(isOpen, onClose);
@@ -43,7 +41,7 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
         }
         loadOrders();
         return () => { cancelled = true; };
-    }, [isOpen, tableId, sessionId]);
+    }, [isOpen, tableId, sessionId, user?.restaurant_id]);
 
     if (!isOpen) return null;
 
@@ -82,7 +80,7 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
                         </div>
                     ) : (
                         orders.map((order, idx) => {
-                            const dt = new Date(order.created_at + 'Z');
+                            const dt = formatHistoryDateTime(order.created_at);
                             const isVoid = order.status === 'void';
                             
                             // Map status to aesthetic pills
@@ -106,7 +104,7 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
                                                 Round {orders.length - idx}
                                             </span>
                                             <span className="text-[10px] font-medium opacity-40 font-mono">
-                                                {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {dt ? dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
                                             </span>
                                         </div>
                                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border ${statusClasses}`}>
@@ -120,7 +118,7 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
                                                 #{order.id.split('-')[0].toUpperCase()}
                                             </span>
                                             <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-50">
-                                                {dt.toLocaleDateString()}
+                                                {dt ? dt.toLocaleDateString() : 'Invalid date'}
                                             </span>
                                         </div>
                                         <div className="text-right flex flex-col gap-0.5">
@@ -140,4 +138,13 @@ export default function TableOrderHistoryModal({ isOpen, tableId, sessionId, onC
             </div>
         </div>
     );
+}
+
+function formatHistoryDateTime(value: string) {
+    const parsed = value.endsWith('Z') ? new Date(value) : new Date(`${value}Z`);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+
+    return parsed;
 }

@@ -7,5 +7,5 @@ export const getTables = (restaurantId?: string) =>
 export const createTable = (name: string, seat_count?: number, zone?: string, restaurantId?: string) =>
     call<FloorTable>('create_table', { name, seatCount: seat_count, zone, restaurantId });
 
-export const deleteTable = (id: string, restaurant_id: string) => 
-    call<void>('delete_table', { id, restaurantId: restaurant_id });
+export const deleteTable = (id: string, restaurant_id: string, actorUserId: string) =>
+    call<void>('delete_table', { id, restaurantId: restaurant_id, actorUserId });

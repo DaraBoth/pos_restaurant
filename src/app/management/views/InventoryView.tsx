@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import InventoryItemModal from '@/components/management/InventoryItemModal';
 import { InventoryItem } from '@/types';
+import { canDelete } from '@/lib/permissions';
 
 export default function InventoryView() {
     const { t, lang } = useLanguage();
@@ -41,9 +42,13 @@ export default function InventoryView() {
     }
 
     async function handleDelete(id: string) {
+        if (!canDelete(user?.role) || !user?.id) {
+            window.alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         if (!window.confirm('Are you sure you want to delete this ingredient? Products linked to it will no longer deduct stock.')) return;
         try {
-            await deleteInventoryItem(id, restaurantId || '');
+            await deleteInventoryItem(id, restaurantId || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
@@ -215,12 +220,14 @@ export default function InventoryView() {
                                                 >
                                                     <Edit2 size={14} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDelete(item.id)}
-                                                    className="p-2 rounded-lg bg-[var(--bg-elevated)] hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500 border border-transparent hover:border-red-500/30 transition-all"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                {canDelete(user?.role) && (
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="p-2 rounded-lg bg-[var(--bg-elevated)] hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500 border border-transparent hover:border-red-500/30 transition-all"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

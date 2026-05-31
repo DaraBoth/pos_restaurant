@@ -5,6 +5,7 @@ import { Layers, Plus, Trash2, Edit3, Search } from 'lucide-react';
 import CategoryModal from '@/components/management/CategoryModal';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { canDelete } from '@/lib/permissions';
 
 export default function CategoriesManagement() {
     const { t } = useLanguage();
@@ -28,9 +29,13 @@ export default function CategoriesManagement() {
     }
 
     async function handleDelete(id: string) {
+        if (!canDelete(user?.role) || !user?.id) {
+            alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         if (!confirm('Are you sure you want to delete this category? All products in this category will become unassigned.')) return;
         try {
-            await deleteCategory(id, user?.restaurant_id || '');
+            await deleteCategory(id, user?.restaurant_id || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
@@ -144,12 +149,14 @@ export default function CategoriesManagement() {
                                             >
                                                 <Edit3 size={12} />
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(cat.id)}
-                                                className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
+                                            {canDelete(user?.role) && (
+                                                <button
+                                                    onClick={() => handleDelete(cat.id)}
+                                                    className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

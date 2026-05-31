@@ -1,26 +1,51 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { getOrders, getOrderItems, deleteOrderHistory } from '@/lib/api/orders';
 import { getRestaurant } from '@/lib/api/restaurant';
-import { Order, OrderItem, Restaurant } from '@/types';
+import { closeDailyReport, getDailyReportDetail, getDailyReportPreview, getDailyReports } from '@/lib/api/reports';
+import { DailyReport, DailyReportDetail, DailyReportExpenseInput, DailyReportPreview, Order, OrderItem, Restaurant } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { printReceipt } from '@/lib/receipt';
 import {
     History, RefreshCw, TableProperties, ChevronDown,
-    ChevronUp, Download, Calendar, Clock, ReceiptText,
+    ChevronUp, Download, Clock, ReceiptText,
     LayoutList, LayoutGrid, Printer, Trash2
 } from 'lucide-react';
 // Dynamic import for XLSX to avoid bundling issues
 let XLSX_MODULE: any = null;
 import { useLanguage } from '@/providers/LanguageProvider';
 import { call } from '@/lib/api/client';
-import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
-import { printSalesSummary } from '@/lib/reports';
+import { format } from 'date-fns';
+import { printDailyClosingReport, printSalesSummary } from '@/lib/reports';
 import { getTopProductsInRange } from '@/lib/api/analytics';
 import { getImageSrc } from '@/lib/image';
+import { canDelete } from '@/lib/permissions';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'hold';
+type PageTab = 'orders' | 'reports' | 'report-history';
+type ReportFilter = 'all' | 'closed';
+const ORDER_HISTORY_VIEW_MODE_KEY = 'dineos.history.viewMode';
+
+interface CashAdjustmentRow {
+    id: string;
+    date: string;
+    category: string;
+    description: string;
+    price: string;
+}
+
+const EXPENSE_CATEGORIES = [
+    'Inventory',
+    'Utility',
+    'Transportation',
+    'Maintenance',
+    'Salary',
+    'Equipment',
+    'Other',
+];
 
 export interface GroupedOrder {
     id: string; // session_id or order_id
@@ -61,25 +86,101 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
 };
 
 export default function HistoryPage() {
+    const searchParams = useSearchParams();
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
+    const [activeTab, setActiveTab] = useState<PageTab>('orders');
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
+    const [reportFilter, setReportFilter] = useState<ReportFilter>('all');
+    const [reportSearch, setReportSearch] = useState('');
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
     const [orderDetails, setOrderDetails] = useState<Record<string, OrderItem[]>>({});
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+        if (typeof window === 'undefined') return 'grid';
+        const saved = window.localStorage.getItem(ORDER_HISTORY_VIEW_MODE_KEY);
+        return saved === 'table' || saved === 'grid' ? saved : 'grid';
+    });
     const loadingItemsRef = useRef<Set<string>>(new Set());
 
     const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+    const [dailyPreview, setDailyPreview] = useState<DailyReportPreview | null>(null);
+    const [reportNotes, setReportNotes] = useState('');
+    const [closedReports, setClosedReports] = useState<DailyReport[]>([]);
+    const [closingReport, setClosingReport] = useState(false);
+    const [adjustments, setAdjustments] = useState<CashAdjustmentRow[]>([
+        { id: 'adj-1', date: format(new Date(), 'yyyy-MM-dd'), category: 'Inventory', description: '', price: '' },
+    ]);
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'reports') {
+            setActiveTab('reports');
+        } else if (tab === 'report-history') {
+            setActiveTab('report-history');
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem(ORDER_HISTORY_VIEW_MODE_KEY, viewMode);
+    }, [viewMode]);
+
+    function createAdjustmentRow(): CashAdjustmentRow {
+        return {
+            id: `adj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            date: format(new Date(), 'yyyy-MM-dd'),
+            category: 'Inventory',
+            description: '',
+            price: '',
+        };
+    }
+
+    function updateAdjustmentRow(id: string, field: keyof Omit<CashAdjustmentRow, 'id'>, value: string) {
+        setAdjustments(prev => prev.map(row => (row.id === id ? { ...row, [field]: value } : row)));
+    }
+
+    function addAdjustmentRow() {
+        setAdjustments(prev => [...prev, createAdjustmentRow()]);
+    }
+
+    function removeAdjustmentRow(id: string) {
+        setAdjustments(prev => {
+            const next = prev.filter(row => row.id !== id);
+            return next.length > 0 ? next : [createAdjustmentRow()];
+        });
+    }
+
+    const normalizedAdjustments = useMemo(() => {
+        return adjustments
+            .map(row => {
+                const priceValue = Number(String(row.price).replace(/,/g, '').trim());
+                return {
+                    date: row.date.trim(),
+                    category: row.category.trim() || 'Other',
+                    description: row.description.trim(),
+                    price_cents: Number.isFinite(priceValue) ? Math.max(0, Math.round(priceValue * 100)) : 0,
+                };
+            })
+            .filter(row => row.description && row.price_cents > 0);
+    }, [adjustments]);
+
+    const adjustmentTotalCents = normalizedAdjustments.reduce((sum, row) => sum + row.price_cents, 0);
 
     useEffect(() => {
         loadOrders();
         loadRestaurant();
+        loadDailyReportPreview();
+        loadClosedReports();
     }, [startDate, endDate]);
+
+    useEffect(() => {
+        loadClosedReports();
+    }, [reportFilter]);
 
     async function loadRestaurant() {
         try {
@@ -94,9 +195,11 @@ export default function HistoryPage() {
         setLoading(true);
         try {
             const data = await getOrders(undefined, startDate, endDate, restaurantId || '');
-            setOrders(data.sort((a, b) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            ));
+            setOrders(
+                data
+                    .filter((order) => order.status === 'completed')
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            );
         } catch (e) {
             console.error(e);
         } finally {
@@ -104,8 +207,58 @@ export default function HistoryPage() {
         }
     }
 
+    async function loadDailyReportPreview() {
+        if (!restaurantId) {
+            setDailyPreview(null);
+            return;
+        }
+        try {
+            const preview = await getDailyReportPreview(endDate, restaurantId);
+            setDailyPreview(preview);
+            if (preview.is_closed && preview.existing_report_id) {
+                const detail = await getDailyReportDetail(preview.existing_report_id, restaurantId);
+                setReportNotes(detail.report.notes || '');
+                setAdjustments(
+                    detail.expenses.length > 0
+                        ? detail.expenses.map((e) => ({
+                            id: e.id,
+                            date: e.date,
+                            category: e.category,
+                            description: e.description,
+                            price: (e.amount_usd_cents / 100).toFixed(2),
+                        }))
+                        : [createAdjustmentRow()]
+                );
+            } else {
+                setReportNotes('');
+                setAdjustments([createAdjustmentRow()]);
+            }
+        } catch (e) {
+            console.error('Failed loading daily report preview', e);
+            setDailyPreview(null);
+        }
+    }
+
+    async function loadClosedReports() {
+        if (!restaurantId) {
+            setClosedReports([]);
+            return;
+        }
+        try {
+            const rows = await getDailyReports(restaurantId, startDate, endDate, reportFilter === 'all' ? undefined : reportFilter);
+            setClosedReports(rows);
+        } catch (e) {
+            console.error('Failed loading closed reports', e);
+            setClosedReports([]);
+        }
+    }
+
     async function handleDeleteGroup(group: GroupedOrder) {
-        if (!user) return;
+        if (!user || !user.id) return;
+        if (!canDelete(user.role)) {
+            window.alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         const confirmMsg = t('confirmDeleteHistory') || 'Are you sure you want to permanently delete this order history? This will remove it from both local and cloud databases and sync across all devices.';
         if (!window.confirm(confirmMsg)) return;
 
@@ -115,7 +268,7 @@ export default function HistoryPage() {
             const sessionId = hasSession ? group.id : null;
             const orderId = !hasSession ? group.id : null;
 
-            await deleteOrderHistory(sessionId, orderId, user.role, restaurantId || '');
+            await deleteOrderHistory(sessionId, orderId, restaurantId || '', user.id);
             loadOrders();
         } catch (e: any) {
             console.error('Failed to delete history', e);
@@ -161,6 +314,16 @@ export default function HistoryPage() {
         if (filter === 'all') return allGroupedOrders;
         return allGroupedOrders.filter(g => g.status === filter);
     }, [allGroupedOrders, filter]);
+
+    const filteredReports = useMemo(() => {
+        const keyword = reportSearch.trim().toLowerCase();
+        if (!keyword) return closedReports;
+        return closedReports.filter(report => (
+            report.report_date.toLowerCase().includes(keyword)
+            || (report.cashier_name || '').toLowerCase().includes(keyword)
+            || (report.status || '').toLowerCase().includes(keyword)
+        ));
+    }, [closedReports, reportSearch]);
 
     const filtered = groupedOrders;
 
@@ -276,7 +439,7 @@ export default function HistoryPage() {
     };
 
     const handlePrintSummary = async () => {
-        if (!restaurant || !filtered || filtered.length === 0) return;
+        if (!restaurant || !allGroupedOrders || allGroupedOrders.length === 0) return;
 
         // Best-sellers query is scoped to the same date range, fetched fresh —
         // never reuse the page's lazy-loaded order items, which may be a partial set.
@@ -293,7 +456,7 @@ export default function HistoryPage() {
             restaurant,
             startDate,
             endDate,
-            groups: filtered.map(g => ({
+            groups: allGroupedOrders.map(g => ({
                 id: g.id,
                 table_id: g.table_id,
                 status: g.status,
@@ -305,7 +468,136 @@ export default function HistoryPage() {
             })),
             cashierName: user?.full_name || user?.username,
             topItems,
+            adjustments: normalizedAdjustments.map(row => ({
+                date: row.date,
+                info: `${row.category}: ${row.description}`,
+                price_cents: row.price_cents,
+            })),
         });
+    };
+
+    const handlePrintDailyReport = async (report: DailyReport) => {
+        if (!restaurant || !restaurantId) return;
+        try {
+            const detail = await getDailyReportDetail(report.id, restaurantId);
+            printDailyClosingReport(restaurant, detail);
+        } catch (e: any) {
+            window.alert('Failed to load report detail: ' + (e?.message || e));
+        }
+    };
+
+    const handleExportDailyReport = async (report: DailyReport) => {
+        if (!restaurantId) return;
+
+        try {
+            if (!XLSX_MODULE) {
+                XLSX_MODULE = await import('xlsx');
+            }
+            const X = XLSX_MODULE.utils ? XLSX_MODULE : XLSX_MODULE.default;
+            if (!X || !X.utils) throw new Error('XLSX utils not found');
+
+            const detail = await getDailyReportDetail(report.id, restaurantId);
+            const dayOrders = await getOrders(undefined, report.report_date, report.report_date, restaurantId);
+
+            const summaryRows = [
+                { Field: 'Report Date', Value: report.report_date },
+                { Field: 'Cashier', Value: report.cashier_name || '' },
+                { Field: 'Total Orders', Value: report.total_orders },
+                { Field: 'Paid Orders', Value: report.paid_orders },
+                { Field: 'Voided Orders', Value: report.voided_orders },
+                { Field: 'Total Sales', Value: (report.total_sales_usd / 100).toFixed(2) },
+                { Field: 'Total Expenses', Value: (report.total_expenses_usd / 100).toFixed(2) },
+                { Field: 'Operational Profit', Value: (report.net_profit_usd / 100).toFixed(2) },
+                { Field: 'Inventory Usage Cost', Value: (detail.inventory_total_cost_usd / 100).toFixed(2) },
+                { Field: 'Estimated Profit After Inventory', Value: ((report.net_profit_usd - detail.inventory_total_cost_usd) / 100).toFixed(2) },
+            ];
+
+            const salesRows = dayOrders
+                .filter(o => o.status === 'completed')
+                .map(o => ({
+                    'Invoice No': o.id.split('-')[0].toUpperCase(),
+                    Time: new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    Table: o.table_id || 'Takeout',
+                    Total: (o.total_usd / 100).toFixed(2),
+                }));
+
+            const expenseRows = detail.expenses.map(e => ({
+                Date: e.date,
+                Category: e.category,
+                Description: e.description,
+                Amount: (e.amount_usd_cents / 100).toFixed(2),
+            }));
+
+            const inventoryRows = detail.inventory_usage.map(i => ({
+                'Inventory Item': i.inventory_item_name,
+                'Used Qty': i.used_quantity.toFixed(2),
+                Unit: i.unit_label,
+                'Cost / Unit': i.cost_per_unit.toFixed(2),
+                'Total Cost': (i.total_cost_usd / 100).toFixed(2),
+            }));
+
+            const wb = X.utils.book_new();
+            X.utils.book_append_sheet(wb, X.utils.json_to_sheet(summaryRows), 'Summary');
+            X.utils.book_append_sheet(wb, X.utils.json_to_sheet(salesRows), 'Sales Details');
+            X.utils.book_append_sheet(wb, X.utils.json_to_sheet(expenseRows), 'Expense Details');
+            X.utils.book_append_sheet(wb, X.utils.json_to_sheet(inventoryRows), 'Inventory Usage');
+
+            const excelBuffer = X.write(wb, { bookType: 'xlsx', type: 'array' });
+            const content = Array.from(new Uint8Array(excelBuffer));
+            const filename = `Daily_Report_${report.report_date}.xlsx`;
+            const savedPath = await call<string>('save_excel_file', { content, filename });
+
+            if (savedPath === 'CANCELLED') return;
+            window.alert('Success! Report saved to:\n' + savedPath);
+        } catch (e: any) {
+            window.alert('Export failed: ' + (e?.message || e));
+        }
+    };
+
+    const handleCloseReport = async () => {
+        if (!restaurantId || !user?.id) return;
+        if (dailyPreview?.is_closed) {
+            window.alert('Today\'s report is already closed.');
+            return;
+        }
+
+        const confirmed = window.confirm(
+            'Are you sure you want to close today\'s report?\n\nAfter closing:\n- Report becomes read-only\n- Historical record is created\n- Report can be printed and exported'
+        );
+        if (!confirmed) return;
+
+        const expenses: DailyReportExpenseInput[] = normalizedAdjustments.map(row => ({
+            date: row.date,
+            category: row.category,
+            description: row.description,
+            amount_usd_cents: row.price_cents,
+        }));
+
+        try {
+            setClosingReport(true);
+            const currentRestaurant = restaurant;
+            if (!currentRestaurant) {
+                throw new Error('Restaurant not loaded');
+            }
+            const detail: DailyReportDetail = await closeDailyReport(
+                endDate,
+                restaurantId,
+                user.id,
+                user.full_name || user.username,
+                reportNotes || undefined,
+                expenses,
+            );
+            if (restaurantId) {
+                window.localStorage.removeItem(`dineos.daily-close-draft.${restaurantId}.${endDate}`);
+            }
+            await loadDailyReportPreview();
+            await loadClosedReports();
+            printDailyClosingReport(currentRestaurant, detail);
+        } catch (e: any) {
+            window.alert('Close report failed: ' + (e?.message || e));
+        } finally {
+            setClosingReport(false);
+        }
     };
 
     // Stats
@@ -313,6 +605,89 @@ export default function HistoryPage() {
 
     // Total revenue is just the sum of completed groups
     const totalRevenueCents = completed.reduce((s, g) => s + g.total_usd, 0);
+    const totalSalesCents = dailyPreview?.total_sales_usd ?? 0;
+    const netProfitCents = Math.max(totalSalesCents - adjustmentTotalCents, 0);
+    const inventoryUsageRows = dailyPreview?.inventory_usage ?? [];
+    const inventoryUsageCostCents = dailyPreview?.inventory_total_cost_usd ?? 0;
+    const estimatedProfitAfterInventoryCents = netProfitCents - inventoryUsageCostCents;
+
+    const handleSaveDraft = () => {
+        if (!restaurantId) return;
+        const draftKey = `dineos.daily-close-draft.${restaurantId}.${endDate}`;
+        window.localStorage.setItem(draftKey, JSON.stringify({
+            notes: reportNotes,
+            expenses: adjustments,
+        }));
+        window.alert('Draft saved.');
+    };
+
+    const handlePrintPreview = () => {
+        if (!restaurant || !restaurantId) return;
+
+        const nowIso = new Date().toISOString();
+        const reportDate = dailyPreview?.report_date || endDate;
+
+        const previewDetail: DailyReportDetail = {
+            report: {
+                id: 'preview',
+                restaurant_id: restaurantId,
+                report_date: reportDate,
+                total_orders: dailyPreview?.total_orders ?? 0,
+                paid_orders: dailyPreview?.paid_orders ?? 0,
+                voided_orders: dailyPreview?.voided_orders ?? 0,
+                total_sales_usd: totalSalesCents,
+                total_sales_khr: dailyPreview?.total_sales_khr ?? 0,
+                total_expenses_usd: adjustmentTotalCents,
+                net_profit_usd: netProfitCents,
+                notes: reportNotes,
+                status: dailyPreview?.is_closed ? 'closed' : 'preview',
+                cashier_name: user?.full_name || user?.username,
+                closed_by_user_id: user?.id,
+                closed_at: nowIso,
+                created_at: nowIso,
+                updated_at: nowIso,
+            },
+            expenses: normalizedAdjustments.map((row, index) => ({
+                id: `preview-expense-${index + 1}`,
+                report_id: 'preview',
+                date: row.date,
+                category: row.category,
+                description: row.description,
+                amount_usd_cents: row.price_cents,
+            })),
+            inventory_total_usage_qty: dailyPreview?.inventory_total_usage_qty ?? 0,
+            inventory_total_cost_usd: inventoryUsageCostCents,
+            inventory_usage: inventoryUsageRows,
+        };
+
+        printDailyClosingReport(restaurant, previewDetail);
+    };
+
+    useEffect(() => {
+        if (!restaurantId || dailyPreview?.is_closed) return;
+
+        const draftKey = `dineos.daily-close-draft.${restaurantId}.${endDate}`;
+        const raw = window.localStorage.getItem(draftKey);
+        if (!raw) return;
+
+        try {
+            const parsed = JSON.parse(raw) as { notes?: string; expenses?: CashAdjustmentRow[] };
+            if (typeof parsed.notes === 'string') {
+                setReportNotes(parsed.notes);
+            }
+            if (Array.isArray(parsed.expenses) && parsed.expenses.length > 0) {
+                setAdjustments(parsed.expenses.map((row) => ({
+                    id: row.id || `adj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    date: row.date || format(new Date(), 'yyyy-MM-dd'),
+                    category: row.category || 'Other',
+                    description: row.description || '',
+                    price: row.price || '',
+                })));
+            }
+        } catch {
+            // Ignore invalid draft data.
+        }
+    }, [restaurantId, endDate, dailyPreview?.is_closed]);
 
     return (
         <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
@@ -391,7 +766,431 @@ export default function HistoryPage() {
                 ))}
             </div>
 
-            {/* ── Tabs & Content ── */}
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('orders')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'orders'
+                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
+                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
+                        }`}
+                >
+                    Order History
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('reports')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'reports'
+                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
+                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
+                        }`}
+                >
+                    Close Daily Report
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('report-history')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'report-history'
+                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
+                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
+                        }`}
+                >
+                    Report History
+                </button>
+            </div>
+
+            {activeTab === 'reports' && (
+            <div className="space-y-4">
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div>
+                            <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">Daily Sales Closing</h2>
+                            <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
+                                Review today's sales, record expenses, and close the daily report.
+                            </p>
+                            <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
+                                {dailyPreview?.is_closed ? `Status: CLOSED (${dailyPreview.report_date})` : `Status: OPEN (${endDate})`}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Today's Sales Summary</h3>
+                        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                            <table className="w-full min-w-[640px]">
+                                <thead className="bg-[var(--bg-elevated)]">
+                                    <tr>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Metric</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Report Date</td>
+                                        <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{dailyPreview?.report_date || endDate}</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Paid Orders</td>
+                                        <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{dailyPreview?.paid_orders ?? 0}</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Total Sales</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.total_sales_usd ?? 0)}</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)] align-top">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Paid Receipts</td>
+                                        <td className="px-3 py-2">
+                                            {allGroupedOrders.length === 0 ? (
+                                                <span className="text-xs font-bold text-[var(--text-secondary)] opacity-70">No paid receipts for selected date.</span>
+                                            ) : (
+                                                <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+                                                    <table className="w-full min-w-[420px]">
+                                                        <thead className="bg-[var(--bg-card)]">
+                                                            <tr>
+                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Time</th>
+                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Receipt</th>
+                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Table</th>
+                                                                <th className="text-right px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {allGroupedOrders.map((receipt) => (
+                                                                <tr key={receipt.id} className="border-t border-[var(--border)]">
+                                                                    <td className="px-2 py-1.5 text-[11px] font-mono text-[var(--foreground)]">
+                                                                        {new Date(receipt.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    </td>
+                                                                    <td className="px-2 py-1.5 text-[11px] font-mono font-black text-[var(--foreground)]">
+                                                                        {receipt.id.split('-')[0].toUpperCase()}
+                                                                    </td>
+                                                                    <td className="px-2 py-1.5 text-[11px] font-bold text-[var(--foreground)]">
+                                                                        {receipt.table_id || 'Takeout'}
+                                                                    </td>
+                                                                    <td className="px-2 py-1.5 text-[11px] text-right font-mono font-black text-[var(--accent)]">
+                                                                        {formatUsd(receipt.total_usd)}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 relative z-20">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Today's Expenses</h3>
+                            <button
+                                type="button"
+                                onClick={addAdjustmentRow}
+                                disabled={!!dailyPreview?.is_closed}
+                                className="px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest"
+                            >
+                                + Add Expense
+                            </button>
+                        </div>
+
+                    <div className="overflow-visible">
+                        <table className="w-full min-w-[680px] border-separate border-spacing-y-2">
+                            <thead>
+                                <tr>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Date</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Category</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Description</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60 w-[180px]">Amount</th>
+                                    <th className="px-3 py-2 w-[72px]"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {adjustments.map((row) => (
+                                    <tr key={row.id} className="align-top">
+                                        <td className="px-1">
+                                            <input
+                                                type="date"
+                                                value={row.date}
+                                                onChange={(e) => updateAdjustmentRow(row.id, 'date', e.target.value)}
+                                                disabled={!!dailyPreview?.is_closed}
+                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black uppercase tracking-widest text-[var(--foreground)]"
+                                            />
+                                        </td>
+                                        <td className="px-1">
+                                            <CustomSelect
+                                                value={row.category}
+                                                onChange={(value) => updateAdjustmentRow(row.id, 'category', value)}
+                                                options={EXPENSE_CATEGORIES.map((cat) => ({ label: cat, value: cat }))}
+                                                disabled={!!dailyPreview?.is_closed}
+                                                className="relative z-30 h-11"
+                                            />
+                                        </td>
+                                        <td className="px-1">
+                                            <input
+                                                type="text"
+                                                value={row.description}
+                                                onChange={(e) => updateAdjustmentRow(row.id, 'description', e.target.value)}
+                                                disabled={!!dailyPreview?.is_closed}
+                                                placeholder="Vegetables purchase, gas refill, delivery..."
+                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black text-[var(--foreground)]"
+                                            />
+                                        </td>
+                                        <td className="px-1">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={row.price}
+                                                onChange={(e) => updateAdjustmentRow(row.id, 'price', e.target.value)}
+                                                disabled={!!dailyPreview?.is_closed}
+                                                placeholder="0.00"
+                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black font-mono text-[var(--foreground)]"
+                                            />
+                                        </td>
+                                        <td className="px-1 text-right">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeAdjustmentRow(row.id)}
+                                                disabled={!!dailyPreview?.is_closed}
+                                                className="h-11 px-3 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest"
+                                            >
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    </div>
+
+                    <div className="space-y-3 pt-1 relative z-0">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Inventory Usage Summary</h3>
+                        {inventoryUsageRows.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-4 text-[11px] font-bold text-[var(--text-secondary)] opacity-70">
+                                No linked inventory usage found for completed sales on this date.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                                <table className="w-full min-w-[680px]">
+                                    <thead className="bg-[var(--bg-elevated)]">
+                                        <tr>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Inventory Item</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Used Qty</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Cost / Unit</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Total Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {inventoryUsageRows.map((item) => (
+                                            <tr key={item.inventory_item_id} className="border-t border-[var(--border)]">
+                                                <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{item.inventory_item_name}</td>
+                                                <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{item.used_quantity.toFixed(2)} {item.unit_label}</td>
+                                                <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">${item.cost_per_unit.toFixed(2)}</td>
+                                                <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(item.total_cost_usd)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-3 pt-1">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Business Summary</h3>
+                        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                            <table className="w-full min-w-[760px]">
+                                <thead className="bg-[var(--bg-elevated)]">
+                                    <tr>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Metric</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Value</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Edit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Total Sales</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-[var(--foreground)]">{formatUsd(totalSalesCents)}</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">Auto (from paid orders)</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Total Expenses</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-orange-400">{formatUsd(adjustmentTotalCents)}</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">Editable in Today's Expenses table</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Inventory Usage Cost</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-sky-300">{formatUsd(inventoryUsageCostCents)}</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">Auto (from linked inventory usage)</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)] bg-emerald-500/10">
+                                        <td className="px-3 py-2 text-xs font-black text-emerald-200">Operational Profit</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-emerald-300">{formatUsd(netProfitCents)}</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-emerald-200/80">Total Sales - Total Expenses</td>
+                                    </tr>
+                                    <tr className="border-t border-[var(--border)] bg-violet-500/10">
+                                        <td className="px-3 py-2 text-xs font-black text-violet-200">Estimated Profit After Inventory</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-violet-300">{formatUsd(estimatedProfitAfterInventoryCents)}</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-violet-200/80">Operational Profit - Inventory Usage Cost</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60">Inventory Usage Cost is estimated from linked recipe usage of completed sales for the selected date. Estimated Profit After Inventory = Operational Profit - Inventory Usage Cost.</p>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Daily Notes</h3>
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Daily Notes</label>
+                        <textarea
+                            value={reportNotes}
+                            onChange={(e) => setReportNotes(e.target.value)}
+                            rows={4}
+                            disabled={!!dailyPreview?.is_closed}
+                            placeholder="Kitchen equipment repaired. Supplier delivery delayed."
+                            className="pos-input px-3 py-2 text-xs w-full bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
+                        />
+                    </div>
+
+                    <div className="space-y-3 border-t border-[var(--border)] mt-3 pt-4">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Actions</h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleSaveDraft}
+                                disabled={!!dailyPreview?.is_closed}
+                                className="px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 font-black text-xs uppercase tracking-widest"
+                            >
+                                Save Draft
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePrintPreview}
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all font-black text-xs uppercase tracking-widest"
+                            >
+                                <Printer size={14} />
+                                Print Preview
+                            </button>
+                            <button
+                                onClick={handleCloseReport}
+                                disabled={closingReport || loading || !allGroupedOrders?.length || !!dailyPreview?.is_closed}
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-black hover:brightness-110 transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
+                            >
+                                <Printer size={14} />
+                                {closingReport ? 'Closing...' : 'Close Report'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            )}
+
+            {activeTab === 'report-history' && (
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">Report History</h2>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
+                            Closed reports for the selected date range.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            type="text"
+                            value={reportSearch}
+                            onChange={(e) => setReportSearch(e.target.value)}
+                            placeholder="Search by date, cashier, status..."
+                            className="pos-input h-10 px-3 text-xs w-[220px] bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
+                        />
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { id: 'all', label: 'All' },
+                                { id: 'closed', label: 'Closed' },
+                            ].map(item => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => setReportFilter(item.id as ReportFilter)}
+                                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${reportFilter === item.id
+                                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
+                                        : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
+                                        }`}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {filteredReports.length === 0 ? (
+                        <div className="lg:col-span-2 flex items-center justify-center py-16 opacity-40 border border-dashed border-[var(--border)] rounded-2xl">
+                            <div className="text-center space-y-2">
+                                <ReceiptText size={28} className="mx-auto" />
+                                <p className="text-xs font-black uppercase tracking-widest">No reports matched this filter</p>
+                            </div>
+                        </div>
+                    ) : filteredReports.map(report => (
+                        <div key={report.id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">{report.report_date}</h3>
+                                    <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
+                                        {report.paid_orders} paid orders
+                                    </p>
+                                </div>
+                                <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                    {report.status}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[10px] font-black uppercase tracking-widest">
+                                <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border)] px-3 py-2">
+                                    <span className="block text-[var(--text-secondary)] opacity-50">USD</span>
+                                    <span className="block mt-1 text-[var(--accent)] text-sm">{formatUsd(report.total_sales_usd)}</span>
+                                </div>
+                                <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border)] px-3 py-2">
+                                    <span className="block text-[var(--text-secondary)] opacity-50">KHR</span>
+                                    <span className="block mt-1 text-[var(--foreground)] text-sm">{formatKhr(report.total_sales_khr)}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest opacity-70">
+                                <span>Total Expenses {formatUsd(report.total_expenses_usd)}</span>
+                                <span>Net Profit {formatUsd(report.net_profit_usd)}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                                <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60">
+                                    Closed by {report.cashier_name || 'Unknown'}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleExportDailyReport(report)}
+                                        className="px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] font-black text-[10px] uppercase tracking-widest transition-all"
+                                    >
+                                        Export
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handlePrintDailyReport(report)}
+                                        className="px-3 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
+                                    >
+                                        Print
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            )}
+
+            {activeTab === 'orders' && (
+            /* ── Tabs & Content ── */
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex gap-2 overflow-x-auto pb-2 container-snap">
@@ -526,7 +1325,7 @@ export default function HistoryPage() {
                                                                             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Master Table Receipt</h4>
                                                                         </div>
                                                                         <div className="flex items-center gap-4">
-                                                                            {user && ['admin', 'manager', 'super_admin'].includes(user.role) && (
+                                                                            {user && canDelete(user.role) && (
                                                                                 <button
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
@@ -765,7 +1564,7 @@ export default function HistoryPage() {
 
                                         {/* Print and Delete buttons */}
                                         <div className="px-3 pb-3 flex items-center gap-2">
-                                            {user && ['admin', 'manager', 'super_admin'].includes(user.role) && (
+                                            {user && canDelete(user.role) && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -811,6 +1610,7 @@ export default function HistoryPage() {
                         </div>
                     ))}
             </div>
+            )}
         </div>
     );
 }

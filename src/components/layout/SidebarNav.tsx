@@ -4,11 +4,12 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon, Download } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import { UpdateStatus } from '@/components/ui/UpdateStatus';
+import { canAccessAdminConsole, roleLabel } from '@/lib/permissions';
 import Link from 'next/link';
 import MySettingsModal from '@/components/layout/MySettingsModal';
 import { useOrder } from '@/providers/OrderProvider';
@@ -146,14 +147,13 @@ export default function SidebarNav() {
                     <NavItem label={t('pos')} icon={LayoutGrid} path="/pos?mode=table" pathname={pathname} searchParams={searchStr} collapsed={collapsed} onClick={clearOrder} />
                 )}
                 <NavItem label={t('buyProduct')} icon={Store} path="/pos?mode=direct" pathname={pathname} searchParams={searchStr} collapsed={collapsed} onClick={clearOrder} />
-                {false && (user?.role === 'admin' || user?.role === 'chef') && (
+                {false && user?.role === 'admin' && (
                     <NavItem label={t('kitchen')} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}
                 <NavItem label={t('history')} icon={History} path="/history" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 
                 <div className="mt-auto flex flex-col gap-0.5 w-full">
-                    <NavItem label={t('downloads')} icon={Download} path="/downloads" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
-                    {(user?.role === 'admin' || user?.role === 'manager') && (
+                    {canAccessAdminConsole(user?.role) && (
                         <NavItem label={t('management')} icon={Settings} path="/management" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                     )}
                 </div>
@@ -188,7 +188,7 @@ export default function SidebarNav() {
                                 {user?.full_name || user?.username}
                             </p>
                             <p className="text-[9px] font-black text-[var(--text-secondary)] opacity-60 uppercase tracking-widest leading-none mt-1.5">
-                                {user?.role}
+                                {roleLabel(user?.role)}
                             </p>
                         </div>
                     )}

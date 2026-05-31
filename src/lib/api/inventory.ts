@@ -44,8 +44,8 @@ export const updateInventoryItem = (data: {
     restaurantId: data.restaurant_id || data.restaurantId
 });
 
-export const deleteInventoryItem = (id: string, restaurantId: string) =>
-    call<void>('delete_inventory_item', { id, restaurantId });
+export const deleteInventoryItem = (id: string, restaurantId: string, actorUserId: string) =>
+    call<void>('delete_inventory_item', { id, restaurantId, actorUserId });
 
 
 export const getInventoryLogs = (restaurant_id?: string) => 

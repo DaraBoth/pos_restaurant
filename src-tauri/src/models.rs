@@ -32,6 +32,7 @@ pub struct RestaurantSummary {
     pub khmer_name: Option<String>,
     pub address: Option<String>,
     pub phone: Option<String>,
+    pub business_type: Option<String>,
     pub license_expires_at: Option<String>,
     pub license_support_contact: Option<String>,
     pub created_at: String,

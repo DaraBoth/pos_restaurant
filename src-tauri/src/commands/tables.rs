@@ -1,6 +1,7 @@
 use tauri::State;
 use libsql::{Connection, params};
 use std::sync::Arc;
+use crate::commands::rbac;
 use crate::models::FloorTable;
 
 #[tauri::command]
@@ -85,12 +86,31 @@ pub async fn create_table(
 }
 
 #[tauri::command]
-pub async fn delete_table(id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn delete_table(
+    id: String,
+    restaurant_id: String,
+    actor_user_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    let actor_role = rbac::require_delete_permission(&pool, &actor_user_id, &restaurant_id).await?;
+
     pool.execute(
         "UPDATE floor_tables SET is_deleted=1 WHERE id=? AND restaurant_id=?",
-        params![id, restaurant_id]
+        params![id.clone(), restaurant_id.clone()]
     )
     .await
     .map_err(|e| format!("Database error: {}", e))?;
+
+    rbac::write_audit_log(
+        &pool,
+        &restaurant_id,
+        &actor_user_id,
+        &actor_role,
+        "delete",
+        "floor_table",
+        &id,
+        None,
+    ).await;
+
     Ok(())
 }

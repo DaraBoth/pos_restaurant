@@ -30,33 +30,6 @@ function escapeHtml(value: string) {
 }
 
 export function getReceiptHtml(payload: ReceiptPrintPayload): string {
-
-    const itemRows = payload.items.map((item, idx) => `
-        <tr class="item-row">
-            <td class="col-id">${idx + 1}</td>
-            <td class="col-name">
-                ${escapeHtml(item.product_name || '')}
-                ${item.product_khmer ? `<div class="item-km">${escapeHtml(item.product_khmer)}</div>` : ''}
-            </td>
-            <td class="col-qty">${item.quantity}</td>
-            <td class="col-price">${formatUsd(item.price_at_order)}</td>
-            <td class="col-total">${formatUsd(item.price_at_order * item.quantity)}</td>
-        </tr>
-    `).join('');
-
-    const paymentRows = payload.payments.map(payment => `
-        <tr>
-            <td class="pay-method">${escapeHtml(payment.method)} <span class="pay-cur">(${escapeHtml(payment.currency)})</span></td>
-            <td>${payment.currency === 'KHR' ? formatKhr(payment.amount) : formatUsd(payment.amount)}</td>
-        </tr>
-    `).join('');
-
-    const footerLines = (payload.restaurant.receipt_footer || 'Thank you for your visit!')
-        .split('\n')
-        .filter(Boolean)
-        .map(line => `<div style="margin-top: 2px;">${escapeHtml(line)}</div>`)
-        .join('');
-
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -66,7 +39,7 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     // Side padding keeps content off the roll edge; bottom padding feeds paper
     // past the cutter head so the auto-cut doesn't slice the last printed line.
     const sidePadding = isSmall ? '2mm' : '4mm';
-    const cutterFeed  = isSmall ? '4mm' : '6mm';
+    const cutterFeed  = isSmall ? '2mm' : '3mm';
 
     return `<!DOCTYPE html>
 <html>
@@ -129,7 +102,7 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     .grand-usd { font-size: ${isSmall ? '14px' : '17px'}; font-weight: 900; padding: 6px 0 2px; border-top: 1px dashed #000; }
     .grand-khr { font-size: ${isSmall ? '10.5px' : '12.5px'}; font-weight: 900; }
 
-    .footer { text-align: center; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
+    .footer { text-align: center; margin-top: 4px; border-top: 1px dashed #000; padding-top: 4px; }
     .footer .msg { font-size: ${isSmall ? '10.5px' : '12px'}; font-weight: 700; }
     .footer .brand { font-size: ${isSmall ? '7px' : '8.5px'}; opacity: 0.4; text-transform: uppercase; margin-top: 4px; }
   </style>
@@ -214,8 +187,8 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
   </div>
 
   <div class="footer">
-    <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you for your visit!')}</div>
-    <div class="brand">Powered by DineOS</div>
+    <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you')}</div>
+    <div class="brand">DineOS</div>
   </div>
 </body>
 </html>`;

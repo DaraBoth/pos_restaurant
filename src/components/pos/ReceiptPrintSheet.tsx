@@ -9,6 +9,11 @@ export default function ReceiptPrintSheet() {
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
+    function handleClose() {
+        setOpen(false);
+        window.setTimeout(() => setJob(null), 220);
+    }
+
     useEffect(() => {
         function onPrint(e: Event) {
             const detail = (e as CustomEvent<ThermalPrintJob>).detail;
@@ -35,11 +40,13 @@ export default function ReceiptPrintSheet() {
     useEffect(() => {
         if (!job) return;
         function onKey(e: KeyboardEvent) {
-            if (e.key === 'Escape') handleClose();
+            if (e.key === 'Escape') {
+                setOpen(false);
+                window.setTimeout(() => setJob(null), 220);
+            }
         }
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [job]);
 
     const activeTemplate = useMemo(() => {
@@ -52,11 +59,6 @@ export default function ReceiptPrintSheet() {
     const isSmall = job.paperWidth === '58mm';
     const showTabs = job.templates.length > 1;
 
-    function handleClose() {
-        setOpen(false);
-        window.setTimeout(() => setJob(null), 220);
-    }
-
     function pickTemplate(id: string) {
         setActiveTemplateId(id);
         if (job?.rememberKey) {
@@ -65,13 +67,56 @@ export default function ReceiptPrintSheet() {
     }
 
     function triggerPrint() {
-        const win = iframeRef.current?.contentWindow;
-        if (!win) return;
-        win.focus();
-        // Same call for paper and PDF — the OS print dialog lets the cashier
-        // either pick a configured USB / LAN / Bluetooth thermal printer
-        // OR pick "Save as PDF" / "Microsoft Print to PDF" as the destination.
-        win.print();
+        const template = activeTemplate;
+        if (!template) return;
+
+        const printFrame = document.createElement('iframe');
+        printFrame.setAttribute('aria-hidden', 'true');
+        printFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:${isSmall ? 220 : 302}px;height:1px;border:0;visibility:hidden;pointer-events:none;`;
+        printFrame.srcdoc = template.html;
+        document.body.appendChild(printFrame);
+
+        const cleanup = () => {
+            window.setTimeout(() => {
+                if (document.body.contains(printFrame)) {
+                    document.body.removeChild(printFrame);
+                }
+            }, 1000);
+        };
+
+        printFrame.onload = () => {
+            const win = printFrame.contentWindow;
+            if (!win) {
+                cleanup();
+                return;
+            }
+
+            win.focus();
+            // Same call for paper and PDF — the OS print dialog lets the cashier
+            // either pick a configured USB / LAN / Bluetooth thermal printer
+            // OR pick "Save as PDF" / "Microsoft Print to PDF" as the destination.
+            win.print();
+            cleanup();
+        };
+    }
+
+    function handleFrameLoad() {
+        const iframe = iframeRef.current;
+        const doc = iframe?.contentDocument;
+        if (!iframe || !doc) return;
+
+        const body = doc.body;
+        const html = doc.documentElement;
+        const height = Math.max(
+            body?.scrollHeight || 0,
+            body?.offsetHeight || 0,
+            html?.scrollHeight || 0,
+            html?.offsetHeight || 0,
+        );
+
+        if (height > 0) {
+            iframe.style.height = `${height}px`;
+        }
     }
 
     return (
@@ -137,14 +182,15 @@ export default function ReceiptPrintSheet() {
 
                 <div className="flex-1 overflow-auto bg-[#e5e5e5] p-5 flex items-start justify-center">
                     <div
-                        className="bg-white shadow-xl flex-shrink-0"
+                        className="bg-white shadow-xl flex-shrink-0 overflow-hidden"
                         style={{ width: isSmall ? 220 : 302 }}
                     >
                         <iframe
                             ref={iframeRef}
                             srcDoc={activeTemplate.html}
                             title={`${job.title} · ${activeTemplate.label}`}
-                            style={{ width: '100%', height: 600, border: 'none', display: 'block' }}
+                            onLoad={handleFrameLoad}
+                            style={{ width: '100%', height: 0, minHeight: 0, border: 'none', display: 'block' }}
                         />
                     </div>
                 </div>

@@ -8,3 +8,5 @@ pub mod kitchen;
 pub mod inventory;
 pub mod analytics;
 pub mod releases;
+pub mod rbac;
+pub mod reports;

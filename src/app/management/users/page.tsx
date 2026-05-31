@@ -4,6 +4,7 @@ import { getUsers, deleteUser } from '@/lib/api/auth';
 import { useAuth } from '@/providers/AuthProvider';
 import type { UserSession } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { canDelete, roleLabel } from '@/lib/permissions';
 import { Users as UsersIcon, Plus, Search, Edit3, Trash2, Shield } from 'lucide-react';
 import UserModal from '@/components/management/UserModal';
 
@@ -31,9 +32,13 @@ export default function UsersManagement() {
     }
 
     async function handleDelete(id: string) {
+        if (!canDelete(user?.role) || !user?.id) {
+            alert('Permission denied: delete is only available to Admin roles.');
+            return;
+        }
         if (!confirm(t('confirm'))) return;
         try {
-            await deleteUser(id, restaurantId || '');
+            await deleteUser(id, restaurantId || '', user.id);
             loadUsers();
         } catch (e) {
             console.error(e);
@@ -121,14 +126,12 @@ export default function UsersManagement() {
 
                                     <td className="px-4 py-2.5">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border
-                                            ${u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
-                                            ${u.role === 'manager' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
-                                            ${u.role === 'cashier' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : ''}
-                                            ${u.role === 'waiter' ? 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)]' : ''}
-                                            ${u.role === 'chef' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : ''}
+                                            ${roleLabel(u.role) === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
+                                            ${roleLabel(u.role) === 'business_admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
+                                            ${roleLabel(u.role) === 'cashier' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : ''}
                                         `}>
                                             <Shield size={10} />
-                                            {u.role}
+                                            {roleLabel(u.role).replace('_', ' ')}
                                         </span>
                                     </td>
 
@@ -148,13 +151,15 @@ export default function UsersManagement() {
                                             >
                                                 <Edit3 size={13} />
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(u.id)}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
-                                                title={t('delete')}
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
+                                            {canDelete(user?.role) && (
+                                                <button
+                                                    onClick={() => handleDelete(u.id)}
+                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-all"
+                                                    title={t('delete')}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

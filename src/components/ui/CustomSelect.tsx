@@ -12,9 +12,10 @@ interface CustomSelectProps {
     options: SelectOption[];
     placeholder?: string;
     className?: string;
+    disabled?: boolean;
 }
 
-export function CustomSelect({ value, onChange, options, placeholder = "Select an option", className = "" }: CustomSelectProps) {
+export function CustomSelect({ value, onChange, options, placeholder = "Select an option", className = "", disabled = false }: CustomSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -37,8 +38,15 @@ export function CustomSelect({ value, onChange, options, placeholder = "Select a
         <div className={`relative ${className}`} ref={containerRef}>
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)] transition-all cursor-pointer shadow-sm hover:brightness-105"
+                onClick={() => {
+                    if (disabled) return;
+                    setIsOpen(!isOpen);
+                }}
+                disabled={disabled}
+                className={`w-full flex items-center justify-between bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-xs font-bold text-[var(--foreground)] outline-none transition-all shadow-sm ${disabled
+                    ? 'opacity-60 cursor-not-allowed'
+                    : 'focus:border-[var(--accent-blue)] cursor-pointer hover:brightness-105'
+                }`}
             >
                 <span className={selectedOption ? '' : 'text-[var(--text-secondary)] opacity-70'}>
                     {selectedOption ? selectedOption.label : placeholder}
@@ -46,8 +54,8 @@ export function CustomSelect({ value, onChange, options, placeholder = "Select a
                 <ChevronDown size={14} className={`text-[var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {isOpen && (
-                <div className="absolute z-50 w-full mt-2 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            {isOpen && !disabled && (
+                <div className="absolute z-[120] w-full mt-2 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="max-h-60 overflow-y-auto p-1.5 no-scrollbar">
                         {options.map((option) => (
                             <button

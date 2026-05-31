@@ -99,7 +99,7 @@ pub async fn get_payments_for_order(
         "SELECT p.id, p.order_id, p.method, p.currency, p.amount, p.bakong_transaction_hash, p.created_at
          FROM payments p
          JOIN orders o ON o.id = p.order_id
-         WHERE p.order_id=? AND o.restaurant_id=? ORDER BY p.created_at",
+         WHERE p.order_id=? AND o.restaurant_id=? AND COALESCE(p.is_deleted, 0) = 0 ORDER BY p.created_at",
         params![order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 

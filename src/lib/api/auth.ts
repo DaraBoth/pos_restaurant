@@ -24,8 +24,8 @@ export const updateUser = (
     fullName: full_name, khmerName: khmer_name, phone
 });
 
-export const deleteUser = (id: string, restaurantId: string) => 
-    call<void>('delete_user', { id, restaurantId });
+export const deleteUser = (id: string, restaurantId: string, actorUserId: string) =>
+    call<void>('delete_user', { id, restaurantId, actorUserId });
 
 export const listAllRestaurants = () =>
     call<RestaurantListResponse>('list_all_restaurants');
@@ -34,6 +34,7 @@ export const createRestaurantWithAdmin = (params: {
     restaurantName: string;
     restaurantAddress?: string;
     restaurantPhone?: string;
+    businessType?: string;
     licenseExpiresAt?: string;
     licenseSupportContact?: string;
     adminUsername: string;
@@ -43,6 +44,7 @@ export const createRestaurantWithAdmin = (params: {
     restaurantName: params.restaurantName,
     restaurantAddress: params.restaurantAddress,
     restaurantPhone: params.restaurantPhone,
+    businessType: params.businessType,
     licenseExpiresAt: params.licenseExpiresAt,
     licenseSupportContact: params.licenseSupportContact,
     adminUsername: params.adminUsername,
@@ -66,8 +68,8 @@ export const superadminCreateRestaurantUser = (params: {
     khmerName: params.khmerName,
 });
 
-export const deleteRestaurant = (restaurantId: string) =>
-    call<void>('delete_restaurant', { restaurantId });
+export const deleteRestaurant = (restaurantId: string, actorUserId: string, actorRole: string) =>
+    call<void>('delete_restaurant', { restaurantId, actorUserId, actorRole });
 
 export const superadminUpdateAdmin = (params: {
     adminId: string;

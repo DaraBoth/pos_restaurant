@@ -54,6 +54,6 @@ export const getPaymentsForOrder = (order_id: string, restaurant_id?: string) =>
 export const deleteOrderHistory = (
     sessionId: string | null,
     orderId: string | null,
-    role: string,
-    restaurantId: string
-) => call<void>('delete_order_history', { sessionId, orderId, role, restaurantId });
+    restaurantId: string,
+    actorUserId: string
+) => call<void>('delete_order_history', { sessionId, orderId, restaurantId, actorUserId });

@@ -5,7 +5,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { RevenueSummary, RevenueByDay, TopProduct, CategoryRevenue, PeakHour } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { formatUsd } from '@/lib/currency';
-import { TrendingUp, ShoppingBag, DollarSign, Clock, AlertTriangle, Flame, PieChart } from 'lucide-react';
+import { TrendingUp, ShoppingBag, DollarSign, Clock, AlertTriangle, Flame, PieChart, RefreshCw } from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 
 type Period = 'week' | 'month' | '3months' | 'year';
@@ -33,6 +33,25 @@ export default function AnalyticsPage() {
     const [period, setPeriod] = useState<Period>('month');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [refreshTick, setRefreshTick] = useState(0);
+    const [autoRefresh, setAutoRefresh] = useState(false);
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
+
+    function triggerRefresh() {
+        setRefreshTick(current => current + 1);
+    }
+
+    useEffect(() => {
+        if (!autoRefresh || !restaurantId) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            setRefreshTick(current => current + 1);
+        }, 60_000);
+
+        return () => window.clearInterval(timer);
+    }, [autoRefresh, restaurantId]);
 
     useEffect(() => {
         if (!restaurantId) {
@@ -58,6 +77,7 @@ export default function AnalyticsPage() {
                 setCategoryRevenue(cr);
                 setPeakHours(ph);
                 setSlowMovers(sm);
+                setLastUpdatedAt(new Date().toLocaleTimeString());
             } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
                 console.error('[Analytics] Load failed:', msg);
@@ -67,7 +87,7 @@ export default function AnalyticsPage() {
             }
         }
         load();
-    }, [period, t, restaurantId]);
+    }, [period, t, restaurantId, refreshTick]);
 
     const maxRevenue = chartData.length > 0 ? Math.max(...chartData.map(d => d.total_usd)) : 1;
 
@@ -116,6 +136,31 @@ export default function AnalyticsPage() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-2 opacity-60">
                     {t('revenueOverview')}
                 </p>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-80">
+                    {autoRefresh ? 'Auto refresh every 60s' : 'Normal refresh mode'}
+                    {lastUpdatedAt ? ` • Updated at ${lastUpdatedAt}` : ''}
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setAutoRefresh(value => !value)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${autoRefresh
+                            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                            : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)]'
+                            }`}
+                    >
+                        {autoRefresh ? 'Auto On' : 'Auto Off'}
+                    </button>
+                    <button
+                        onClick={triggerRefresh}
+                        className="px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent-blue)]/40 hover:bg-[var(--accent-blue)]/10 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                    >
+                        <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {error && (

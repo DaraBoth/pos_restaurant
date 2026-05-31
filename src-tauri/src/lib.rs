@@ -197,6 +197,11 @@ pub fn run() {
             commands::releases::create_app_release,
             commands::releases::delete_app_release,
             commands::releases::download_release_file,
+            // Daily Reports
+            commands::reports::get_daily_report_preview,
+            commands::reports::close_daily_report,
+            commands::reports::get_daily_reports,
+            commands::reports::get_daily_report_detail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

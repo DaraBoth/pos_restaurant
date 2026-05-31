@@ -26,6 +26,7 @@ type CreateForm = {
     restaurantName: string;
     restaurantAddress: string;
     restaurantPhone: string;
+    businessType: string;
     licenseExpiresAt: string;
     licenseSupportContact: string;
     adminUsername: string;
@@ -33,12 +34,24 @@ type CreateForm = {
     adminFullName: string;
 };
 
+type LicenseFilter = 'all' | 'expired' | 'expiring_7' | 'expiring_30' | 'perpetual' | 'no_admin';
+
+const BUSINESS_TYPE_OPTIONS = [
+    { label: 'Restaurant/Pub/Bar', value: 'Restaurant/Pub/Bar' },
+    { label: 'Cafe/Coffee Shop', value: 'Cafe/Coffee Shop' },
+    { label: 'Bakery/Dessert', value: 'Bakery/Dessert' },
+    { label: 'Fast Food', value: 'Fast Food' },
+    { label: 'Hotel/Resort F&B', value: 'Hotel/Resort F&B' },
+    { label: 'Other', value: 'Other' },
+];
+
 function CreateBusinessModal({ onClose, onCreated }: {
     onClose: () => void;
     onCreated: () => void;
 }) {
     const [form, setForm] = useState<CreateForm>({
         restaurantName: '', restaurantAddress: '', restaurantPhone: '',
+        businessType: 'Restaurant/Pub/Bar',
         licenseExpiresAt: '', licenseSupportContact: 'Contact our service team to renew your subscription.',
         adminUsername: '', adminPassword: '', adminFullName: '',
     });
@@ -66,6 +79,7 @@ function CreateBusinessModal({ onClose, onCreated }: {
                 restaurantName: form.restaurantName,
                 restaurantAddress: form.restaurantAddress || undefined,
                 restaurantPhone: form.restaurantPhone || undefined,
+                businessType: form.businessType || undefined,
                 licenseExpiresAt: form.licenseExpiresAt || undefined,
                 licenseSupportContact: form.licenseSupportContact || undefined,
                 adminUsername: form.adminUsername,
@@ -120,6 +134,14 @@ function CreateBusinessModal({ onClose, onCreated }: {
                             <Field label="Business Name *" value={form.restaurantName} onChange={update('restaurantName')} placeholder="Summer Café" />
                             <Field label="Address" value={form.restaurantAddress} onChange={update('restaurantAddress')} placeholder="Phnom Penh, Cambodia" />
                             <Field label="Phone" value={form.restaurantPhone} onChange={update('restaurantPhone')} placeholder="+855 12 345 678" />
+                            <div className="space-y-1.5">
+                                <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Business Category</label>
+                                <CustomSelect
+                                    value={form.businessType}
+                                    onChange={(value) => setForm(prev => ({ ...prev, businessType: value }))}
+                                    options={BUSINESS_TYPE_OPTIONS}
+                                />
+                            </div>
                             <Field label="License Expiry" type="date" value={form.licenseExpiresAt} onChange={update('licenseExpiresAt')} />
                             <Field label="Support Contact" value={form.licenseSupportContact} onChange={update('licenseSupportContact')} placeholder="Phone, Telegram, or office contact" />
                         </div>
@@ -232,6 +254,9 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 
                 {/* Details */}
                 <div className="space-y-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <Building2 size={11} /> {r.business_type || 'Restaurant/Pub/Bar'}
+                    </div>
                     <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${licenseExpired ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'}`}>
                         {licenseExpired ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
                         {licenseLabel}
@@ -288,15 +313,18 @@ function RestaurantCard({ r, onSelect }: { r: RestaurantSummary; onSelect: () =>
 }
 
 // ─── Restaurant Detail Drawer ────────────────────────────────────────────
-function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: {
+function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated, actorUserId, actorRole }: {
     r: RestaurantSummary;
     onClose: () => void;
     onEditAdmin: (r: RestaurantSummary) => void;
     onCreateUser: (r: RestaurantSummary) => void;
     onUpdated: () => void;
+    actorUserId: string;
+    actorRole: string;
 }) {
     const [licenseExpiresAt, setLicenseExpiresAt] = useState(r.license_expires_at || '');
     const [supportContact, setSupportContact] = useState(r.license_support_contact || '');
+    const [businessType, setBusinessType] = useState(r.business_type || 'Restaurant/Pub/Bar');
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
     const [deleting, setDeleting] = useState(false);
@@ -312,7 +340,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
         setSaving(true);
         setMessage('');
         try {
-            await updateRestaurantLicense(r.id, licenseExpiresAt || undefined, supportContact || undefined);
+            await updateRestaurantLicense(r.id, licenseExpiresAt || undefined, supportContact || undefined, businessType || undefined);
             setMessage('License updated.');
             onUpdated();
         } catch (error) {
@@ -331,7 +359,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
         setDeleting(true);
         setMessage('');
         try {
-            await deleteRestaurant(r.id);
+            await deleteRestaurant(r.id, actorUserId, actorRole);
             onUpdated();
             onClose();
         } catch (error) {
@@ -365,6 +393,7 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                     {r.address && <Row icon={MapPin} label="Address" value={r.address} />}
                     {r.phone && <Row icon={Phone} label="Phone" value={r.phone} />}
                     <Row icon={Calendar} label="Created" value={new Date(r.created_at + 'Z').toLocaleDateString()} />
+                    <Row icon={Building2} label="Category" value={businessType || 'Restaurant/Pub/Bar'} />
                     <Row icon={licenseExpired ? ShieldAlert : ShieldCheck} label="License" value={licenseExpiresAt || 'Perpetual'} />
 
                     <div className="border-t border-[var(--border)] pt-4 space-y-3">
@@ -455,6 +484,14 @@ function RestaurantDrawer({ r, onClose, onEditAdmin, onCreateUser, onUpdated }: 
                             </div>
                         </div>
                         <div className="space-y-1.5">
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Business Category</label>
+                            <CustomSelect
+                                value={businessType}
+                                onChange={(value) => setBusinessType(value)}
+                                options={BUSINESS_TYPE_OPTIONS}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
                             <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Expiry Date</label>
                             <input
                                 type="date"
@@ -541,6 +578,8 @@ export default function SuperAdminPage() {
     const [movingUser, setMovingUser] = useState<SuperadminUserView | null>(null);
     const [showReleases, setShowReleases] = useState(false);
     const [latestVersion, setLatestVersion] = useState('v1.0');
+    const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>('all');
+    const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
 
     useEffect(() => {
         if (user?.role !== 'super_admin') {
@@ -586,6 +625,32 @@ export default function SuperAdminPage() {
 
     const totalRestaurants = restaurants?.length || 0;
     const totalWithAdmin   = (restaurants || []).filter(r => r.admin_id).length;
+    const expiredCount = restaurants.filter(r => {
+        const days = getLicenseDaysRemaining(r.license_expires_at);
+        return days !== null && days < 0;
+    }).length;
+    const expiringSoonCount = restaurants.filter(r => {
+        const days = getLicenseDaysRemaining(r.license_expires_at);
+        return days !== null && days >= 0 && days <= 7;
+    }).length;
+    const expiringThisMonthCount = restaurants.filter(r => {
+        const days = getLicenseDaysRemaining(r.license_expires_at);
+        return days !== null && days >= 0 && days <= 30;
+    }).length;
+    const visibleRestaurants = restaurants.filter(r => {
+        return matchesLicenseFilter(r, licenseFilter) && matchesBusinessTypeFilter(r, businessTypeFilter);
+    });
+    const urgentAlerts = restaurants
+        .filter(r => {
+            const days = getLicenseDaysRemaining(r.license_expires_at);
+            return days !== null && days <= 7;
+        })
+        .sort((a, b) => {
+            const aDays = getLicenseDaysRemaining(a.license_expires_at) ?? 9999;
+            const bDays = getLicenseDaysRemaining(b.license_expires_at) ?? 9999;
+            return aDays - bDays;
+        })
+        .slice(0, 5);
 
     return (
         <div className="min-h-screen bg-[var(--background)]">
@@ -664,14 +729,57 @@ export default function SuperAdminPage() {
                     {[
                         { label: 'Total Restaurants', value: totalRestaurants, color: 'var(--accent)' },
                         { label: 'Active Clients',    value: totalWithAdmin,   color: '#3b82f6'        },
-                        { label: 'No Admin Yet',      value: totalRestaurants - totalWithAdmin, color: '#f59e0b' },
-                        { label: 'Platform Version',  value: latestVersion,           color: '#a78bfa'        },
+                        { label: 'Expired Licenses',  value: expiredCount, color: '#ef4444' },
+                        { label: 'Expiring in 30d',   value: expiringThisMonthCount, color: '#f59e0b' },
                     ].map(stat => (
                         <div key={stat.label} className="pos-card px-4 py-3 space-y-1">
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-50">{stat.label}</p>
                             <p className="text-2xl font-black font-mono" style={{ color: stat.color }}>{stat.value}</p>
                         </div>
                     ))}
+                </div>
+
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">Subscription Monitoring</p>
+                            <p className="text-xs text-amber-100/80">Normal refresh mode is active. Use refresh to update this dashboard.</p>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                            <span className="px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400">Expired: {expiredCount}</span>
+                            <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300">Due 7d: {expiringSoonCount}</span>
+                            <span className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-300">Version {latestVersion}</span>
+                        </div>
+                    </div>
+                    {urgentAlerts.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {urgentAlerts.map(item => {
+                                const days = getLicenseDaysRemaining(item.license_expires_at);
+                                const statusText = days === null
+                                    ? 'No expiry set'
+                                    : days < 0
+                                        ? `Expired ${Math.abs(days)}d ago`
+                                        : days === 0
+                                            ? 'Expires today'
+                                            : `Expires in ${days}d`;
+
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => setSelected(item)}
+                                        className="text-left rounded-xl border border-amber-500/20 bg-[var(--bg-card)] px-3 py-2 hover:border-amber-400/40 transition-all"
+                                    >
+                                        <p className="text-[11px] font-black text-[var(--foreground)] truncate">{item.name}</p>
+                                        <p className="text-[10px] text-amber-300 uppercase tracking-widest">{statusText}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-300 font-semibold">
+                            No urgent subscription alerts in the next 7 days.
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Toolbar ── */}
@@ -681,6 +789,30 @@ export default function SuperAdminPage() {
                         <p className="text-xs text-[var(--text-secondary)] opacity-50">Each entry represents a paying client + their admin account.</p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <div className="min-w-44">
+                            <CustomSelect
+                                value={licenseFilter}
+                                onChange={(value) => setLicenseFilter(value as LicenseFilter)}
+                                options={[
+                                    { label: 'All Businesses', value: 'all' },
+                                    { label: 'Expired License', value: 'expired' },
+                                    { label: 'Expiring in 7 Days', value: 'expiring_7' },
+                                    { label: 'Expiring in 30 Days', value: 'expiring_30' },
+                                    { label: 'Perpetual License', value: 'perpetual' },
+                                    { label: 'No Admin Yet', value: 'no_admin' },
+                                ]}
+                            />
+                        </div>
+                        <div className="min-w-44">
+                            <CustomSelect
+                                value={businessTypeFilter}
+                                onChange={(value) => setBusinessTypeFilter(value)}
+                                options={[
+                                    { label: 'All Categories', value: 'all' },
+                                    ...BUSINESS_TYPE_OPTIONS,
+                                ]}
+                            />
+                        </div>
                         <button
                             onClick={load}
                             className="p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-black transition-all group"
@@ -721,12 +853,20 @@ export default function SuperAdminPage() {
                         <Store size={48} strokeWidth={1} />
                         <div className="text-center">
                             <p className="font-black uppercase tracking-widest">No businesses yet</p>
-                            <p className="text-xs mt-1 opacity-60">Click "New Business" to onboard your first client.</p>
+                            <p className="text-xs mt-1 opacity-60">Click &quot;New Business&quot; to onboard your first client.</p>
+                        </div>
+                    </div>
+                ) : visibleRestaurants.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-40">
+                        <AlertTriangle size={40} strokeWidth={1.5} />
+                        <div className="text-center">
+                            <p className="font-black uppercase tracking-widest">No businesses match this filter</p>
+                            <p className="text-xs mt-1 opacity-70">Try switching the license filter to view all records.</p>
                         </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                        {restaurants.map(r => (
+                        {visibleRestaurants.map(r => (
                             <RestaurantCard key={r.id} r={r} onSelect={() => setSelected(r)} />
                         ))}
                     </div>
@@ -746,6 +886,8 @@ export default function SuperAdminPage() {
                     onEditAdmin={(r) => setEditAdmin(r)} 
                     onCreateUser={(r) => setCreateUserFor(r)}
                     onUpdated={load}
+                    actorUserId={user?.id || ''}
+                    actorRole={user?.role || ''}
                 />
             )}
             {editAdmin && (
@@ -800,6 +942,56 @@ function isLicenseExpired(value?: string) {
     const now = new Date();
     const expiry = new Date(`${value}T23:59:59`);
     return Number.isFinite(expiry.getTime()) && now > expiry;
+}
+
+function getLicenseDaysRemaining(value?: string) {
+    if (!value) {
+        return null;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(`${value}T00:00:00`);
+    if (!Number.isFinite(expiry.getTime())) {
+        return null;
+    }
+
+    const diffMs = expiry.getTime() - today.getTime();
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function matchesLicenseFilter(restaurant: RestaurantSummary, filter: LicenseFilter) {
+    const days = getLicenseDaysRemaining(restaurant.license_expires_at);
+
+    if (filter === 'all') {
+        return true;
+    }
+    if (filter === 'no_admin') {
+        return !restaurant.admin_id;
+    }
+    if (filter === 'perpetual') {
+        return days === null;
+    }
+    if (filter === 'expired') {
+        return days !== null && days < 0;
+    }
+    if (filter === 'expiring_7') {
+        return days !== null && days >= 0 && days <= 7;
+    }
+    if (filter === 'expiring_30') {
+        return days !== null && days >= 0 && days <= 30;
+    }
+
+    return true;
+}
+
+function matchesBusinessTypeFilter(restaurant: RestaurantSummary, filter: string) {
+    if (filter === 'all') {
+        return true;
+    }
+
+    return (restaurant.business_type || 'Restaurant/Pub/Bar') === filter;
 }
 
 function getLicenseStatusLabel(value?: string) {
@@ -914,10 +1106,8 @@ function CreateRestaurantUserModal({ restaurant, onClose, onCreated }: {
                             onChange={(val) => setRole(val)}
                             options={[
                                 { label: 'Admin', value: 'admin' },
-                                { label: 'Manager', value: 'manager' },
-                                { label: 'Cashier', value: 'cashier' },
-                                { label: 'Waiter', value: 'waiter' },
-                                { label: 'Chef', value: 'chef' }
+                                { label: 'Business Admin', value: 'business_admin' },
+                                { label: 'Cashier', value: 'cashier' }
                             ]}
                         />
                     </div>

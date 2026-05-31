@@ -6,6 +6,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 import { verifyRestaurantLicense } from '@/lib/api/restaurant';
 import { isRestaurantSynced } from '@/lib/api/system';
+import { canAccessAdminConsole } from '@/lib/permissions';
 import type { RestaurantLicenseStatus } from '@/types';
 import { AlertTriangle, WifiOff, CloudUpload, LogIn } from 'lucide-react';
 
@@ -75,6 +76,12 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
             // Block super-admin routes for non-super_admin users
             if (pathname.startsWith(SUPER_ADMIN_PATH)) {
                 router.replace('/login');
+                return;
+            }
+
+            // Cashier must never access admin console routes directly.
+            if (pathname.startsWith('/management') && !canAccessAdminConsole(user?.role)) {
+                router.replace('/pos');
                 return;
             }
 

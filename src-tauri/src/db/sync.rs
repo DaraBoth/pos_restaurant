@@ -35,6 +35,9 @@ const RESTAURANT_TABLES: &[(&str, &str, SyncMode)] = &[
     ("payments",        "id",           SyncMode::ViaOrders),
     ("table_sessions",  "id",           SyncMode::Direct),  // table_id links to floor_tables
     ("inventory_logs",  "id",           SyncMode::Direct),
+    ("app_audit_logs",  "id",           SyncMode::Direct),
+    ("daily_reports", "id",            SyncMode::Direct),
+    ("daily_report_expenses", "id",    SyncMode::Direct),
     ("_sync_state",     "restaurant_id", SyncMode::Direct),
 ];
 
