@@ -97,3 +97,34 @@ Every business-data row carries a `restaurant_id`. Backend commands require the 
 - Frontend is `"use client"` heavy (Tauri IPC requires `window`); `client.ts` guards against SSR-time invocation by throwing if `window` is undefined.
 - Khmer Riel symbol is `៛`; locale `km-KH` is used for number formatting.
 - Tauri credentials and signing keys: `private.key`, `signing.key.pub`, and the baked tokens in `db/mod.rs` exist in this repo — treat the working tree as containing secrets and avoid pushing leaked tokens upstream.
+
+## Multi-Agent Workflow (ORBIT)
+
+This repo is wired to a [DailyGoalMap ORBIT](https://dailygoalmap.vercel.app) task queue. A four-agent harness lives in `.claude/` (tracked in git except `settings.local.json`).
+
+### Agents
+| Agent | Role |
+|-------|------|
+| **coder** | The only agent that edits source. Implements ORBIT tasks, runs `pnpm lint`, routes to reviewer. |
+| **code-reviewer** | Read-only diff gate. Approves (`wf:approved`) or files a change-request back to coder. |
+| **qa-agent** | Exercises the running desktop app, files `wf:bug` tasks with repro steps. |
+| **advisor** | Prioritizes backlog, creates well-specced `wf:coder-task` tasks for coder. |
+
+### Slash commands
+```
+/implement [task-id]        — coder picks up a task and implements it
+/review-before-pr [task-id] — code-reviewer gates before human deploys
+/qa-task [task-id]          — qa-agent exercises the app and files bugs
+/sync-agent-task [agent]    — show current ORBIT queue for all/one agent
+```
+
+### Docs
+- `.claude/docs/project-context.md` — lean architecture reference for agents
+- `.claude/docs/workflow.md` — full tag state machine and agent capability matrix
+- `.claude/docs/orbit-api-notes.md` — ORBIT MCP API reference
+- `.claude/skills/orbit-task-manager.md` — reusable ORBIT curl patterns
+
+### Key rules
+- **coder** is the only agent allowed to modify source files.
+- No agent pushes, deploys, or runs `release.ps1` — that is always the human's job after `wf:approved`.
+- `ORBIT_API_KEY` lives in `.env` (gitignored); never hardcode it anywhere.

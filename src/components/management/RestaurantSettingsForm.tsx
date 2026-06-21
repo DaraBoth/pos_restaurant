@@ -492,6 +492,42 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                 )}
 
             </div>
+
+            {/* Setup-mode footer — tab advance + final "Get Started" */}
+            {mode === 'setup' && (
+                <div className="mt-6 flex items-center justify-between">
+                    <button
+                        onClick={() => {
+                            const tabs: SubTabType[] = ['identity', 'address', 'branding', 'operational'];
+                            const idx = tabs.indexOf(activeTab as SubTabType);
+                            if (idx > 0) setActiveSubTab(tabs[idx - 1]);
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-all ${activeTab === 'identity' ? 'invisible' : ''}`}
+                    >
+                        ← Back
+                    </button>
+
+                    {activeTab === 'operational' ? (
+                        <button
+                            onClick={onNext}
+                            className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[var(--accent-blue)]/20"
+                        >
+                            Get Started <ArrowRight size={14} />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                const tabs: SubTabType[] = ['identity', 'address', 'branding', 'operational'];
+                                const idx = tabs.indexOf(activeTab as SubTabType);
+                                if (idx < tabs.length - 1) setActiveSubTab(tabs[idx + 1]);
+                            }}
+                            className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[var(--accent-blue)]/20"
+                        >
+                            Next <ArrowRight size={14} />
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

@@ -26,8 +26,8 @@
 .DS_Store
 *.pem
 
-# Claude Code local settings
-.claude/
+# Claude Code — track agent harness but not local permission settings
+.claude/settings.local.json
 
 # Tauri-updater debug artifacts (the real latest.json is uploaded to GitHub
 # Releases by CI; we don't keep a copy in the repo).
