@@ -18,6 +18,8 @@
 /out/
 /src/out/
 /src/.next/
+/web/.next/
+/web/out/
 
 # production
 /build

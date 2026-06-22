@@ -156,6 +156,7 @@ export interface Order {
     created_at: string;
     updated_at?: string;
     completed_at?: string;
+    receipt_number?: string;
 }
 
 export interface OrderItem {

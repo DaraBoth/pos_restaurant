@@ -4,6 +4,7 @@ import { formatKhr, formatUsd } from '@/lib/currency';
 export interface ReceiptPrintPayload {
     restaurant: Restaurant;
     orderId: string;
+    receiptNumber?: string;
     tableId?: string;
     customerName?: string;
     customerPhone?: string;
@@ -121,7 +122,7 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 
   <table class="meta">
     <tr>
-      <td><span class="lbl">Receipt:</span> <span class="val">#${escapeHtml(payload.orderId.slice(0, 8).toUpperCase())}</span></td>
+      <td><span class="lbl">Receipt:</span> <span class="val">#${escapeHtml(payload.receiptNumber ?? payload.orderId.slice(0, 8).toUpperCase())}</span></td>
       <td class="right"><span class="val">${escapeHtml(dateStr)}</span></td>
     </tr>
     ${payload.tableId ? `
@@ -248,7 +249,7 @@ export function printReceipt(payload: ReceiptPrintPayload) {
         ],
         paperWidth: payload.restaurant.receipt_width === '58mm' ? '58mm' : '80mm',
         title: 'Receipt',
-        subtitle: `#${payload.orderId.slice(0, 8).toUpperCase()}`,
+        subtitle: `#${payload.receiptNumber ?? payload.orderId.slice(0, 8).toUpperCase()}`,
         rememberKey: 'dineos.template.receipt',
     });
 }

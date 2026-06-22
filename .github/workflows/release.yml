@@ -47,10 +47,40 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      # Tauri CLI tries to base64-decode TAURI_SIGNING_PRIVATE_KEY when the
+      # value is not a file path. The raw rsign key content is NOT base64, so
+      # that decode fails with "invalid utf-8 sequence" on both Windows and
+      # macOS. Writing the key to a temp file and setting the env var to the
+      # path forces Tauri to use its file-reading code path instead. printf %b
+      # on macOS and the PowerShell -replace on Windows both expand literal \n
+      # escape sequences that may be present in the GitHub secret value.
+      - name: Prepare signing key (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          KEY_PATH="${RUNNER_TEMP}/tauri.key"
+          printf '%b' "${TAURI_SIGNING_PRIVATE_KEY_RAW}" > "${KEY_PATH}"
+          echo "TAURI_SIGNING_PRIVATE_KEY=${KEY_PATH}" >> "${GITHUB_ENV}"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_RAW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+      - name: Prepare signing key (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $keyPath = "$env:RUNNER_TEMP\tauri.key"
+          $keyContent = $env:TAURI_SIGNING_PRIVATE_KEY_RAW -replace '\\n', "`n"
+          Set-Content -Path $keyPath -Value $keyContent -NoNewline -Encoding utf8
+          "TAURI_SIGNING_PRIVATE_KEY=$keyPath" >> $env:GITHUB_ENV
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_RAW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # Both prepare steps set TAURI_SIGNING_PRIVATE_KEY in GITHUB_ENV to
+          # a temp file path; env.TAURI_SIGNING_PRIVATE_KEY (the path) is
+          # truthy and takes precedence over the raw secret via the || fallback.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY || secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
@@ -66,3 +96,12 @@ jobs:
           # broken in v2.3.x. See CLAUDE.md "Auto-update" for the full flow.
           releaseDraft: false
           prerelease: false
+
+      - name: Clean up signing key (macOS)
+        if: always() && runner.os == 'macOS'
+        run: rm -f "${RUNNER_TEMP}/tauri.key"
+
+      - name: Clean up signing key (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: Remove-Item -Force "$env:RUNNER_TEMP\tauri.key" -ErrorAction SilentlyContinue

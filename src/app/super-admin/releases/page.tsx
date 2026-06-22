@@ -1,25 +1,31 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { useLanguage } from '@/providers/LanguageProvider';
 import { getAppReleases, createAppRelease, deleteAppRelease, type AppRelease } from '@/lib/api/releases';
-import { 
-    Download, Plus, Trash2, History, ArrowLeft, 
+import {
+    Plus, Trash2, History, ArrowLeft,
     Monitor, ShieldCheck, ExternalLink, RefreshCw,
-    AlertCircle, FileDown, Rocket, Check
+    FileDown, Rocket
 } from 'lucide-react';
+
+function githubAssetUrl(version: string, platform: 'windows' | 'mac'): string {
+    const v = version.replace(/^v/, '');
+    if (!v) return '';
+    const base = `https://github.com/DaraBoth/pos_restaurant/releases/download/v${v}`;
+    return platform === 'windows'
+        ? `${base}/DineOS_${v}_x64_en-US.msi`
+        : `${base}/DineOS_${v}_aarch64.dmg`;
+}
 
 export default function ReleaseManagementPage() {
     const { user } = useAuth();
     const router = useRouter();
-    const { t } = useLanguage();
-    
+
     const [releases, setReleases] = useState<AppRelease[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    
+
     const [form, setForm] = useState({
         version: '',
         releaseNotes: '',
@@ -29,7 +35,6 @@ export default function ReleaseManagementPage() {
         macSignature: ''
     });
     const [submitting, setSubmitting] = useState(false);
-    const [fileStatus, setFileStatus] = useState<{ windows?: string, mac?: string }>({});
 
     useEffect(() => {
         if (user?.role !== 'super_admin') {
@@ -54,29 +59,19 @@ export default function ReleaseManagementPage() {
     const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setForm(prev => ({ ...prev, [k]: e.target.value }));
 
-    const handleFile = (os: 'windows' | 'mac', e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (file.size > 150 * 1024 * 1024) {
-            alert("File is too large (>150MB). Please select a file under 150MB.");
-            e.target.value = '';
-            return;
-        }
-
-        setFileStatus(prev => ({ ...prev, [os]: 'Processing...' }));
-
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const b64 = ev.target?.result as string;
-            if (os === 'windows') setForm(prev => ({ ...prev, windowsFile: b64 }));
-            else setForm(prev => ({ ...prev, macFile: b64 }));
-            setFileStatus(prev => ({ ...prev, [os]: `Ready (${(file.size / 1024 / 1024).toFixed(1)} MB)` }));
-        };
-        reader.onerror = () => {
-            setFileStatus(prev => ({ ...prev, [os]: 'Error reading file' }));
-        };
-        reader.readAsDataURL(file);
+    // Auto-fill GitHub asset URLs when version changes, unless user already typed a custom URL.
+    const handleVersionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const ver = e.target.value;
+        setForm(prev => ({
+            ...prev,
+            version: ver,
+            windowsFile: (!prev.windowsFile || prev.windowsFile === githubAssetUrl(prev.version, 'windows'))
+                ? githubAssetUrl(ver, 'windows')
+                : prev.windowsFile,
+            macFile: (!prev.macFile || prev.macFile === githubAssetUrl(prev.version, 'mac'))
+                ? githubAssetUrl(ver, 'mac')
+                : prev.macFile,
+        }));
     };
 
     async function handleSubmit(e: React.FormEvent) {
@@ -94,7 +89,6 @@ export default function ReleaseManagementPage() {
             });
             setShowCreate(false);
             setForm({ version: '', releaseNotes: '', windowsFile: '', windowsSignature: '', macFile: '', macSignature: '' });
-            setFileStatus({});
             load();
         } catch (err) {
             alert(err instanceof Error ? err.message : String(err));
@@ -118,7 +112,7 @@ export default function ReleaseManagementPage() {
             <header className="sticky top-0 z-30 bg-[var(--sidebar-bg)] border-b border-[var(--border)] px-8 py-4">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <button 
+                        <button
                             onClick={() => router.back()}
                             className="p-2 rounded-xl hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-secondary)]"
                         >
@@ -149,9 +143,9 @@ export default function ReleaseManagementPage() {
                     <div className="max-w-3xl mx-auto">
                         <div className="pos-card p-8 border-purple-500/20 bg-purple-500/5 relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
-                                < Rocket size={200} strokeWidth={1} />
+                                <Rocket size={200} strokeWidth={1} />
                             </div>
-                            
+
                             <form onSubmit={handleSubmit} className="space-y-8 relative">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-6">
@@ -161,7 +155,16 @@ export default function ReleaseManagementPage() {
                                             </h3>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">Version Number *</label>
-                                                <input value={form.version} onChange={update('version')} required className="pos-input w-full" placeholder="e.g. 1.0.9" />
+                                                <input
+                                                    value={form.version}
+                                                    onChange={handleVersionChange}
+                                                    required
+                                                    className="pos-input w-full"
+                                                    placeholder="e.g. 1.1.2"
+                                                />
+                                                <p className="text-[9px] text-[var(--text-secondary)] opacity-40">
+                                                    GitHub asset URLs will be auto-filled below.
+                                                </p>
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">Release Notes</label>
@@ -176,19 +179,16 @@ export default function ReleaseManagementPage() {
                                                 <Monitor size={14} /> Windows Platform
                                             </h3>
                                             <div className="space-y-3">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 block">External Download URL</label>
-                                                <input value={form.windowsFile} onChange={update('windowsFile')} className="pos-input w-full" placeholder="https://github.com/..." />
-                                                <div className="relative flex items-center gap-3">
-                                                    <div className="flex-1 h-px bg-[var(--border)]" />
-                                                    <span className="text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase">OR Upload File</span>
-                                                    <div className="flex-1 h-px bg-[var(--border)]" />
-                                                </div>
-                                                <input type="file" accept=".msi" onChange={(e) => handleFile('windows', e)} className="block w-full text-[10px] text-[var(--text-secondary)] file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-blue-500/10 file:text-blue-400 cursor-pointer" />
-                                                {fileStatus.windows && (
-                                                    <div className={`text-[10px] font-black uppercase tracking-tighter ${fileStatus.windows.includes('Ready') ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                        {fileStatus.windows}
-                                                    </div>
-                                                )}
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 block">GitHub Release Asset URL</label>
+                                                <input
+                                                    value={form.windowsFile}
+                                                    onChange={update('windowsFile')}
+                                                    className="pos-input w-full"
+                                                    placeholder="https://github.com/.../DineOS_x.y.z_x64_en-US.msi"
+                                                />
+                                                <p className="text-[9px] text-[var(--text-secondary)] opacity-40 leading-relaxed">
+                                                    Paste the GitHub release asset URL. Do not upload binary files — installer binaries must be served via GitHub CDN.
+                                                </p>
                                                 <input value={form.windowsSignature} onChange={update('windowsSignature')} className="pos-input w-full font-mono text-[10px]" placeholder="Signature (base64)" />
                                             </div>
                                         </div>
@@ -198,14 +198,16 @@ export default function ReleaseManagementPage() {
                                                 <ShieldCheck size={14} /> macOS Platform
                                             </h3>
                                             <div className="space-y-3">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 block">External Download URL</label>
-                                                <input value={form.macFile} onChange={update('macFile')} className="pos-input w-full" placeholder="https://github.com/..." />
-                                                <input type="file" accept=".dmg" onChange={(e) => handleFile('mac', e)} className="block w-full text-[10px] text-[var(--text-secondary)] file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-emerald-500/10 file:text-emerald-400 cursor-pointer" />
-                                                {fileStatus.mac && (
-                                                    <div className={`text-[10px] font-black uppercase tracking-tighter ${fileStatus.mac.includes('Ready') ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                        {fileStatus.mac}
-                                                    </div>
-                                                )}
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 block">GitHub Release Asset URL</label>
+                                                <input
+                                                    value={form.macFile}
+                                                    onChange={update('macFile')}
+                                                    className="pos-input w-full"
+                                                    placeholder="https://github.com/.../DineOS_x.y.z_aarch64.dmg"
+                                                />
+                                                <p className="text-[9px] text-[var(--text-secondary)] opacity-40 leading-relaxed">
+                                                    Paste the GitHub release asset URL. Do not upload binary files — installer binaries must be served via GitHub CDN.
+                                                </p>
                                                 <input value={form.macSignature} onChange={update('macSignature')} className="pos-input w-full font-mono text-[10px]" placeholder="Signature (base64)" />
                                             </div>
                                         </div>

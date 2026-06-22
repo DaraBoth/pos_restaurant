@@ -1,9 +1,10 @@
 'use client';
 
+import type { Update, DownloadEvent } from '@tauri-apps/plugin-updater';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    Download, RefreshCw, CheckCircle2, ArrowUpCircle, Clock,
+    Download, RefreshCw, CheckCircle2, ArrowUpCircle, Clock, X,
 } from 'lucide-react';
 
 type UpdateState =
@@ -19,8 +20,10 @@ export function UpdateStatus() {
     const [latestVersion, setLatestVersion] = useState('');
     const [downloaded, setDownloaded] = useState(0);
     const [contentLength, setContentLength] = useState(0);
-    const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+    const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
     const [dismissed, setDismissed] = useState('');
+    const [errorMsg, setErrorMsg] = useState('');
+    const [sizeHint, setSizeHint] = useState('');
 
     // Snapshot of state for use inside the polling callback — avoids stale-closure
     // bugs when the interval fires while we're already mid-install.
@@ -30,6 +33,9 @@ export function UpdateStatus() {
     // Version that's been installed on disk and is waiting for the user to restart.
     // Used so a follow-up poll doesn't re-prompt for the same version.
     const installedVersionRef = useRef<string>('');
+
+    // Interval handle — stored in a ref so install() can stop polling after success.
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const progressPct = useMemo(() => {
         if (!contentLength) return 0;
@@ -84,8 +90,14 @@ export function UpdateStatus() {
         }
 
         check();
-        const timer = setInterval(check, 10 * 60 * 1000);
-        return () => { cancelled = true; clearInterval(timer); };
+        timerRef.current = setInterval(check, 10 * 60 * 1000);
+        return () => {
+            cancelled = true;
+            if (timerRef.current !== null) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
     }, [dismissed]);
 
     async function install() {
@@ -93,18 +105,28 @@ export function UpdateStatus() {
         setState('downloading');
         setDownloaded(0);
         setContentLength(0);
+        setErrorMsg('');
+        setSizeHint('');
         try {
-            await pendingUpdate.downloadAndInstall((event: any) => {
-                if (event.event === 'Started') setContentLength(event.data?.contentLength || 0);
+            await pendingUpdate.downloadAndInstall((event: DownloadEvent) => {
+                if (event.event === 'Started') {
+                    const bytes = event.data?.contentLength;
+                    setContentLength(bytes || 0);
+                    if (bytes) setSizeHint(Math.round(bytes / 1024 / 1024) + ' MB');
+                }
                 if (event.event === 'Progress') setDownloaded(p => p + (event.data?.chunkLength || 0));
             });
             console.info(`[Updater] v${latestVersion} installed on disk; prompting for restart`);
             installedVersionRef.current = latestVersion;
             setState('installed');
+            if (timerRef.current !== null) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
         } catch (err) {
             console.error('[Updater] install failed:', err);
-            // Drop the user back to the "Update v…" pill so they can retry.
             setState('available');
+            setErrorMsg('Download failed. Tap to retry.');
         }
     }
 
@@ -129,22 +151,41 @@ export function UpdateStatus() {
 
     if (state === 'available') {
         pill = (
-            <button
-                onClick={install}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all group"
-                style={{ background: '#f59e0b12', borderColor: '#f59e0b40' }}
-                title={`Update to v${latestVersion}`}
-            >
-                <span className="relative flex-shrink-0">
-                    <span className="block w-2 h-2 rounded-full bg-amber-400" />
-                    <span className="absolute inset-0 rounded-full bg-amber-400 opacity-50 animate-ping" />
-                </span>
-                <ArrowUpCircle size={12} className="text-amber-400 flex-shrink-0" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex-1 text-left truncate">
-                    Update v{latestVersion}
-                </span>
-                <Download size={11} className="text-amber-400/70 group-hover:text-amber-300 flex-shrink-0" />
-            </button>
+            <div className="w-full space-y-1">
+                <div
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all group"
+                    style={{ background: '#f59e0b12', borderColor: '#f59e0b40' }}
+                >
+                    <button
+                        type="button"
+                        onClick={install}
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                        title={`Update to v${latestVersion}`}
+                    >
+                        <span className="relative flex-shrink-0">
+                            <span className="block w-2 h-2 rounded-full bg-amber-400" />
+                            <span className="absolute inset-0 rounded-full bg-amber-400 opacity-50 animate-ping" />
+                        </span>
+                        <ArrowUpCircle size={12} className="text-amber-400 flex-shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex-1 text-left truncate">
+                            Update v{latestVersion}
+                        </span>
+                        <Download size={11} className="text-amber-400/70 group-hover:text-amber-300 flex-shrink-0" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setDismissed(latestVersion)}
+                        className="ml-0.5 p-0.5 rounded text-amber-400/60 hover:text-amber-300 hover:bg-amber-400/10 transition-colors flex-shrink-0"
+                        title="Dismiss"
+                        aria-label="Dismiss update"
+                    >
+                        <X size={10} />
+                    </button>
+                </div>
+                {errorMsg && (
+                    <p className="text-[9px] text-red-400 px-1">{errorMsg}</p>
+                )}
+            </div>
         );
     } else if (state === 'downloading') {
         pill = (
@@ -155,7 +196,7 @@ export function UpdateStatus() {
                 <div className="flex items-center gap-2">
                     <RefreshCw size={12} className="text-blue-400 animate-spin flex-shrink-0" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">
-                        Downloading… {progressPct}%
+                        Downloading… {progressPct}%{sizeHint ? ` of ${sizeHint}` : ''}
                     </span>
                 </div>
                 <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">

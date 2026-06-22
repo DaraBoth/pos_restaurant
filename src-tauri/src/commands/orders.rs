@@ -340,7 +340,8 @@ pub async fn get_orders(
 ) -> Result<Vec<Order>, String> {
     let mut query = String::from(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
+                receipt_number
          FROM orders WHERE is_deleted = 0 AND restaurant_id = ?"
     );
 
@@ -385,6 +386,7 @@ pub async fn get_orders(
             created_at: row.get::<String>(14).unwrap_or_default(),
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
+            receipt_number: row.get::<String>(17).ok(),
         });
     }
 
@@ -399,7 +401,8 @@ pub async fn get_session_rounds(
 ) -> Result<Vec<Order>, String> {
     let mut rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
+                receipt_number
          FROM orders
          WHERE session_id = ? AND restaurant_id = ? AND is_deleted = 0
          ORDER BY round_number ASC",
@@ -426,6 +429,7 @@ pub async fn get_session_rounds(
             created_at: row.get::<String>(14).unwrap_or_default(),
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
+            receipt_number: row.get::<String>(17).ok(),
         });
     }
 
@@ -479,7 +483,8 @@ pub async fn get_active_order_for_table(
 ) -> Result<Option<Order>, String> {
     let mut rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
+                receipt_number
          FROM orders
          WHERE table_id = ? AND restaurant_id = ? AND status IN ('open', 'pending_payment') AND is_deleted = 0
          ORDER BY created_at DESC
@@ -506,6 +511,7 @@ pub async fn get_active_order_for_table(
             created_at: row.get::<String>(14).unwrap_or_default(),
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
+            receipt_number: row.get::<String>(17).ok(),
         }))
     } else {
         Ok(None)
@@ -520,7 +526,8 @@ pub async fn get_orders_for_table(
 ) -> Result<Vec<Order>, String> {
     let mut rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
+                receipt_number
          FROM orders
          WHERE table_id = ? AND restaurant_id = ? AND is_deleted = 0
          ORDER BY created_at DESC",
@@ -547,6 +554,7 @@ pub async fn get_orders_for_table(
             created_at: row.get::<String>(14).unwrap_or_default(),
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
+            receipt_number: row.get::<String>(17).ok(),
         });
     }
 
@@ -591,10 +599,22 @@ pub async fn checkout_order(
     let final_khr = round_khr(final_total, exch_rate);
 
     pool.execute(
-        "UPDATE orders SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0,
-                status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
+        "UPDATE orders
+         SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0,
+             status = 'completed', updated_at = datetime('now'), completed_at = datetime('now'),
+             receipt_number = (
+                 strftime('%Y%m%d', 'now', 'localtime') || '-' ||
+                 printf('%04d', (
+                     SELECT COALESCE(MAX(CAST(substr(receipt_number, 10) AS INTEGER)), 0) + 1
+                     FROM orders
+                     WHERE restaurant_id = ?
+                       AND date(completed_at, 'localtime') = date('now', 'localtime')
+                       AND receipt_number IS NOT NULL
+                       AND receipt_number LIKE '________-%'
+                 ))
+             )
          WHERE id = ? AND restaurant_id = ?",
-         params![final_total, final_khr, order_id.clone(), restaurant_id.clone()]
+         params![final_total, final_khr, restaurant_id.clone(), order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut item_rows = pool.query(
@@ -628,7 +648,8 @@ pub async fn checkout_order(
 
     let mut order_rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
+                receipt_number
          FROM orders WHERE id=? AND restaurant_id = ?",
          params![order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
@@ -653,6 +674,7 @@ pub async fn checkout_order(
         created_at: row.get::<String>(14).unwrap_or_default(),
         updated_at: row.get::<String>(15).ok(),
         completed_at: row.get::<String>(16).ok(),
+        receipt_number: row.get::<String>(17).ok(),
     })
 }
 

@@ -860,7 +860,7 @@ export default function HistoryPage() {
                                                                         {new Date(receipt.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                     </td>
                                                                     <td className="px-2 py-1.5 text-[11px] font-mono font-black text-[var(--foreground)]">
-                                                                        {receipt.id.split('-')[0].toUpperCase()}
+                                                                        {receipt.orders[0]?.receipt_number ?? receipt.id.split('-')[0].toUpperCase()}
                                                                     </td>
                                                                     <td className="px-2 py-1.5 text-[11px] font-bold text-[var(--foreground)]">
                                                                         {receipt.table_id || 'Takeout'}
@@ -1276,7 +1276,9 @@ export default function HistoryPage() {
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-2.5 font-mono text-xs font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
-                                                            {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
+                                                            {g.table_id
+                                                                ? `SESSION ${g.id.split('-')[0].toUpperCase()}`
+                                                                : `#${g.orders[0]?.receipt_number ?? g.id.split('-')[0].toUpperCase()}`}
                                                         </td>
                                                         <td className="px-4 py-2.5">
                                                             <div className="text-xs font-black mb-0.5">{new Date(g.created_at + 'Z').toLocaleDateString()}</div>
@@ -1372,7 +1374,7 @@ export default function HistoryPage() {
                                                                         {g.orders.map((o, index) => (
                                                                             <div key={o.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3">
                                                                                 <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2 text-[10px] font-black uppercase tracking-widest opacity-60">
-                                                                                    <span>{g.table_id ? `Round ${index + 1}` : 'Order Segment'} - #{o.id.split('-')[0].toUpperCase()}</span>
+                                                                                    <span>{g.table_id ? `Round ${index + 1}` : 'Order Segment'} - #{o.receipt_number ?? o.id.split('-')[0].toUpperCase()}</span>
                                                                                     <span>{new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                                                 </div>
 
@@ -1475,7 +1477,9 @@ export default function HistoryPage() {
                                                 )}
                                             </div>
                                             <p className="font-mono text-xs font-black text-[var(--accent)] tracking-widest">
-                                                {g.table_id ? `SESSION ${g.id.split('-')[0].toUpperCase()}` : `#${g.id.split('-')[0].toUpperCase()}`}
+                                                {g.table_id
+                                                    ? `SESSION ${g.id.split('-')[0].toUpperCase()}`
+                                                    : `#${g.orders[0]?.receipt_number ?? g.id.split('-')[0].toUpperCase()}`}
                                             </p>
                                             <div className="flex items-center gap-1.5 mt-1 text-[var(--text-secondary)] opacity-50">
                                                 <Clock size={10} />

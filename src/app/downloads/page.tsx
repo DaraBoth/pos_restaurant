@@ -6,34 +6,114 @@ import { Download, Monitor, HardDrive, Cpu, ShieldCheck, History, ArrowRight, Ex
 
 type DownloadState = 'idle' | 'downloading' | 'done' | 'error';
 
+interface GithubAsset {
+    name: string;
+    browser_download_url: string;
+}
+
+interface GithubRelease {
+    tag_name: string;
+    assets: GithubAsset[];
+}
+
+interface MergedRelease extends AppRelease {
+    githubWindowsUrl?: string;
+    githubMacUrl?: string;
+}
+
+async function fetchGithubReleases(): Promise<Map<string, { windowsUrl: string; macUrl: string }>> {
+    const res = await fetch('https://api.github.com/repos/DaraBoth/pos_restaurant/releases', {
+        headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data: GithubRelease[] = await res.json();
+
+    const map = new Map<string, { windowsUrl: string; macUrl: string }>();
+    for (const release of data) {
+        const ver = release.tag_name.replace(/^v/, '');
+        const windowsAsset = release.assets.find(a => a.name.endsWith('.msi') || a.name.endsWith('-setup.exe'));
+        const macAsset = release.assets.find(a => a.name.endsWith('.dmg'));
+        if (windowsAsset || macAsset) {
+            map.set(ver, {
+                windowsUrl: windowsAsset?.browser_download_url ?? '',
+                macUrl: macAsset?.browser_download_url ?? '',
+            });
+        }
+    }
+    return map;
+}
+
 export default function DownloadsPage() {
     const { t } = useLanguage();
-    const [releases, setReleases] = useState<AppRelease[]>([]);
+    const [releases, setReleases] = useState<MergedRelease[]>([]);
     const [loading, setLoading] = useState(true);
     const [dlState, setDlState] = useState<Record<string, DownloadState>>({});
     const [dlMsg, setDlMsg] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        getAppReleases().then(setReleases).catch(console.error).finally(() => setLoading(false));
+        async function load() {
+            const [dbResult, ghResult] = await Promise.allSettled([
+                getAppReleases(),
+                fetchGithubReleases(),
+            ]);
+
+            const db: AppRelease[] = dbResult.status === 'fulfilled' ? dbResult.value : [];
+            const gh: Map<string, { windowsUrl: string; macUrl: string }> =
+                ghResult.status === 'fulfilled' ? ghResult.value : new Map();
+
+            // Merge: prefer GitHub CDN URLs over DB-stored values.
+            const merged: MergedRelease[] = db.map(r => {
+                const ver = r.version.replace(/^v/, '');
+                const ghData = gh.get(ver);
+                return {
+                    ...r,
+                    githubWindowsUrl: ghData?.windowsUrl || undefined,
+                    githubMacUrl: ghData?.macUrl || undefined,
+                };
+            });
+
+            setReleases(merged);
+            setLoading(false);
+        }
+        load();
     }, []);
 
     const latest = releases[0];
 
-    const hasFile = (release: AppRelease, platform: 'windows' | 'mac') => {
-        const val = platform === 'windows' ? release.windows_file : release.mac_file;
-        return !!val;
+    const hasFile = (release: MergedRelease, platform: 'windows' | 'mac') => {
+        if (platform === 'windows') return !!(release.githubWindowsUrl || release.windows_file);
+        return !!(release.githubMacUrl || release.mac_file);
     };
 
-    const handleDownload = async (release: AppRelease, platform: 'windows' | 'mac') => {
+    const handleDownload = async (release: MergedRelease, platform: 'windows' | 'mac') => {
         const key = `${release.id}-${platform}`;
-        setDlState(s => ({ ...s, [key]: 'downloading' }));
-        setDlMsg(s => ({ ...s, [key]: 'Fetching from database…' }));
+        const ghUrl = platform === 'windows' ? release.githubWindowsUrl : release.githubMacUrl;
 
+        setDlState(s => ({ ...s, [key]: 'downloading' }));
+
+        // Prefer GitHub CDN — open directly in browser, no IPC, no Turso bandwidth.
+        if (ghUrl) {
+            try {
+                const { open } = await import('@tauri-apps/plugin-shell');
+                await open(ghUrl);
+            } catch {
+                window.open(ghUrl, '_blank');
+            }
+            setDlState(s => ({ ...s, [key]: 'done' }));
+            setDlMsg(s => ({ ...s, [key]: 'Opened in browser' }));
+            setTimeout(() => {
+                setDlState(s => ({ ...s, [key]: 'idle' }));
+                setDlMsg(s => ({ ...s, [key]: '' }));
+            }, 5000);
+            return;
+        }
+
+        // Fallback: DB-stored entry (external URL or legacy binary).
+        setDlMsg(s => ({ ...s, [key]: 'Fetching from database…' }));
         try {
             const result = await downloadReleaseFile(release.id, platform);
 
             if (result.startsWith('url:')) {
-                // External URL — open in browser
                 const url = result.slice(4);
                 try {
                     const { open } = await import('@tauri-apps/plugin-shell');
@@ -44,25 +124,22 @@ export default function DownloadsPage() {
                 setDlState(s => ({ ...s, [key]: 'done' }));
                 setDlMsg(s => ({ ...s, [key]: 'Opened in browser' }));
             } else {
-                // File written to Downloads folder — open the folder
                 setDlMsg(s => ({ ...s, [key]: 'Saved! Opening Downloads folder…' }));
                 try {
                     const { open } = await import('@tauri-apps/plugin-shell');
-                    // Open the parent directory of the saved file
                     const dir = result.substring(0, Math.max(result.lastIndexOf('/'), result.lastIndexOf('\\')));
                     await open(dir);
                 } catch {
-                    // Shell not available — that's fine, file is saved
+                    // Shell not available — file is saved
                 }
                 setDlState(s => ({ ...s, [key]: 'done' }));
-                setDlMsg(s => ({ ...s, [key]: `Saved to Downloads folder` }));
+                setDlMsg(s => ({ ...s, [key]: 'Saved to Downloads folder' }));
             }
         } catch (err) {
             setDlState(s => ({ ...s, [key]: 'error' }));
             setDlMsg(s => ({ ...s, [key]: err instanceof Error ? err.message : String(err) }));
         }
 
-        // Reset state after 5 seconds
         setTimeout(() => {
             setDlState(s => ({ ...s, [key]: 'idle' }));
             setDlMsg(s => ({ ...s, [key]: '' }));
@@ -77,7 +154,7 @@ export default function DownloadsPage() {
         icon: Icon,
         activeClass,
     }: {
-        release: AppRelease;
+        release: MergedRelease;
         platform: 'windows' | 'mac';
         label: string;
         subLabel: string;
@@ -88,6 +165,7 @@ export default function DownloadsPage() {
         const state = dlState[key] || 'idle';
         const msg = dlMsg[key] || '';
         const available = hasFile(release, platform);
+        const isGithub = !!(platform === 'windows' ? release.githubWindowsUrl : release.githubMacUrl);
 
         return (
             <div className="space-y-2">
@@ -116,9 +194,7 @@ export default function DownloadsPage() {
                     {available && (
                         <span className="mt-2 text-[10px] font-mono opacity-50 flex items-center gap-1">
                             <ExternalLink size={10} />
-                            {platform === 'windows'
-                                ? (release.windows_file === 'db' ? 'from database' : 'external link')
-                                : (release.mac_file === 'db' ? 'from database' : 'external link')}
+                            {isGithub ? 'GitHub CDN' : 'external link'}
                         </span>
                     )}
                 </button>
@@ -194,7 +270,7 @@ export default function DownloadsPage() {
                                         {latest.release_notes && (
                                             <div className="space-y-3">
                                                 <h3 className="text-xs font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 flex items-center gap-2">
-                                                    <History size={14} /> What's New
+                                                    <History size={14} /> What&apos;s New
                                                 </h3>
                                                 <div className="p-5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)]/50 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
                                                     {latest.release_notes}

@@ -118,7 +118,7 @@ export default function CheckoutModal({
                 }
             }
 
-            let customerName, customerPhone;
+            let customerName, customerPhone, receiptNumber: string | undefined;
             if (sessionId) {
                 await checkoutSession(sessionId, payments, user?.restaurant_id || '', discountCents);
                 // get details from arbitrary round, usually the active order has customer details
@@ -129,12 +129,14 @@ export default function CheckoutModal({
                 const completedOrder = await checkoutOrder(orderId, payments, user?.restaurant_id || '', discountCents);
                 customerName = completedOrder.customer_name;
                 customerPhone = completedOrder.customer_phone;
+                receiptNumber = completedOrder.receipt_number ?? undefined;
             }
 
             const restaurant = await getRestaurant(user?.restaurant_id || '');
             const payload: ReceiptPrintPayload = {
                 restaurant,
                 orderId,
+                receiptNumber,
                 tableId,
                 customerName: customerName,
                 customerPhone: customerPhone,

@@ -160,6 +160,7 @@ pub struct Order {
     pub created_at: String,
     pub updated_at: Option<String>,
     pub completed_at: Option<String>,
+    pub receipt_number: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

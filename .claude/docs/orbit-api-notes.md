@@ -1,8 +1,10 @@
 # ORBIT API Notes
 
-MCP endpoint for DailyGoalMap ORBIT task API.
+MCP endpoint for DailyGoalMap ORBIT task API.  
+**Full usage patterns → `.claude/skills/orbit-task-manager.md`** (use that skill file in agent sessions).
 
 ## Connection
+
 ```
 POST https://dailygoalmap.vercel.app/api/mcp
 Headers:
@@ -16,112 +18,37 @@ Key is stored in `.env` as `ORBIT_API_KEY` (gitignored). Read it:
 ORBIT_KEY=$(grep ORBIT_API_KEY .env | cut -d= -f2 | tr -d '\r')
 ```
 
-## Tools
+## Tools quick-reference
 
-### `tasks.next`
-Pull the next open task for an agent tag (primary loop call).
-```json
-{
-  "tool": "tasks.next",
-  "input": { "agent_tag": "assign:coder" }
-}
-```
-Returns: `{"ok":true,"status":200,"result":{"tasks":[...], ...}}`
-Empty queue: `{"result":{"tasks":[]}}`
+| Tool | Required input fields | Notes |
+|------|-----------------------|-------|
+| `tasks.next` | `agent_tag` | Returns `{ idle: true }` when queue empty; check `skill_refresh` flag |
+| `tasks.list` | — | Supports `tags`, `match`, `completed`, `date`, `date_from`, `date_to`, `limit`, `offset` |
+| `tasks.create` | `title` | Returns created task with `id` |
+| `tasks.update` | `task_id` | Tags array **replaces** existing tags entirely |
+| `tasks.complete` | `task_id` | Only toggles completion; does not touch tags |
+| `tasks.move` | `task_id` | Date/time rescheduling only |
+| `tasks.delete` | `task_id` | Permanent |
 
-### `tasks.list`
-List tasks with optional filters.
-```json
-{
-  "tool": "tasks.list",
-  "input": {
-    "tags": ["project:dineos"],
-    "completed": false,
-    "limit": 20,
-    "offset": 0
-  }
-}
-```
-
-### `tasks.create`
-Create a new task.
-```json
-{
-  "tool": "tasks.create",
-  "input": {
-    "title": "...",
-    "description": "...",
-    "tags": ["project:dineos", "assign:coder", "wf:coder-task"]
-  }
-}
-```
-Returns the created task with its `id`.
-
-### `tasks.update`
-Update a task (tags, title, description).
-```json
-{
-  "tool": "tasks.update",
-  "input": {
-    "id": "<task-id>",
-    "tags": ["project:dineos", "wf:done", "assign:code-reviewer"],
-    "title": "optional new title",
-    "description": "optional new description"
-  }
-}
-```
-Tag array REPLACES existing tags — always include all desired tags, not just the new ones.
-
-### `tasks.complete`
-Mark a task as done (preserves tags, sets completed state).
-```json
-{
-  "tool": "tasks.complete",
-  "input": {
-    "id": "<task-id>",
-    "tags": ["project:dineos", "wf:done", "assign:code-reviewer"]
-  }
-}
-```
-
-### `tasks.move`
-Move a task (reorder in the queue).
-```json
-{
-  "tool": "tasks.move",
-  "input": { "id": "<task-id>", "position": 0 }
-}
-```
-
-### `tasks.delete`
-Delete a task permanently.
-```json
-{
-  "tool": "tasks.delete",
-  "input": { "id": "<task-id>" }
-}
-```
+> All mutation operations use `task_id` (UUID). Never use `id` as the field name.
 
 ## Response format
-All tools return:
+
 ```json
-{
-  "ok": true,
-  "status": 200,
-  "result": { ... }
-}
-```
-On error:
-```json
-{
-  "ok": false,
-  "status": 4xx,
-  "error": "..."
-}
+{ "ok": true, "status": 200, "result": { ... } }
 ```
 
-## Tag naming conventions for DineOS
-Always include `project:dineos` on every task. Agent routing via `assign:<agent>`. Workflow state via `wf:<state>`. See `.claude/docs/workflow.md` for the full state machine.
+On error:
+```json
+{ "ok": false, "error": "description of what went wrong" }
+```
+
+| Status | Meaning |
+|--------|---------|
+| 400 | Missing or invalid input |
+| 401 | Missing or invalid API key |
+| 405 | Method not allowed |
+| 500 | Server or database error |
 
 ## Security note
 Never print or log the API key. Never hardcode it in agent files or commands. Always read from `.env`.
