@@ -16,9 +16,9 @@ export function formatUsd(cents: number): string {
     return `$${(cents / 100).toFixed(2)}`;
 }
 
-/** Format KHR riels to display string: e.g. 18450 → "18,450 ៛" */
+/** Format KHR riels to display string: e.g. 18450 → "៛ 18,450" */
 export function formatKhr(riels: number): string {
-    return `${riels.toLocaleString('km-KH')} ៛`;
+    return `៛ ${riels.toLocaleString('km-KH')}`;
 }
 
 /** Format USD cents to short numeric: 450 → "4.50" */
@@ -42,10 +42,10 @@ export interface OrderTotals {
     totalKhr: number;
 }
 
-export function calculateTotals(subtotalCents: number, exchangeRate: number): OrderTotals {
-    const vatCents = 0;
+export function calculateTotals(subtotalCents: number, exchangeRate: number, vatEnabled = false): OrderTotals {
+    const vatCents = vatEnabled ? Math.round(subtotalCents * 0.1) : 0;
     const pltCents = 0;
-    const totalUsdCents = subtotalCents;
+    const totalUsdCents = subtotalCents + vatCents + pltCents;
     const totalKhr = roundKhr(totalUsdCents, exchangeRate);
     return { subtotalCents, vatCents, pltCents, totalUsdCents, totalKhr };
 }

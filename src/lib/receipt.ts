@@ -8,6 +8,10 @@ export interface ReceiptPrintPayload {
     tableId?: string;
     customerName?: string;
     customerPhone?: string;
+    cashierName?: string;
+    receivedCents?: number;
+    changeCents?: number;
+    changeKhr?: number;
     discountPct?: number;
     discountCents?: number;
     items: OrderItem[];
@@ -33,7 +37,7 @@ function escapeHtml(value: string) {
 export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const paperWidth = payload.restaurant.receipt_width === '58mm' ? '58mm' : '80mm';
     const isSmall = paperWidth === '58mm';
@@ -140,9 +144,9 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
   <table class="items-tbl">
     <thead>
       <tr>
-        <th class="col-qty center">QTY</th>
-        <th>DESCRIPTION</th>
-        <th class="col-total right">TOTAL</th>
+        <th class="col-qty center">Qty</th>
+        <th>Description</th>
+        <th class="col-total right">Total</th>
       </tr>
     </thead>
     <tbody>
@@ -177,17 +181,20 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
         <td class="right">${formatUsd(payload.totals.vatCents)}</td>
       </tr>` : ''}
       <tr>
-        <td class="grand-usd">TOTAL USD</td>
+        <td class="grand-usd">Total (USD)</td>
         <td class="right grand-usd">${formatUsd(payload.totals.totalUsdCents)}</td>
       </tr>
       <tr>
-        <td class="grand-khr">TOTAL KHR</td>
+        <td class="grand-khr">Total (KHR)</td>
         <td class="right grand-khr">${formatKhr(payload.totals.totalKhr)}</td>
       </tr>
     </table>
   </div>
 
   <div class="footer">
+    ${payload.cashierName ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;margin-bottom:3px;">Cashier: ${escapeHtml(payload.cashierName)}</div>` : ''}
+    ${(payload.receivedCents ?? 0) > 0 ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;">Paid: ${escapeHtml(formatUsd(payload.receivedCents!))}</div>` : ''}
+    ${(payload.changeCents ?? 0) > 0 ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;">Change: ${escapeHtml(formatUsd(payload.changeCents!))}${payload.changeKhr ? ` / ${escapeHtml(formatKhr(payload.changeKhr))}` : ''}</div>` : ''}
     <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you')}</div>
     <div class="brand">DineOS</div>
   </div>

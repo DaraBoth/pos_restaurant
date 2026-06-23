@@ -1,15 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getExchangeRate, setExchangeRate, ExchangeRate } from '@/lib/tauri-commands';
+import { getExchangeRate, setExchangeRate, getOrders, ExchangeRate } from '@/lib/tauri-commands';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { formatKhr } from '@/lib/currency';
-import { RefreshCw, Save, ArrowRightLeft } from 'lucide-react';
+import { RefreshCw, Save, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 
 export default function ExchangeRateManagement() {
     const [rate, setRate] = useState<ExchangeRate | null>(null);
     const [newRateInput, setNewRateInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [rateWarning, setRateWarning] = useState<{ count: number; oldRate: number } | null>(null);
     const { t } = useLanguage();
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
@@ -28,10 +29,23 @@ export default function ExchangeRateManagement() {
         }
     }
 
-    async function handleUpdate() {
+    async function handleUpdate(confirmed = false) {
         const val = parseInt(newRateInput, 10);
         if (isNaN(val) || val <= 0) return alert(t('invalidRate'));
 
+        if (!confirmed) {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const orders = await getOrders(undefined, today, today, restaurantId || '');
+                const todayCompleted = orders.filter(o => o.status === 'completed');
+                if (todayCompleted.length > 0 && rate) {
+                    setRateWarning({ count: todayCompleted.length, oldRate: rate.rate });
+                    return;
+                }
+            } catch { /* silently skip check if orders call fails */ }
+        }
+
+        setRateWarning(null);
         setLoading(true);
         try {
             await setExchangeRate(val, restaurantId || undefined);
@@ -118,7 +132,7 @@ export default function ExchangeRateManagement() {
                     </p>
 
                     <button
-                        onClick={handleUpdate}
+                        onClick={() => handleUpdate(false)}
                         disabled={loading || !newRateInput || !hasChanged}
                         className={`w-full mt-6 py-3 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 transition-all ${
                             hasChanged
@@ -131,6 +145,39 @@ export default function ExchangeRateManagement() {
                     </button>
                 </div>
             </div>
+
+            {/* Warning dialog: today's orders used the old rate */}
+            {rateWarning && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[var(--bg-card)] border border-amber-500/40 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+                        <div className="flex items-start gap-3 mb-4">
+                            <AlertTriangle size={22} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-black text-sm text-amber-300 mb-1">Rate change warning</p>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                                    {rateWarning.count} completed order{rateWarning.count !== 1 ? 's' : ''} today used{' '}
+                                    <span className="font-bold text-[var(--foreground)]">{formatKhr(rateWarning.oldRate)}</span> per USD.
+                                    Changing the rate now will affect future orders only — past receipts keep their original amounts.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-4">
+                            <button
+                                onClick={() => setRateWarning(null)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-[var(--border)] text-[var(--text-secondary)] hover:bg-white/[0.05] transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleUpdate(true)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-500 text-black hover:bg-amber-400 transition-all"
+                            >
+                                Change anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

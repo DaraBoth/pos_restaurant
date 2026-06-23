@@ -106,6 +106,7 @@ pub struct Restaurant {
     pub updated_at: Option<String>,
     pub business_type: String,
     pub disable_tables: i64,
+    pub vat_enabled: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +135,7 @@ pub struct RestaurantUpsertInput {
     pub logo_path: Option<String>,
     pub business_type: Option<String>,
     pub disable_tables: Option<i64>,
+    pub vat_enabled: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

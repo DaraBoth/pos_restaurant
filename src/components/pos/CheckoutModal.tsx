@@ -23,10 +23,14 @@ export default function CheckoutModal({
     const [usdInput, setUsdInput] = useState<string>('');
     const [method, setMethod] = useState<'cash' | 'khqr' | 'card'>('cash');
     const [loading, setLoading] = useState(false);
+    const [paymentError, setPaymentError] = useState<string>('');
     const [discountPct, setDiscountPct] = useState<number>(0);
+    const [discountUsdInput, setDiscountUsdInput] = useState<string>('');
+    const [discountMode, setDiscountMode] = useState<'pct' | 'fixed'>('pct');
 
     const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
     const [combinedTotals, setCombinedTotals] = useState(totals);
+    const [completedPayload, setCompletedPayload] = useState<ReceiptPrintPayload | null>(null);
 
     useEffect(() => {
         refreshRate();
@@ -65,7 +69,10 @@ export default function CheckoutModal({
     useOverlayBehavior(true, onClose);
 
     // Discount + derived totals
-    const discountCents = Math.round(combinedTotals.subtotalCents * discountPct / 100);
+    const fixedDiscountCents = discountMode === 'fixed' ? parseToCents(discountUsdInput) : 0;
+    const discountCents = discountMode === 'pct'
+        ? Math.round(combinedTotals.subtotalCents * discountPct / 100)
+        : Math.min(fixedDiscountCents, combinedTotals.subtotalCents);
     const discountedTotals = {
         ...combinedTotals,
         subtotalCents: combinedTotals.subtotalCents - discountCents,
@@ -82,6 +89,10 @@ export default function CheckoutModal({
 
     // Change due if they overpay in USD cash
     const changeUsdCents = Math.max(0, usdInputCents - discountedTotals.totalUsdCents);
+
+    // Cash underpayment guard: only applies when method is cash and some USD has been entered
+    const isUnderpaid = method === 'cash' && usdInputCents > 0 && usdInputCents < discountedTotals.totalUsdCents;
+    const shortfallCents = isUnderpaid ? discountedTotals.totalUsdCents - usdInputCents : 0;
 
     async function handleConfirm() {
         if (!orderId) return;
@@ -133,6 +144,7 @@ export default function CheckoutModal({
             }
 
             const restaurant = await getRestaurant(user?.restaurant_id || '');
+            const changeKhr = changeUsdCents > 0 ? Math.round(changeUsdCents / 100 * exchangeRate) : undefined;
             const payload: ReceiptPrintPayload = {
                 restaurant,
                 orderId,
@@ -140,17 +152,26 @@ export default function CheckoutModal({
                 tableId,
                 customerName: customerName,
                 customerPhone: customerPhone,
-                discountPct: discountPct > 0 ? discountPct : undefined,
+                cashierName: user?.full_name || user?.username,
+                receivedCents: usdInputCents > 0 ? usdInputCents : undefined,
+                changeCents: changeUsdCents > 0 ? changeUsdCents : undefined,
+                changeKhr,
+                discountPct: discountMode === 'pct' && discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
                 items: combinedItems,
                 payments,
                 totals: discountedTotals,
             };
             clearOrder();
-            onComplete(payload);
+            setCompletedPayload(payload);
         } catch (e) {
             console.error(e);
-            alert(t('error'));
+            const msg = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+            if (msg.includes('database') || msg.includes('sql')) {
+                setPaymentError(t('paymentErrorDatabase'));
+            } else {
+                setPaymentError(t('paymentErrorGeneral'));
+            }
         } finally {
             setLoading(false);
         }
@@ -190,7 +211,9 @@ export default function CheckoutModal({
                 tableId,
                 customerName: currentOrder?.customer_name,
                 customerPhone: currentOrder?.customer_phone,
-                discountPct: discountPct > 0 ? discountPct : undefined,
+                cashierName: user?.full_name || user?.username,
+                receivedCents: usdInputCents > 0 ? usdInputCents : undefined,
+                discountPct: discountMode === 'pct' && discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
                 items: combinedItems,
                 payments,
@@ -198,6 +221,38 @@ export default function CheckoutModal({
             };
             printReceipt(payload);
         });
+    }
+
+    if (completedPayload) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-sm shadow-2xl border border-[var(--border)] flex flex-col items-center gap-6 p-8">
+                    <div className="w-16 h-16 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+                        <CheckCircle size={32} className="text-green-400" strokeWidth={2} />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest mb-1">{t('paymentConfirmed')}</p>
+                        {completedPayload.receiptNumber && (
+                            <p className="text-xs text-[var(--text-secondary)]">#{completedPayload.receiptNumber}</p>
+                        )}
+                    </div>
+                    <div className="flex gap-3 w-full">
+                        <button
+                            onClick={() => { printReceipt(completedPayload); }}
+                            className="flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 uppercase tracking-wider border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--foreground)] hover:bg-[var(--bg-dark)] transition-all"
+                        >
+                            <Printer size={16} /> {t('printReceipt')}
+                        </button>
+                        <button
+                            onClick={() => onComplete(completedPayload)}
+                            className="flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 uppercase tracking-wider pos-btn-primary transition-all"
+                        >
+                            {t('done')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -222,7 +277,9 @@ export default function CheckoutModal({
                             {discountCents > 0 && (
                                 <div className="flex items-center justify-between mb-1.5">
                                     <span className="text-sm font-mono text-[var(--text-secondary)] line-through opacity-60">{formatUsd(combinedTotals.totalUsdCents)}</span>
-                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/30 text-yellow-600">-{discountPct}%</span>
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/30 text-yellow-600">
+                                        {discountMode === 'pct' ? `-${discountPct}%` : `-${formatUsd(discountCents)}`}
+                                    </span>
                                 </div>
                             )}
                             <div className="text-3xl font-black font-mono text-[var(--foreground)] tracking-tighter leading-none">
@@ -230,6 +287,9 @@ export default function CheckoutModal({
                             </div>
                             <div className="text-base font-bold font-mono text-[var(--text-secondary)] opacity-60 mt-1">
                                 {formatKhr(discountedTotals.totalKhr)}
+                            </div>
+                            <div className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40 mt-0.5">
+                                $1 = {formatKhr(Math.round(exchangeRate))}
                             </div>
                             {discountCents > 0 && (
                                 <div className="mt-1.5 text-[10px] font-bold text-yellow-600">
@@ -240,43 +300,70 @@ export default function CheckoutModal({
 
                         {/* Discount */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-1.5 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">
-                                <Tag size={10} />
-                                Discount
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <div className="relative w-20 flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                                <label className="flex items-center gap-1.5 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">
+                                    <Tag size={10} />
+                                    Discount
+                                </label>
+                                <div className="flex rounded-lg overflow-hidden border border-[var(--border)]">
+                                    <button
+                                        onClick={() => setDiscountMode('pct')}
+                                        className={`px-2 py-1 text-[9px] font-black transition-colors ${discountMode === 'pct' ? 'bg-yellow-500/20 text-yellow-600' : 'bg-[var(--bg-dark)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                                    >%</button>
+                                    <button
+                                        onClick={() => setDiscountMode('fixed')}
+                                        className={`px-2 py-1 text-[9px] font-black transition-colors ${discountMode === 'fixed' ? 'bg-yellow-500/20 text-yellow-600' : 'bg-[var(--bg-dark)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                                    >$</button>
+                                </div>
+                            </div>
+                            {discountMode === 'pct' ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="relative w-20 flex-shrink-0">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value={discountPct === 0 ? '' : discountPct}
+                                            onChange={e => {
+                                                const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                                setDiscountPct(v);
+                                            }}
+                                            placeholder="0"
+                                            className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
+                                        />
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-black text-[var(--text-secondary)]/50">%</span>
+                                    </div>
+                                    <div className="flex gap-1 flex-1">
+                                        {[5, 10, 15, 20, 50].map(pct => (
+                                            <button
+                                                key={pct}
+                                                onClick={() => setDiscountPct(discountPct === pct ? 0 : pct)}
+                                                className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-colors ${
+                                                    discountPct === pct
+                                                        ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-600'
+                                                        : 'bg-[var(--bg-dark)] border-[var(--border)] text-[var(--text-secondary)] hover:text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500/25'
+                                                }`}
+                                            >
+                                                {pct}%
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-[var(--text-secondary)]/50">$</span>
                                     <input
                                         type="number"
                                         min="0"
-                                        max="100"
-                                        step="1"
-                                        value={discountPct === 0 ? '' : discountPct}
-                                        onChange={e => {
-                                            const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                                            setDiscountPct(v);
-                                        }}
-                                        placeholder="0"
-                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
+                                        step="0.01"
+                                        value={discountUsdInput}
+                                        onChange={e => setDiscountUsdInput(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
                                     />
-                                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-black text-[var(--text-secondary)]/50">%</span>
                                 </div>
-                                <div className="flex gap-1 flex-1">
-                                    {[5, 10, 15, 20, 50].map(pct => (
-                                        <button
-                                            key={pct}
-                                            onClick={() => setDiscountPct(discountPct === pct ? 0 : pct)}
-                                            className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-colors ${
-                                                discountPct === pct
-                                                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-600'
-                                                    : 'bg-[var(--bg-dark)] border-[var(--border)] text-[var(--text-secondary)] hover:text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500/25'
-                                            }`}
-                                        >
-                                            {pct}%
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -289,7 +376,7 @@ export default function CheckoutModal({
                                 ].map(m => (
                                     <button
                                         key={m.id}
-                                        onClick={() => setMethod(m.id as any)}
+                                        onClick={() => setMethod(m.id as 'cash' | 'khqr' | 'card')}
                                         className={`flex flex-col items-center justify-center py-3 px-2 rounded-xl border-2 transition-all ${method === m.id
                                                     ? 'border-[var(--accent-blue)] bg-[var(--accent-blue)]/10 text-[var(--foreground)]'
                                                 : 'border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent-blue)]/30'
@@ -359,17 +446,29 @@ export default function CheckoutModal({
                             >
                                 <Printer size={20} />
                             </button>
-                            <button
-                                onClick={handleConfirm}
-                                disabled={loading}
-                                className="pos-btn-primary flex-1 py-4 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 uppercase tracking-widest active:scale-[0.98] transition-all"
-                            >
-                                {loading ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <><CheckCircle size={18} strokeWidth={2.5} /> {t('confirmPayment')}</>
+                            <div className="flex-1 flex flex-col gap-1">
+                                {isUnderpaid && (
+                                    <p className="text-[10px] text-red-400 font-bold text-center">
+                                        {t('paymentShort')} {formatUsd(shortfallCents)}
+                                    </p>
                                 )}
-                            </button>
+                                {paymentError && (
+                                    <p className="text-[10px] text-red-400 font-bold text-center leading-snug">
+                                        {paymentError}
+                                    </p>
+                                )}
+                                <button
+                                    onClick={handleConfirm}
+                                    disabled={loading || isUnderpaid}
+                                    className="pos-btn-primary w-full py-4 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 uppercase tracking-widest active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <><CheckCircle size={18} strokeWidth={2.5} /> {t('confirmPayment')}</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

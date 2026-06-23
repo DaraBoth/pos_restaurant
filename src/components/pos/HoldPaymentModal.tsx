@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { holdOrder } from '@/lib/tauri-commands';
 import { PauseCircle, User, Phone, X } from 'lucide-react';
 
@@ -13,6 +14,7 @@ interface Props {
 export default function HoldPaymentModal({ onClose, onComplete }: Props) {
     const { orderId, tableId } = useOrder();
     const { user } = useAuth();
+    const { t } = useLanguage();
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [loading, setLoading] = useState(false);
@@ -40,7 +42,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                             <PauseCircle size={16} className="text-yellow-400" />
                         </div>
                         <div>
-                            <h2 className="text-sm font-black text-[var(--foreground)] leading-none">Hold for Payment</h2>
+                            <h2 className="text-sm font-black text-[var(--foreground)] leading-none">{t('holdForPayment')}</h2>
                             {tableId && (
                                 <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Table {tableId}</p>
                             )}
@@ -64,7 +66,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                     <div className="space-y-1">
                         <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">
                             <User size={10} />
-                            Customer Name
+                            {t('customerName')}
                         </label>
                         <input
                             type="text"
@@ -79,7 +81,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                     <div className="space-y-1">
                         <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">
                             <Phone size={10} />
-                            Phone Number
+                            {t('phoneNumber')}
                         </label>
                         <input
                             type="tel"
@@ -105,7 +107,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                         className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/25 transition-all disabled:opacity-50 active:scale-95"
                     >
                         <PauseCircle size={13} strokeWidth={2.5} />
-                        {loading ? 'Saving...' : 'Hold Order'}
+                        {loading ? t('saving') : t('holdOrder')}
                     </button>
                 </div>
             </div>

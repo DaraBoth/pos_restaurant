@@ -27,6 +27,7 @@ const DEFAULT: RestaurantInput = {
     license_support_contact: '',
     business_type: 'Restaurant/Pub/Bar',
     disable_tables: 0,
+    vat_enabled: 0,
 };
 
 const SAMPLE_SETUP_INFO: RestaurantInput = {
@@ -164,6 +165,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         license_support_contact: restaurant.license_support_contact || '',
                         business_type: restaurant.business_type || 'Restaurant/Pub/Bar',
                         disable_tables: restaurant.disable_tables || 0,
+                        vat_enabled: restaurant.vat_enabled ?? 0,
                     });
                 }
             } catch (error) {
@@ -183,7 +185,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
     }, []);
 
     // Save field function for automatic / checkmark saving
-    async function saveField(field: keyof RestaurantInput, value: any) {
+    async function saveField(field: keyof RestaurantInput, value: RestaurantInput[keyof RestaurantInput]) {
         const updatedInfo = { ...info, [field]: value };
         try {
             await updateRestaurant(updatedInfo, restaurantId || undefined);
@@ -491,6 +493,31 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                     </div>
                 )}
 
+            </div>
+
+            {/* VAT Registration Toggle */}
+            <div className="space-y-4 mt-4 p-4 border border-[var(--border)] rounded-2xl">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                        <p className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">VAT Registration</p>
+                        <p className="text-[10px] text-[var(--text-secondary)] opacity-70 max-w-md">
+                            Only enable if your restaurant is registered with GDT for VAT. When enabled, 10% VAT will be added to all receipts. Printing VAT for a non-registered restaurant is illegal under Cambodian tax law.
+                        </p>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            const newVal = (info.vat_enabled ?? 0) === 1 ? 0 : 1;
+                            await saveField('vat_enabled', newVal);
+                        }}
+                        className="focus:outline-none transition-all hover:scale-105 active:scale-95 flex-shrink-0"
+                    >
+                        {(info.vat_enabled ?? 0) === 1 ? (
+                            <ToggleRight size={38} className="text-[var(--accent-blue)]" />
+                        ) : (
+                            <ToggleLeft size={38} className="text-[var(--text-secondary)]" />
+                        )}
+                    </button>
+                </div>
             </div>
 
             {/* Setup-mode footer — tab advance + final "Get Started" */}

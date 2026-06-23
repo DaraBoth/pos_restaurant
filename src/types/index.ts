@@ -54,6 +54,7 @@ export interface Restaurant {
     license_support_contact?: string;
     business_type?: string;
     disable_tables?: number;
+    vat_enabled?: number;
 }
 
 export interface RestaurantLicenseStatus {
@@ -82,6 +83,7 @@ export interface RestaurantInput {
     license_support_contact?: string;
     business_type?: string;
     disable_tables?: number;
+    vat_enabled?: number;
 }
 
 export interface SetupStatus {

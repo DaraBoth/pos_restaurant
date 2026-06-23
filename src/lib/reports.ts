@@ -574,7 +574,8 @@ export function printDailyClosingReport(restaurant: Restaurant, detail: DailyRep
   </style>
 </head>
 <body>
-  <div class="center title">DineOS POS</div>
+  <div class="center title">${escapeHtml(restaurant.name)}</div>
+  ${restaurant.khmer_name ? `<div class="center sub">${escapeHtml(restaurant.khmer_name)}</div>` : ''}
   <div class="center title">Daily Sales Report</div>
   <div class="line"></div>
 
@@ -628,7 +629,7 @@ export function printDailyClosingReport(restaurant: Restaurant, detail: DailyRep
   </table>
 
   <div class="line"></div>
-  <div class="footer">DineOS</div>
+  <div class="footer">Powered by DineOS</div>
 </body>
 </html>`;
 

@@ -2,8 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Printer, Usb, FileDown } from 'lucide-react';
 import { THERMAL_PRINT_EVENT, type ThermalPrintJob } from '@/lib/receipt';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export default function ReceiptPrintSheet() {
+    const { t } = useLanguage();
     const [job, setJob] = useState<ThermalPrintJob | null>(null);
     const [open, setOpen] = useState(false);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
@@ -196,11 +198,7 @@ export default function ReceiptPrintSheet() {
                 </div>
 
                 <div className="px-5 py-3 text-[10px] leading-snug text-[var(--text-secondary)] opacity-70 border-t border-[var(--border)] flex-shrink-0">
-                    Pick the configured USB / LAN thermal printer in the next dialog
-                    — or choose <span className="font-bold">Save as PDF</span> /
-                    <span className="font-bold"> Microsoft Print to PDF</span> as the destination
-                    to keep a digital copy. Set <span className="font-bold">Margins: None</span>
-                    and disable Headers &amp; Footers.
+                    {t('printerInstructions')}
                 </div>
 
                 <footer className="flex gap-2 p-4 border-t border-[var(--border)] flex-shrink-0">

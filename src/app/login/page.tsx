@@ -74,8 +74,13 @@ export default function LoginPage() {
             }
 
             router.replace('/pos/tables');
-        } catch (err: any) {
-            setError(err instanceof Error ? err.message : String(err));
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+            if (msg.includes('invalid credentials') || msg.includes('not found') || msg.includes('wrong')) {
+                setError(t('wrongCredentials'));
+            } else {
+                setError(t('loginFailed'));
+            }
         } finally {
             setLoading(false);
         }
@@ -138,7 +143,7 @@ export default function LoginPage() {
                 {/* Main Form Area */}
                 <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 max-w-[640px] mx-auto w-full">
                     <div className="mb-12">
-                        <h2 className="text-4xl font-black text-[var(--foreground)] tracking-tight mb-3">Sign In</h2>
+                        <h2 className="text-4xl font-black text-[var(--foreground)] tracking-tight mb-3">{t('signIn')}</h2>
                         <p className="text-[var(--text-secondary)] text-sm font-medium tracking-tight mt-3 max-w-md">
                             {t('firstLoginDesc')}
                         </p>
@@ -201,15 +206,15 @@ export default function LoginPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest group-hover/check:text-[var(--foreground)] transition-colors">
-                                    Remember Me
+                                    {t('rememberMe')}
                                 </span>
                             </label>
 
-                            <span 
+                            <span
                                 onClick={handleOpenSupport}
                                 className="text-[11px] font-black text-emerald-500/50 uppercase tracking-widest hover:text-emerald-500 cursor-pointer transition-colors"
                             >
-                                Forgot Password?
+                                {t('forgotPassword')}
                             </span>
                         </div>
 
@@ -254,7 +259,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="p-8 text-center text-[var(--text-secondary)]/30 text-[10px] font-bold uppercase tracking-[0.3em] mt-auto">
-                    &copy; 2026 &bull; Copy right by DineOS System
+                    {t('copyright')}
                 </div>
             </div>
         </div>

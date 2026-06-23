@@ -83,6 +83,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
     open: { bg: 'rgba(249,115,22,0.1)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
     hold: { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
     pending_payment: { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.3)' },
+    void: { bg: 'rgba(239,68,68,0.1)', text: '#ef4444', border: 'rgba(239,68,68,0.25)' },
 };
 
 export default function HistoryPage() {
@@ -197,7 +198,7 @@ export default function HistoryPage() {
             const data = await getOrders(undefined, startDate, endDate, restaurantId || '');
             setOrders(
                 data
-                    .filter((order) => order.status === 'completed')
+                    .filter((order) => order.status === 'completed' || order.status === 'void')
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             );
         } catch (e) {

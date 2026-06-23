@@ -16,6 +16,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [showVoidConfirm, setShowVoidConfirm] = useState(false);
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
     const [committing, setCommitting] = useState(false);
@@ -109,7 +110,12 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     }
 
     async function handleVoid() {
+        setShowVoidConfirm(true);
+    }
+
+    async function confirmVoid() {
         if (!orderId) return;
+        setShowVoidConfirm(false);
         try {
             await voidOrder(orderId, user?.restaurant_id || '');
             clearOrder();
@@ -148,7 +154,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 const allItems = await getSessionOrderItems(sessionId, user.restaurant_id!);
 
                 // Group by product_id to combine same items from different rounds
-                const groupedMap = new Map<string, any>();
+                const groupedMap = new Map<string, { product_id: string; quantity: number; [key: string]: unknown }>();
                 for (const item of allItems) {
                     if (groupedMap.has(item.product_id)) {
                         const existing = groupedMap.get(item.product_id)!;
@@ -174,7 +180,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                     total_at_order: i.priceCents * i.qty,
                     status: 'pending',
                     created_at: new Date().toISOString()
-                })) as any; // Cast because status/created_at don't exist on OrderItem type but engine handles them or ignores
+                })) as unknown as typeof receiptItems;
 
                 receiptTotals = {
                     subtotalCents: localCartTotalCents,
@@ -253,7 +259,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             onClick={handlePrintReceipt}
                             disabled={orderId ? isEmpty : localCart.length === 0}
                             className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent)]/20 text-[var(--accent)] disabled:opacity-30"
-                            title="Print Receipt Preview"
+                            title={t('printReceipt')}
                         >
                             <Printer size={13} />
                         </button>
@@ -285,8 +291,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                             : 'bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent-blue)]/50'
                                             }`}
                                     >
-                                        Round {round.round_number}
-                                        {isActive && <span className="ml-1.5 opacity-80">(View)</span>}
+                                        {t('round')} {round.round_number}
+                                        {isActive && <span className="ml-1.5 opacity-80">({t('view')})</span>}
                                     </button>
                                 );
                             })}
@@ -295,7 +301,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 className="snap-start flex-shrink-0 px-4 py-3 rounded-xl text-sm font-bold tracking-wide text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center gap-2"
                             >
                                 <Plus size={14} strokeWidth={3} />
-                                New Round
+                                {t('newRound')}
                             </button>
                         </div>
 
@@ -345,7 +351,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                             <button
                                                 onClick={() => updateLocalCartQty(item.productId, 0)}
                                                 className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                title="Remove item"
+                                                title={t('removeItem')}
                                             >
                                                 <X size={13} strokeWidth={2.5} />
                                             </button>
@@ -429,7 +435,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                                 <button
                                                     onClick={() => void handleCommittedQtySet(item.id, '0', item.quantity)}
                                                     className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                    title="Remove item"
+                                                    title={t('removeItem')}
                                                 >
                                                     <X size={13} strokeWidth={2.5} />
                                                 </button>
@@ -567,7 +573,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                         ? <Loader2 size={16} className="animate-spin" />
                                         : <Check size={16} strokeWidth={2.5} />
                                     }
-                                    Place Order
+                                    {t('placeOrder')}
                                 </button>
                             )}
                         </div>
@@ -578,10 +584,10 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         <div className="grid grid-cols-3 gap-1.5">
                             <button
                                 onClick={handleVoid}
-                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-red-500/8 border border-red-500/20 text-red-400/80 hover:text-red-400 hover:border-red-500/40 transition-all active:scale-95"
+                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-red-600 border border-red-700 text-white hover:bg-red-700 transition-all active:scale-95"
                             >
                                 <XCircle size={16} strokeWidth={2.5} />
-                                {t('cancel')}
+                                {t('voidOrder')}
                             </button>
                             <button
                                 onClick={onHold}
@@ -589,7 +595,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-yellow-500/8 border border-yellow-500/25 text-yellow-400/80 hover:text-yellow-400 hover:border-yellow-500/45 transition-all disabled:opacity-40 active:scale-95"
                             >
                                 <PauseCircle size={16} strokeWidth={2.5} />
-                                Hold
+                                {t('hold')}
                             </button>
                             <button
                                 className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-[var(--accent-green)]/15 border border-[var(--accent-green)]/30 text-[var(--accent-green)] hover:bg-[var(--accent-green)]/25 transition-all disabled:opacity-40 active:scale-95"
@@ -610,6 +616,32 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 sessionId={sessionId}
                 onClose={() => setIsHistoryOpen(false)}
             />
+
+            {/* Void confirmation dialog */}
+            {showVoidConfirm && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
+                    <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
+                        <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">{t('voidOrder')}</h3>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                            {t('voidConfirmMessage')}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowVoidConfirm(false)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmVoid}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 transition-all"
+                            >
+                                {t('voidOrder')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

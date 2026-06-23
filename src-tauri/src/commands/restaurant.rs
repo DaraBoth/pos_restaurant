@@ -24,7 +24,7 @@ pub async fn get_restaurant(restaurant_id: Option<String>, pool: State<'_, Arc<C
     };
 
     let mut rows = pool.query(
-        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at, COALESCE(business_type, 'Restaurant/Pub/Bar'), COALESCE(disable_tables, 0), COALESCE(receipt_width, '80mm')
+        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at, COALESCE(business_type, 'Restaurant/Pub/Bar'), COALESCE(disable_tables, 0), COALESCE(receipt_width, '80mm'), COALESCE(vat_enabled, 0)
          FROM restaurants
          WHERE id = ? AND is_deleted = 0",
          params![id_to_use]
@@ -55,6 +55,7 @@ pub async fn get_restaurant(restaurant_id: Option<String>, pool: State<'_, Arc<C
         updated_at: row.get::<String>(15).ok(),
         business_type: row.get::<String>(16).unwrap_or_else(|_| "Restaurant/Pub/Bar".to_string()),
         disable_tables: row.get::<i64>(17).unwrap_or(0),
+        vat_enabled: row.get::<i64>(19).unwrap_or(0),
     })
 }
 
@@ -101,6 +102,7 @@ pub async fn update_restaurant(
              logo_path = ?,
              business_type = ?,
              disable_tables = ?,
+             vat_enabled = ?,
              updated_at = datetime('now')
          WHERE id = ?",
          params![
@@ -117,6 +119,7 @@ pub async fn update_restaurant(
              input.logo_path.unwrap_or_default(),
              input.business_type.unwrap_or_else(|| "Restaurant/Pub/Bar".to_string()),
              input.disable_tables.unwrap_or(0),
+             input.vat_enabled.unwrap_or(0),
              restaurant_id.clone()
          ]
     )
