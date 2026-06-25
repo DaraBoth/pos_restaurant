@@ -1,12 +1,13 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getKitchenOrders, updateKitchenItemStatus } from '@/lib/api/kitchen';
 import type { KitchenOrder, KitchenOrderItem } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { ChefHat, UtensilsCrossed, CheckCircle2, Clock, RefreshCw, Flame, LayoutList, Layers } from 'lucide-react';
+import { ChefHat, UtensilsCrossed, CheckCircle2, Clock, RefreshCw, Flame, LayoutList, Layers, Volume2, VolumeX } from 'lucide-react';
 
 const POLL_INTERVAL = 8;
+const MUTE_KEY = 'dineos.kitchen.mute';
 type KitchenStatus = KitchenOrderItem['kitchen_status'];
 
 interface AggregatedItem {
@@ -42,10 +43,57 @@ export default function KitchenPage() {
     const [countdown, setCountdown] = useState(POLL_INTERVAL);
     const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
     const [viewMode, setViewMode] = useState<'summary' | 'tables'>('summary');
+    const [muteSound, setMuteSound] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return window.localStorage.getItem(MUTE_KEY) === 'true';
+    });
+    const muteSoundRef = useRef(muteSound);
+    const prevOrderIdsRef = useRef<Set<string> | null>(null);
+    const [undoStack, setUndoStack] = useState<Array<{ itemId: string; prevStatus: KitchenStatus }>>([]);
+
+    useEffect(() => { muteSoundRef.current = muteSound; }, [muteSound]);
+
+    function toggleMute() {
+        setMuteSound(prev => {
+            const next = !prev;
+            window.localStorage.setItem(MUTE_KEY, String(next));
+            return next;
+        });
+    }
+
+    function playKitchenAlert() {
+        if (muteSoundRef.current || typeof window === 'undefined') return;
+        try {
+            const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            gain.gain.setValueAtTime(0.35, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.4);
+            osc.onended = () => ctx.close();
+        } catch (e) {
+            console.error('Kitchen alert error:', e);
+        }
+    }
 
     const refresh = useCallback(async () => {
         try {
             const data = await getKitchenOrders(restaurantId || undefined);
+            const newIds = new Set(data.map((o: KitchenOrder) => o.id));
+            if (prevOrderIdsRef.current !== null) {
+                let hasNew = false;
+                for (const id of newIds) {
+                    if (!prevOrderIdsRef.current.has(id)) { hasNew = true; break; }
+                }
+                if (hasNew) playKitchenAlert();
+            }
+            prevOrderIdsRef.current = newIds;
             setOrders(data);
         } catch (e) {
             console.error(e);
@@ -119,6 +167,11 @@ export default function KitchenPage() {
     async function handleAdvanceSingle(item: KitchenOrderItem) {
         const cfg = STATUS_CONFIG[item.kitchen_status];
         if (!cfg.next) return;
+        const prevStatus = item.kitchen_status;
+        setUndoStack(prev => {
+            const entry = { itemId: item.id, prevStatus };
+            return [entry, ...prev].slice(0, 5);
+        });
         setUpdatingIds(prev => new Set([...prev, item.id]));
         try {
             await updateKitchenItemStatus(item.id, cfg.next, restaurantId || '');
@@ -127,6 +180,21 @@ export default function KitchenPage() {
             console.error(e);
         } finally {
             setUpdatingIds(prev => { const s = new Set(prev); s.delete(item.id); return s; });
+        }
+    }
+
+    async function handleUndo() {
+        if (undoStack.length === 0) return;
+        const [entry, ...rest] = undoStack;
+        setUndoStack(rest);
+        setUpdatingIds(prev => new Set([...prev, entry.itemId]));
+        try {
+            await updateKitchenItemStatus(entry.itemId, entry.prevStatus, restaurantId || '');
+            await refresh();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setUpdatingIds(prev => { const s = new Set(prev); s.delete(entry.itemId); return s; });
         }
     }
 
@@ -163,6 +231,27 @@ export default function KitchenPage() {
                             <Flame size={11} className="text-orange-400" />
                             <span className="text-[11px] font-bold text-orange-300">{totalCooking}</span>
                         </div>
+                    )}
+
+                    {/* Mute toggle */}
+                    <button
+                        onClick={toggleMute}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${muteSound ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20' : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                        title={muteSound ? t('soundMuted') : t('soundOn')}
+                    >
+                        {muteSound ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                    </button>
+
+                    {/* Undo button */}
+                    {undoStack.length > 0 && (
+                        <button
+                            onClick={handleUndo}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[11px] font-semibold text-blue-300 hover:bg-blue-500/20 transition-colors"
+                        >
+                            <span className="text-[11px]">↩</span>
+                            <span>{t('undo')}</span>
+                            {undoStack.length > 1 && <span className="ml-0.5 opacity-60">({undoStack.length})</span>}
+                        </button>
                     )}
 
                     {/* View toggle */}

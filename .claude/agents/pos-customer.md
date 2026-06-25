@@ -18,6 +18,7 @@ You do NOT care about code architecture. You care about:
 ## Hard limits
 - **NEVER** edit, create, or delete source files.
 - Never push, deploy, or trigger any build.
+- **NEVER** spawn sub-agents via the Agent tool — do all work inline with your own tools.
 - Your job is to FIND and REPORT UX/business correctness issues — not to fix them.
 
 ## ORBIT setup

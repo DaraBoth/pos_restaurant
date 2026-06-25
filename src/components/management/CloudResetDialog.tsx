@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CloudOff, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { triggerSyncReset } from '@/lib/api/restaurant';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface CloudResetDialogProps {
     restaurantId: string;
@@ -10,6 +11,7 @@ interface CloudResetDialogProps {
 
 export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
     const [status, setStatus] = useState<'idle' | 'confirming' | 'resetting' | 'done'>('idle');
+    const { t } = useLanguage();
 
     async function handleReset() {
         if (!restaurantId) return;
@@ -20,7 +22,6 @@ export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
             setTimeout(() => setStatus('idle'), 3000);
         } catch (error) {
             console.error(error);
-            alert('Failed to reset sync state.');
             setStatus('idle');
         }
     }
@@ -34,21 +35,19 @@ export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
                     <CloudOff size={16} className="text-amber-500" />
                 </div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">
-                    Cloud Sync & Repair
+                    {t('fixCloudSync')}
                 </h2>
             </div>
 
             <div className="space-y-4">
-                <p className="text-xs font-bold text-[var(--text-secondary)] leading-relaxed uppercase tracking-wider">
-                    If your cloud database was recently wiped or changes aren't appearing, 
-                    you can force a full re-synchronization.
+                <p className="text-xs font-bold text-[var(--text-secondary)] leading-relaxed">
+                    {t('fixCloudSyncDesc')}
                 </p>
-                
+
                 <div className="bg-amber-500/10 rounded-xl p-4 border border-amber-500/20 flex items-start gap-3">
                     <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[10px] font-bold text-amber-200/80 leading-relaxed uppercase tracking-widest">
-                        This will mark all local data as "new" for the cloud on the next sync cycle. 
-                        Safe to use if the cloud is empty or desynced.
+                    <p className="text-[11px] font-bold text-amber-200/80 leading-relaxed">
+                        {t('fixCloudSyncWarning')}
                     </p>
                 </div>
 
@@ -59,7 +58,7 @@ export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
                             className="px-6 py-3 rounded-xl border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
                         >
                             <RefreshCw size={14} />
-                            Reset Sync Cursor
+                            {t('reuploadToCloud')}
                         </button>
                     )}
 
@@ -69,7 +68,7 @@ export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
                                 onClick={handleReset}
                                 className="px-6 py-3 rounded-xl bg-amber-600 text-white hover:bg-amber-500 transition-all text-[10px] font-black uppercase tracking-widest"
                             >
-                                Confirm Reset
+                                {t('confirm')}
                             </button>
                             <button
                                 onClick={() => setStatus('idle')}
@@ -83,14 +82,14 @@ export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
                     {status === 'resetting' && (
                         <div className="flex items-center gap-3 text-amber-500 transition-all">
                             <RefreshCw size={16} className="animate-spin" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Resetting Sync...</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">{t('syncSyncing')}</span>
                         </div>
                     )}
 
                     {status === 'done' && (
                         <div className="flex items-center gap-3 text-green-500 animate-in zoom-in-95 transition-all">
                             <CheckCircle2 size={16} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Sync set to full re-upload</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">{t('reuploadQueued')}</span>
                         </div>
                     )}
                 </div>

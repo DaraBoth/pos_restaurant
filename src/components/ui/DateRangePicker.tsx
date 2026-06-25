@@ -3,7 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DayPicker, DateRange } from 'react-day-picker';
 import { format, isSameDay } from 'date-fns';
+import { enUS, km } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface DateRangePickerProps {
     startDate: Date;
@@ -12,6 +14,8 @@ interface DateRangePickerProps {
 }
 
 export function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
+    const { t, lang } = useLanguage();
+    const dateLocale = lang === 'km' ? km : enUS;
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,9 +45,9 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const displayDate = range.from && range.to 
-        ? `${format(range.from, 'dd MMM yyyy')} - ${format(range.to, 'dd MMM yyyy')}`
-        : 'Select date range';
+    const displayDate = range.from && range.to
+        ? `${format(range.from, 'dd MMM yyyy', { locale: dateLocale })} - ${format(range.to, 'dd MMM yyyy', { locale: dateLocale })}`
+        : t('selectDateRange');
 
     return (
         <div className="relative" ref={containerRef}>
@@ -102,6 +106,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
                             selected={range}
                             onSelect={handleSelect}
                             numberOfMonths={1}
+                            locale={dateLocale}
                             initialFocus
                         />
                         <div className="mt-4 pt-4 border-t border-[var(--border)] flex justify-end">
@@ -109,7 +114,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
                                 onClick={() => setIsOpen(false)}
                                 className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-[var(--accent-blue)] hover:bg-[var(--bg-elevated)] rounded-lg transition-colors"
                             >
-                                Done
+                                {t('done')}
                             </button>
                         </div>
                     </div>

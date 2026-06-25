@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { format } from 'date-fns';
 import { getRevenueSummary, getRevenueByPeriod, getTopProducts, getRevenueByCategory, getPeakHours, getSlowMovers } from '@/lib/api/analytics';
 import { useAuth } from '@/providers/AuthProvider';
 import { RevenueSummary, RevenueByDay, TopProduct, CategoryRevenue, PeakHour } from '@/types';
@@ -8,14 +9,50 @@ import { formatUsd } from '@/lib/currency';
 import { TrendingUp, ShoppingBag, DollarSign, Clock, AlertTriangle, Flame, PieChart, RefreshCw } from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 
-type Period = 'week' | 'month' | '3months' | 'year';
+type Period = 'today' | 'week' | 'month' | '3months' | 'year';
 
 const PERIOD_LABELS: Record<Period, TranslationKey> = {
+    today: 'today',
     week: 'last7Days',
     month: 'thisMonth',
     '3months': 'last3Months',
     year: 'thisYear',
 };
+
+// Converts a 24h hour ("13", "09:00") to a 12h AM/PM label ("1 PM", "9 AM").
+function to12h(hourStr: string): string {
+    const hour = parseInt(hourStr, 10) || 0;
+    if (hour === 0) return '12 AM';
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return '12 PM';
+    return `${hour - 12} PM`;
+}
+
+// "today" rows carry an "HH:00" hour bucket; everything else carries a yyyy-MM-dd date.
+function formatChartLabel(dateStr: string, period: Period): string {
+    if (period === 'today') {
+        return to12h(dateStr.split(':')[0]);
+    }
+    return format(new Date(dateStr + 'T12:00:00'), 'dd/MM');
+}
+
+const SLOW_MOVERS_CONFIG_KEY = 'dineos.slowmovers.config';
+
+function readSlowMoversConfig(): { threshold: number; days: number } {
+    const fallback = { threshold: 3, days: 30 };
+    if (typeof window === 'undefined') return fallback;
+    try {
+        const raw = window.localStorage.getItem(SLOW_MOVERS_CONFIG_KEY);
+        if (!raw) return fallback;
+        const cfg = JSON.parse(raw);
+        return {
+            threshold: typeof cfg.threshold === 'number' ? cfg.threshold : fallback.threshold,
+            days: typeof cfg.days === 'number' ? cfg.days : fallback.days,
+        };
+    } catch {
+        return fallback;
+    }
+}
 
 export default function AnalyticsPage() {
     const { t, lang } = useLanguage();
@@ -29,6 +66,8 @@ export default function AnalyticsPage() {
     const [categoryRevenue, setCategoryRevenue] = useState<CategoryRevenue[]>([]);
     const [peakHours, setPeakHours] = useState<PeakHour[]>([]);
     const [slowMovers, setSlowMovers] = useState<TopProduct[]>([]);
+    const [slowMoversThreshold, setSlowMoversThreshold] = useState<number>(() => readSlowMoversConfig().threshold);
+    const [slowMoversDays, setSlowMoversDays] = useState<number>(() => readSlowMoversConfig().days);
 
     const [period, setPeriod] = useState<Period>('month');
     const [loading, setLoading] = useState(true);
@@ -63,20 +102,18 @@ export default function AnalyticsPage() {
             setLoading(true);
             setError('');
             try {
-                const [s, d, tp, cr, ph, sm] = await Promise.all([
+                const [s, d, tp, cr, ph] = await Promise.all([
                     getRevenueSummary(restaurantId || undefined),
                     getRevenueByPeriod(period, restaurantId || undefined),
                     getTopProducts(period, restaurantId || undefined),
                     getRevenueByCategory(period, restaurantId || undefined),
                     getPeakHours(period, restaurantId || undefined),
-                    getSlowMovers(restaurantId || undefined)
                 ]);
                 setSummary(s);
                 setChartData(d);
                 setTopProducts(tp);
                 setCategoryRevenue(cr);
                 setPeakHours(ph);
-                setSlowMovers(sm);
                 setLastUpdatedAt(new Date().toLocaleTimeString());
             } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
@@ -88,6 +125,19 @@ export default function AnalyticsPage() {
         }
         load();
     }, [period, t, restaurantId, refreshTick]);
+
+    // Slow movers reload independently when its threshold/days config changes, and the config persists.
+    useEffect(() => {
+        if (!restaurantId) return;
+        try {
+            window.localStorage.setItem(SLOW_MOVERS_CONFIG_KEY, JSON.stringify({ threshold: slowMoversThreshold, days: slowMoversDays }));
+        } catch {
+            // localStorage may be unavailable; non-fatal
+        }
+        getSlowMovers(restaurantId, slowMoversThreshold, slowMoversDays)
+            .then(setSlowMovers)
+            .catch(e => console.error('[Analytics] Slow movers load failed:', e instanceof Error ? e.message : String(e)));
+    }, [restaurantId, slowMoversThreshold, slowMoversDays, refreshTick]);
 
     const maxRevenue = chartData.length > 0 ? Math.max(...chartData.map(d => d.total_usd)) : 1;
 
@@ -233,7 +283,7 @@ export default function AnalyticsPage() {
                                              <div
                                                  key={day.date}
                                                  className="flex-1 h-full flex flex-col items-stretch group relative"
-                                                 title={`${day.date}: ${formatUsd(day.total_usd)} (${day.order_count} ${t('orders')})`}
+                                                 title={`${formatChartLabel(day.date, period)}: ${formatUsd(day.total_usd)} (${day.order_count} ${t('orders')})`}
                                              >
                                                  <div className="w-full flex-1 flex flex-col justify-end relative">
                                                      <div
@@ -250,10 +300,7 @@ export default function AnalyticsPage() {
                                 {/* Labels */}
                                 <div className="flex gap-1.5 pt-2">
                                     {chartData.map(day => {
-                                        const d = new Date(day.date);
-                                        const label = chartData.length <= 14
-                                            ? `${d.getMonth()+1}/${d.getDate()}`
-                                            : `${d.getMonth()+1}/${d.getDate()}`;
+                                        const label = formatChartLabel(day.date, period);
                                         return (
                                             <div key={day.date} className="flex-1 text-center text-[9px] font-mono font-bold text-[var(--text-secondary)] opacity-60 truncate">
                                                 {label}
@@ -350,7 +397,7 @@ export default function AnalyticsPage() {
                                      return peakHours.map(ph => {
                                          const height = (ph.order_count / maxOrders) * 100;
                                          return (
-                                             <div key={ph.hour} className="flex-1 h-full flex flex-col items-center justify-end gap-1 group relative" title={`${ph.hour} : ${ph.order_count} orders`}>
+                                             <div key={ph.hour} className="flex-1 h-full flex flex-col items-center justify-end gap-1 group relative" title={`${to12h(ph.hour)} : ${ph.order_count} orders`}>
                                                  <div className="w-full flex-1 flex flex-col justify-end relative">
                                                      <div 
                                                          className="w-full rounded-md bg-purple-500/50 group-hover:bg-purple-400 transition-colors relative overflow-hidden"
@@ -359,7 +406,7 @@ export default function AnalyticsPage() {
                                                          <div className="absolute top-0 left-0 w-full h-1 bg-white/30" />
                                                      </div>
                                                  </div>
-                                                 <span className="text-[9px] text-[var(--text-secondary)] font-mono font-bold opacity-60 pt-1 select-none leading-none">{ph.hour.split(':')[0]}h</span>
+                                                 <span className="text-[9px] text-[var(--text-secondary)] font-mono font-bold opacity-60 pt-1 select-none leading-none">{to12h(ph.hour)}</span>
                                              </div>
                                          )
                                      });
@@ -369,13 +416,32 @@ export default function AnalyticsPage() {
 
                         {/* Slow Movers Widget */}
                         <div className="rounded-2xl border border-white/5 bg-[var(--bg-card)] p-6">
-                            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-dashed border-white/5">
+                            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-dashed border-white/5">
                                 <div className="bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
                                     <AlertTriangle size={16} className="text-rose-400" />
                                 </div>
                                 <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
-                                    Slow Movers (Last 30 Days)
+                                    Slow Movers
                                 </h3>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mb-5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">
+                                <span>{t('fewerThan')}</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={slowMoversThreshold}
+                                    onChange={e => setSlowMoversThreshold(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                    className="w-14 px-2 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-mono text-center focus:outline-none focus:border-rose-400/50"
+                                />
+                                <span>{t('ordersIn')}</span>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={slowMoversDays}
+                                    onChange={e => setSlowMoversDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                    className="w-14 px-2 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] font-mono text-center focus:outline-none focus:border-rose-400/50"
+                                />
+                                <span>{t('days')}</span>
                             </div>
                             <div className="space-y-3">
                                 {slowMovers.slice(0, 5).map(sm => (

@@ -64,7 +64,14 @@ pub async fn get_products(
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Product>, String> {
     let mut products = Vec::new();
-    
+
+    // Auto-reset sold_out_today for any product whose sold_out_today was set on a previous day.
+    let _ = pool.execute(
+        "UPDATE products SET sold_out_today=0, updated_at=datetime('now')
+         WHERE restaurant_id=? AND sold_out_today=1 AND DATE(updated_at,'localtime') < DATE('now','localtime')",
+        params![restaurant_id.clone()]
+    ).await;
+
     let mut rows = if let Some(cat_id) = category_id {
         pool.query(
             "WITH RECURSIVE subcats(id) AS (
@@ -75,7 +82,8 @@ pub async fn get_products(
                 WHERE c.is_deleted = 0
              )
              SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at, p.stock_quantity, p.sku,
+                    p.sold_out_today, p.description, p.khmer_description, p.cost_price_cents
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.category_id IN (SELECT id FROM subcats) AND p.restaurant_id = ?
              ORDER BY p.name",
@@ -84,7 +92,8 @@ pub async fn get_products(
     } else {
         pool.query(
             "SELECT p.id, p.category_id, p.name, p.khmer_name, p.price_cents, p.is_available, p.image_path,
-                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at
+                    c.name AS category_name, c.khmer_name AS category_khmer, p.created_at, p.stock_quantity, p.sku,
+                    p.sold_out_today, p.description, p.khmer_description, p.cost_price_cents
              FROM products p LEFT JOIN categories c ON p.category_id = c.id
              WHERE p.is_deleted = 0 AND p.restaurant_id = ?
              ORDER BY c.sort_order, p.name",
@@ -127,6 +136,12 @@ pub async fn get_products(
             category_khmer: row.get::<String>(8).ok(),
             ingredients,
             created_at: row.get::<String>(9).unwrap_or_default(),
+            stock_quantity: row.get::<i64>(10).unwrap_or(0),
+            sku: row.get::<String>(11).ok().filter(|s| !s.is_empty()),
+            sold_out_today: row.get::<i64>(12).unwrap_or(0),
+            description: row.get::<String>(13).ok().filter(|s| !s.is_empty()),
+            khmer_description: row.get::<String>(14).ok().filter(|s| !s.is_empty()),
+            cost_price_cents: row.get::<i64>(15).ok(),
         });
     }
 
@@ -182,12 +197,16 @@ pub async fn create_product(
     image_path: Option<String>,
     ingredients: Vec<IngredientInput>,
     restaurant_id: String,
+    sku: Option<String>,
+    description: Option<String>,
+    khmer_description: Option<String>,
+    cost_price_cents: Option<i64>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let _: u64 = pool.execute(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, image_path, restaurant_id, updated_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, image_path, restaurant_id, sku, description, khmer_description, cost_price_cents, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         params![
             id.clone(),
             category_id,
@@ -195,7 +214,11 @@ pub async fn create_product(
             khmer_name.unwrap_or_default(),
             price_cents,
             image_path.unwrap_or_default(),
-            restaurant_id.clone()
+            restaurant_id.clone(),
+            sku.unwrap_or_default(),
+            description.unwrap_or_default(),
+            khmer_description.unwrap_or_default(),
+            cost_price_cents
         ]
     )
     .await
@@ -224,10 +247,15 @@ pub async fn update_product(
     image_path: Option<String>,
     ingredients: Vec<IngredientInput>,
     restaurant_id: String,
+    sku: Option<String>,
+    sold_out_today: Option<bool>,
+    description: Option<String>,
+    khmer_description: Option<String>,
+    cost_price_cents: Option<i64>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     let _: u64 = pool.execute(
-        "UPDATE products SET name=?, khmer_name=?, price_cents=?, category_id=?, is_available=?, image_path=?, updated_at=datetime('now')
+        "UPDATE products SET name=?, khmer_name=?, price_cents=?, category_id=?, is_available=?, image_path=?, sku=?, sold_out_today=?, description=?, khmer_description=?, cost_price_cents=?, updated_at=datetime('now')
          WHERE id=? AND restaurant_id=?",
          params![
              name,
@@ -236,6 +264,11 @@ pub async fn update_product(
              category_id,
              is_available as i64,
              image_path.unwrap_or_default(),
+             sku.unwrap_or_default(),
+             sold_out_today.unwrap_or(false) as i64,
+             description.unwrap_or_default(),
+             khmer_description.unwrap_or_default(),
+             cost_price_cents,
              id.clone(),
              restaurant_id.clone()
          ]
@@ -257,6 +290,22 @@ pub async fn update_product(
         ).await.map_err(|e| format!("Ingredient re-insert error: {}", e))?;
     }
 
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_sold_out_today(
+    id: String,
+    sold_out: bool,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE products SET sold_out_today=?, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![sold_out as i64, id, restaurant_id]
+    )
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
     Ok(())
 }
 

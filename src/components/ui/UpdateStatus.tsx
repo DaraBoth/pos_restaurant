@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import {
     Download, RefreshCw, CheckCircle2, ArrowUpCircle, Clock, X,
 } from 'lucide-react';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 type UpdateState =
     | 'idle'
@@ -16,6 +17,7 @@ type UpdateState =
     | 'pending-restart'; // user chose "Later"; sidebar shows reminder pill
 
 export function UpdateStatus() {
+    const { t } = useLanguage();
     const [state, setState] = useState<UpdateState>('idle');
     const [latestVersion, setLatestVersion] = useState('');
     const [downloaded, setDownloaded] = useState(0);
@@ -168,7 +170,7 @@ export function UpdateStatus() {
                         </span>
                         <ArrowUpCircle size={12} className="text-amber-400 flex-shrink-0" />
                         <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex-1 text-left truncate">
-                            Update v{latestVersion}
+                            {t('updateAvailable')}{latestVersion}
                         </span>
                         <Download size={11} className="text-amber-400/70 group-hover:text-amber-300 flex-shrink-0" />
                     </button>
@@ -196,7 +198,7 @@ export function UpdateStatus() {
                 <div className="flex items-center gap-2">
                     <RefreshCw size={12} className="text-blue-400 animate-spin flex-shrink-0" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">
-                        Downloading… {progressPct}%{sizeHint ? ` of ${sizeHint}` : ''}
+                        {t('downloading')} {progressPct}%{sizeHint ? ` of ${sizeHint}` : ''}
                     </span>
                 </div>
                 <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
@@ -217,7 +219,7 @@ export function UpdateStatus() {
             >
                 <Clock size={12} className="text-emerald-400 flex-shrink-0" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex-1 text-left truncate">
-                    Restart for v{latestVersion}
+                    {t('restartFor')}{latestVersion}
                 </span>
                 <RefreshCw size={11} className="text-emerald-400/70 group-hover:text-emerald-300 flex-shrink-0" />
             </button>
@@ -237,7 +239,7 @@ export function UpdateStatus() {
                             </div>
                             <div>
                                 <h2 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest">
-                                    Update Ready
+                                    {t('updateReady')}
                                 </h2>
                                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                     v{latestVersion} downloaded and installed
@@ -245,9 +247,7 @@ export function UpdateStatus() {
                             </div>
                         </div>
                         <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                            The new version is ready. Restart now to start using it, or keep
-                            working and restart later — it will take effect the next time you
-                            open the app.
+                            {t('updateReadyBody')}
                         </p>
                         <div className="flex gap-3">
                             <button
@@ -255,14 +255,14 @@ export function UpdateStatus() {
                                 onClick={restartLater}
                                 className="flex-1 py-3 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-white/5 transition-colors text-sm font-black uppercase tracking-widest"
                             >
-                                Later
+                                {t('later')}
                             </button>
                             <button
                                 type="button"
                                 onClick={restartNow}
                                 className="flex-1 py-3 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 transition-colors text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
-                                <RefreshCw size={14} strokeWidth={3} /> Restart Now
+                                <RefreshCw size={14} strokeWidth={3} /> {t('restartNow')}
                             </button>
                         </div>
                     </div>

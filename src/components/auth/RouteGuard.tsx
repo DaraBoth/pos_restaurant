@@ -85,6 +85,12 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                 return;
             }
 
+            // Downloads page is restricted to admin and super_admin.
+            if (pathname.startsWith('/downloads') && !canAccessAdminConsole(user?.role)) {
+                router.replace('/pos');
+                return;
+            }
+
             // Only call the Tauri setup-status IPC once per auth session.
             // After the first check, navigating between tabs skips the spinner
             // and goes straight to rendering children.

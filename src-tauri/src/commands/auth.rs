@@ -67,6 +67,54 @@ fn verify_login_password(password: &str, password_hash: &str) -> Result<(), Stri
         .map_err(|_| "Invalid username or password".to_string())
 }
 
+// Failed-attempt lockout (shared-terminal brute-force guard).
+const MAX_FAILED_LOGINS: i64 = 5;
+// Lock duration is applied directly in SQL as '+15 minutes' (see record_failed_login).
+
+/// Minutes remaining on an active lock for `username` on the local DB, or None if not locked.
+async fn lock_minutes_remaining(conn: &Connection, username: &str) -> Option<i64> {
+    let mut rows = conn.query(
+        "SELECT CASE
+                    WHEN locked_until IS NOT NULL AND locked_until > datetime('now','localtime')
+                    THEN CAST((julianday(locked_until) - julianday('now','localtime')) * 1440 AS INTEGER) + 1
+                    ELSE 0
+                END
+         FROM users WHERE username = ? AND is_deleted = 0",
+        params![username.to_string()]
+    ).await.ok()?;
+    let row = rows.next().await.ok().flatten()?;
+    let mins = row.get::<i64>(0).unwrap_or(0);
+    if mins > 0 { Some(mins) } else { None }
+}
+
+/// Records a wrong-password attempt; locks the account once the threshold is hit.
+/// Returns Some(minutes) when the account is (now) locked. No-op if the user has no local row.
+async fn record_failed_login(conn: &Connection, username: &str) -> Option<i64> {
+    let _ = conn.execute(
+        "UPDATE users
+            SET failed_login_attempts = failed_login_attempts + 1,
+                locked_until = CASE WHEN failed_login_attempts + 1 >= ?
+                    THEN datetime('now','localtime','+15 minutes') ELSE locked_until END,
+                updated_at = datetime('now')
+          WHERE username = ? AND is_deleted = 0",
+        params![MAX_FAILED_LOGINS, username.to_string()]
+    ).await;
+    lock_minutes_remaining(conn, username).await
+}
+
+/// Clears the failed-attempt counter and lock after a successful login.
+async fn reset_login_attempts(conn: &Connection, username: &str) {
+    let _ = conn.execute(
+        "UPDATE users SET failed_login_attempts = 0, locked_until = NULL, updated_at = datetime('now')
+          WHERE username = ? AND is_deleted = 0 AND (failed_login_attempts > 0 OR locked_until IS NOT NULL)",
+        params![username.to_string()]
+    ).await;
+}
+
+fn account_locked_message(minutes: i64) -> String {
+    format!("Account locked. Too many failed attempts. Try again in {} minutes.", minutes.max(1))
+}
+
 fn to_user_session(record: &AuthRecord) -> UserSession {
     UserSession {
         id: record.id.clone(),
@@ -355,6 +403,13 @@ pub async fn login(
 ) -> Result<UserSession, String> {
     let superadmin_login = is_superadmin_username(&username);
 
+    // ── Lockout guard (skip superadmin — cloud-only, must never be locked out) ──
+    if !superadmin_login {
+        if let Some(mins) = lock_minutes_remaining(&pool, &username).await {
+            return Err(account_locked_message(mins));
+        }
+    }
+
     // ── Local-first check (for returning users who have already logged in once) ──
     // We do this for ALL non-superadmin users regardless of internet state.
     // If local DB errors (e.g. pending migration), we log and fall through gracefully.
@@ -364,6 +419,7 @@ pub async fn login(
             Ok(Some(local_record)) => {
                 if verify_login_password(&password, &local_record.password_hash).is_ok() {
                     // ✅ Known user, correct password — allow offline login
+                    reset_login_attempts(&pool, &username).await;
                     println!("[Auth] Local login granted for '{}'", username);
                     return Ok(to_user_session(&local_record));
                 }
@@ -396,7 +452,10 @@ pub async fn login(
         }
         if local_password_mismatch {
             // Offline and local hash doesn't match — the user typed the wrong password.
-            return Err("Invalid username or password.".to_string());
+            return Err(match record_failed_login(&pool, &username).await {
+                Some(mins) => account_locked_message(mins),
+                None => "Invalid username or password.".to_string(),
+            });
         }
         return Err("No local account found on this device. An internet connection is required for first-time login. Please connect and try again.".to_string());
     };
@@ -435,7 +494,20 @@ pub async fn login(
         return Err("Invalid username or password".to_string());
     };
 
-    verify_login_password(&password, &remote_record.password_hash)?;
+    if verify_login_password(&password, &remote_record.password_hash).is_err() {
+        // Remote-confirmed wrong password — count it against the local lockout counter.
+        if !superadmin_login {
+            if let Some(mins) = record_failed_login(&pool, &username).await {
+                return Err(account_locked_message(mins));
+            }
+        }
+        return Err("Invalid username or password.".to_string());
+    }
+
+    // Successful remote auth — clear any prior failed-attempt state for this user.
+    if !superadmin_login {
+        reset_login_attempts(&pool, &username).await;
+    }
 
     // Superadmin is intentionally cloud-only and must not be cached locally.
     if is_superadmin_username(&remote_record.username) || is_superadmin_role(&remote_record.role) {
@@ -538,7 +610,7 @@ pub async fn create_user(
 #[tauri::command]
 pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<Vec<User>, String> {
     let mut rows = pool.query(
-        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, phone, is_deleted, created_at
+        "SELECT id, restaurant_id, username, password_hash, role, full_name, khmer_name, phone, is_deleted, created_at, locked_until
          FROM users WHERE is_deleted = 0 AND restaurant_id = ? ORDER BY role, username",
         params![restaurant_id]
     )
@@ -558,10 +630,26 @@ pub async fn get_users(restaurant_id: String, pool: State<'_, Arc<Connection>>) 
             phone: row.get::<String>(7).ok(),
             is_deleted: row.get::<i64>(8).unwrap_or(0),
             created_at: row.get::<String>(9).unwrap_or_default(),
+            locked_until: row.get::<String>(10).ok(),
         });
     }
 
     Ok(users)
+}
+
+/// Admin action: clear a user's failed-attempt counter and lock immediately.
+#[tauri::command]
+pub async fn unlock_user(
+    user_id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE users SET failed_login_attempts = 0, locked_until = NULL, updated_at = datetime('now')
+          WHERE id = ? AND restaurant_id = ?",
+        params![user_id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -1115,7 +1203,136 @@ pub async fn superadmin_create_restaurant_user(
     Ok(user_id)
 }
 
-/// Creates an additional super_admin account (cloud-only, no restaurant).  
+#[tauri::command]
+pub async fn set_user_pin(
+    restaurant_id: String,
+    user_id: String,
+    pin: String,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
+) -> Result<(), String> {
+    if pin.len() < 4 || pin.len() > 6 || !pin.chars().all(|c| c.is_ascii_digit()) {
+        return Err("PIN must be 4-6 digits.".to_string());
+    }
+
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(pin.as_bytes(), &salt)
+        .map_err(|e| format!("Hash error: {}", e))?
+        .to_string();
+
+    const SQL: &str = "UPDATE users SET pin_hash = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?";
+
+    pool.execute(SQL, params![hash.clone(), user_id.clone(), restaurant_id.clone()])
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    if let Some(remote_conn) = remote.0.as_ref() {
+        if let Err(e) = remote_conn.execute(SQL, params![hash, user_id, restaurant_id]).await {
+            eprintln!("[Auth] Warning: could not mirror PIN update to remote: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn login_with_pin(
+    restaurant_id: String,
+    pin: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<UserSession, String> {
+    if pin.len() < 4 || pin.len() > 6 || !pin.chars().all(|c| c.is_ascii_digit()) {
+        return Err("Invalid PIN format.".to_string());
+    }
+
+    // Locked accounts (failed-attempt lockout) are excluded so PIN can't bypass the lock.
+    let mut rows = pool.query(
+        "SELECT id, restaurant_id, username, pin_hash, role, full_name, khmer_name, phone
+         FROM users WHERE restaurant_id = ? AND pin_hash IS NOT NULL AND pin_hash != '' AND is_deleted = 0
+           AND (locked_until IS NULL OR locked_until <= datetime('now','localtime'))",
+        params![restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        let pin_hash: String = match row.get::<String>(3) {
+            Ok(h) if !h.is_empty() => h,
+            _ => continue,
+        };
+
+        let parsed = match PasswordHash::new(&pin_hash) {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
+
+        if Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok() {
+            let username = row.get::<String>(2).unwrap_or_default();
+            reset_login_attempts(&pool, &username).await;
+            return Ok(UserSession {
+                id: row.get::<String>(0).unwrap_or_default(),
+                restaurant_id: row.get::<String>(1).ok(),
+                username,
+                role: rbac::normalize_role_for_session(&row.get::<String>(4).unwrap_or_default()),
+                full_name: row.get::<String>(5).ok(),
+                khmer_name: row.get::<String>(6).ok(),
+                phone: row.get::<String>(7).ok(),
+            });
+        }
+    }
+
+    Err("Invalid PIN".to_string())
+}
+
+#[tauri::command]
+pub async fn change_password(
+    user_id: String,
+    current_password: String,
+    new_password: String,
+    pool: State<'_, Arc<Connection>>,
+    remote: State<'_, RemoteDb>,
+) -> Result<(), String> {
+    if new_password.len() < 6 {
+        return Err("New password must be at least 6 characters.".to_string());
+    }
+
+    let mut rows = pool.query(
+        "SELECT password_hash FROM users WHERE id = ? AND is_deleted = 0",
+        params![user_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?
+        .ok_or_else(|| "User not found".to_string())?;
+
+    let existing_hash: String = row.get(0).unwrap_or_default();
+
+    let parsed = PasswordHash::new(&existing_hash)
+        .map_err(|_| "Invalid password hash".to_string())?;
+    Argon2::default()
+        .verify_password(current_password.as_bytes(), &parsed)
+        .map_err(|_| "Current password is incorrect".to_string())?;
+
+    let salt = SaltString::generate(&mut OsRng);
+    let new_hash = Argon2::default()
+        .hash_password(new_password.as_bytes(), &salt)
+        .map_err(|e| format!("Hash error: {}", e))?
+        .to_string();
+
+    const SQL: &str = "UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?";
+
+    pool.execute(SQL, params![new_hash.clone(), user_id.clone()])
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+    if let Some(remote_conn) = remote.0.as_ref() {
+        if let Err(e) = remote_conn.execute(SQL, params![new_hash, user_id]).await {
+            eprintln!("[Auth] Warning: could not mirror password change to remote: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// Creates an additional super_admin account (cloud-only, no restaurant).
 /// Only callable from the superadmin dashboard.
 #[tauri::command]
 pub async fn create_superadmin_account(

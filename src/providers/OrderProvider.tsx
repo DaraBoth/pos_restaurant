@@ -20,6 +20,7 @@ interface OrderContextValue {
     items: OrderItem[];
     totals: OrderTotals;
     exchangeRate: number;
+    rateEffectiveFrom: string | null;
     tableId: string;
     sessionId: string | null;
     rounds: Order[];
@@ -48,7 +49,7 @@ const EMPTY_TOTALS: OrderTotals = {
 
 const OrderContext = createContext<OrderContextValue>({
     orderId: null, items: [], totals: EMPTY_TOTALS,
-    exchangeRate: 4100, tableId: '', sessionId: null, rounds: [], isTakeout: false, isDirect: false,
+    exchangeRate: 4100, rateEffectiveFrom: null, tableId: '', sessionId: null, rounds: [], isTakeout: false, isDirect: false,
     localCart: [],
     setOrderId: () => { }, setItems: () => { }, setTableId: () => { },
     setSessionId: () => { }, setRounds: () => { }, switchRound: async () => {},
@@ -61,14 +62,20 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [orderId, setOrderId] = useState<string | null>(null);
     const [items, setItemsState] = useState<OrderItem[]>([]);
     const [exchangeRate, setExchangeRate] = useState(4100);
+    const [rateEffectiveFrom, setRateEffectiveFrom] = useState<string | null>(null);
     const [tableId, setTableId] = useState('');
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [rounds, setRounds] = useState<Order[]>([]);
     const [isTakeout, setTakeout] = useState(false);
     const [isDirect, setDirect] = useState(false);
     const [localCart, setLocalCart] = useState<LocalCartItem[]>([]);
-    const { user } = useAuth();
+    const { user, reportActiveOrder } = useAuth();
     const restaurantId = user?.restaurant_id;
+
+    // Let AuthProvider know when an order is in progress so idle-logout can warn harder.
+    useEffect(() => {
+        reportActiveOrder(items.length > 0 || localCart.length > 0);
+    }, [items.length, localCart.length, reportActiveOrder]);
 
     const subtotalCents = items.reduce(
         (sum, item) => sum + item.price_at_order * item.quantity, 0
@@ -83,6 +90,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         try {
             const rate = await getExchangeRate(restaurantId || undefined);
             setExchangeRate(rate.rate);
+            setRateEffectiveFrom(rate.effective_from ?? null);
         } catch {
             // Keep default rate if Tauri not available
         }
@@ -193,7 +201,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <OrderContext.Provider value={{
-            orderId, items, totals, exchangeRate, tableId, sessionId, rounds, isTakeout, isDirect,
+            orderId, items, totals, exchangeRate, rateEffectiveFrom, tableId, sessionId, rounds, isTakeout, isDirect,
             localCart,
             setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout, setDirect,
             refreshRate, clearOrder, loadTableSession, switchRound,

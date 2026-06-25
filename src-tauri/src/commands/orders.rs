@@ -339,29 +339,32 @@ pub async fn get_orders(
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Vec<Order>, String> {
     let mut query = String::from(
-        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
-                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
-                receipt_number
-         FROM orders WHERE is_deleted = 0 AND restaurant_id = ?"
+        "SELECT o.id, o.user_id, o.table_id, o.session_id, o.round_number, o.status, o.total_usd, o.total_khr, o.tax_vat, o.tax_plt,
+                o.bakong_bill_number, o.notes, o.customer_name, o.customer_phone, o.created_at, o.updated_at, o.completed_at,
+                o.receipt_number, o.voided_by, o.voided_at, o.void_reason,
+                COALESCE(NULLIF(vu.full_name, ''), vu.username) AS voided_by_name,
+                o.exchange_rate_used
+         FROM orders o LEFT JOIN users vu ON o.voided_by = vu.id
+         WHERE o.is_deleted = 0 AND o.restaurant_id = ?"
     );
 
     let mut args = Vec::new();
     args.push(libsql::Value::Text(restaurant_id));
 
     if let Some(s) = status {
-        query.push_str(" AND status = ?");
+        query.push_str(" AND o.status = ?");
         args.push(libsql::Value::Text(s));
     }
     if let Some(sd) = start_date {
-        query.push_str(" AND created_at >= ?");
+        query.push_str(" AND o.created_at >= ?");
         args.push(libsql::Value::Text(format!("{} 00:00:00", sd)));
     }
     if let Some(ed) = end_date {
-        query.push_str(" AND created_at <= ?");
+        query.push_str(" AND o.created_at <= ?");
         args.push(libsql::Value::Text(format!("{} 23:59:59", ed)));
     }
 
-    query.push_str(" ORDER BY created_at DESC LIMIT 500");
+    query.push_str(" ORDER BY o.created_at DESC LIMIT 500");
 
     let mut rows = pool.query(query.as_str(), args)
         .await.map_err(|e| format!("Database error: {}", e))?;
@@ -387,6 +390,11 @@ pub async fn get_orders(
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
             receipt_number: row.get::<String>(17).ok(),
+            voided_by: row.get::<String>(18).ok(),
+            voided_at: row.get::<String>(19).ok(),
+            void_reason: row.get::<String>(20).ok(),
+            voided_by_name: row.get::<String>(21).ok(),
+            exchange_rate_used: row.get::<f64>(22).ok(),
         });
     }
 
@@ -430,6 +438,11 @@ pub async fn get_session_rounds(
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
             receipt_number: row.get::<String>(17).ok(),
+            voided_by: None,
+            voided_at: None,
+            void_reason: None,
+            voided_by_name: None,
+            exchange_rate_used: None,
         });
     }
 
@@ -512,6 +525,11 @@ pub async fn get_active_order_for_table(
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
             receipt_number: row.get::<String>(17).ok(),
+            voided_by: None,
+            voided_at: None,
+            void_reason: None,
+            voided_by_name: None,
+            exchange_rate_used: None,
         }))
     } else {
         Ok(None)
@@ -555,6 +573,11 @@ pub async fn get_orders_for_table(
             updated_at: row.get::<String>(15).ok(),
             completed_at: row.get::<String>(16).ok(),
             receipt_number: row.get::<String>(17).ok(),
+            voided_by: None,
+            voided_at: None,
+            void_reason: None,
+            voided_by_name: None,
+            exchange_rate_used: None,
         });
     }
 
@@ -567,6 +590,7 @@ pub async fn checkout_order(
     payments: Vec<PaymentInput>,
     discount_cents: Option<i64>,
     restaurant_id: String,
+    customer_name: Option<String>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Order, String> {
     let mut tb_rows = pool.query("SELECT table_id, user_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
@@ -600,8 +624,9 @@ pub async fn checkout_order(
 
     pool.execute(
         "UPDATE orders
-         SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0,
+         SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0, exchange_rate_used = ?,
              status = 'completed', updated_at = datetime('now'), completed_at = datetime('now'),
+             customer_name = COALESCE(?, customer_name),
              receipt_number = (
                  strftime('%Y%m%d', 'now', 'localtime') || '-' ||
                  printf('%04d', (
@@ -614,7 +639,7 @@ pub async fn checkout_order(
                  ))
              )
          WHERE id = ? AND restaurant_id = ?",
-         params![final_total, final_khr, restaurant_id.clone(), order_id.clone(), restaurant_id.clone()]
+         params![final_total, final_khr, exch_rate, customer_name.filter(|s| !s.is_empty()), restaurant_id.clone(), order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut item_rows = pool.query(
@@ -675,6 +700,11 @@ pub async fn checkout_order(
         updated_at: row.get::<String>(15).ok(),
         completed_at: row.get::<String>(16).ok(),
         receipt_number: row.get::<String>(17).ok(),
+        voided_by: None,
+        voided_at: None,
+        void_reason: None,
+        voided_by_name: None,
+        exchange_rate_used: None,
     })
 }
 
@@ -751,9 +781,9 @@ pub async fn checkout_session(
         recalculate_order_totals(o_id, &restaurant_id, &pool).await?;
         
         let _: u64 = pool.execute(
-            "UPDATE orders SET status = 'completed', updated_at = datetime('now'), completed_at = datetime('now')
+            "UPDATE orders SET status = 'completed', updated_at = datetime('now'), completed_at = datetime('now'), exchange_rate_used = ?
              WHERE id = ? AND restaurant_id = ?",
-             params![o_id.clone(), restaurant_id.clone()]
+             params![exch_rate, o_id.clone(), restaurant_id.clone()]
         ).await.map_err(|e| format!("Database error: {}", e))?;
 
         let mut sold_items = Vec::new();
@@ -866,14 +896,17 @@ pub async fn hold_order(
 }
 
 #[tauri::command]
-pub async fn void_order(order_id: String, restaurant_id: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
+pub async fn void_order(order_id: String, restaurant_id: String, voided_by: String, void_reason: String, pool: State<'_, Arc<Connection>>) -> Result<(), String> {
     let mut tb_rows = pool.query("SELECT table_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
         .await.map_err(|e| format!("Database error: {}", e))?;
     let table_id = if let Some(row) = tb_rows.next().await.map_err(|e| e.to_string())? {
         row.get::<String>(0).ok()
     } else { None };
 
-    pool.execute("UPDATE orders SET status='void', updated_at=datetime('now') WHERE id=? AND restaurant_id = ?", params![order_id, restaurant_id.clone()])
+    pool.execute(
+        "UPDATE orders SET status='void', voided_by=?, voided_at=datetime('now'), void_reason=?, updated_at=datetime('now') WHERE id=? AND restaurant_id = ?",
+        params![voided_by, void_reason, order_id, restaurant_id.clone()]
+    )
         .await.map_err(|e| format!("Database error: {}", e))?;
 
     if let Some(table_name) = table_id {
@@ -912,6 +945,14 @@ async fn release_table_if_no_open_orders(table_name: &str, restaurant_id: &str, 
 }
 
 async fn deduct_inventory(product_id: &str, qty: i64, restaurant_id: &str, user_id: Option<&str>, pool: &Arc<Connection>) -> Result<(), String> {
+    // Product-level stock: only decrement stock-tracked products (stock_quantity > 0). Oversell is
+    // allowed — a sale that takes a tracked product below zero is permitted; the owner reconciles.
+    let _: u64 = pool.execute(
+        "UPDATE products SET stock_quantity = stock_quantity - ?, updated_at = datetime('now')
+         WHERE id = ? AND restaurant_id = ? AND stock_quantity > 0",
+        params![qty, product_id.to_string(), restaurant_id.to_string()]
+    ).await.map_err(|e| format!("Stock decrement error: {}", e))?;
+
     let mut ing_rows = pool.query(
         "SELECT inventory_item_id, usage_quantity FROM product_ingredients WHERE product_id=? AND restaurant_id=?",
         params![product_id.to_string(), restaurant_id.to_string()]
@@ -992,7 +1033,7 @@ pub async fn get_revenue_summary(
     restaurant_id: String,
 ) -> Result<RevenueSummary, String> {
     let mut today_rows = pool.query(
-        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND date(created_at)=date('now')", 
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND date(created_at,'localtime')=date('now','localtime')",
         params![restaurant_id.clone()]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let (today_usd, today_orders) = if let Some(r) = today_rows.next().await.unwrap_or(None) {
@@ -1000,7 +1041,7 @@ pub async fn get_revenue_summary(
     } else { (0, 0) };
 
     let mut month_rows = pool.query(
-        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND strftime('%Y-%m',created_at)=strftime('%Y-%m','now')", 
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND strftime('%Y-%m',created_at,'localtime')=strftime('%Y-%m','now','localtime')",
         params![restaurant_id.clone()]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let (month_usd, month_orders) = if let Some(r) = month_rows.next().await.unwrap_or(None) {
@@ -1008,7 +1049,7 @@ pub async fn get_revenue_summary(
     } else { (0, 0) };
 
     let mut year_rows = pool.query(
-        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND strftime('%Y',created_at)=strftime('%Y','now')", 
+        "SELECT COALESCE(SUM(total_usd),0), COUNT(*) FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND strftime('%Y',created_at,'localtime')=strftime('%Y','now','localtime')",
         params![restaurant_id.clone()]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let (year_usd, year_orders) = if let Some(r) = year_rows.next().await.unwrap_or(None) {
@@ -1016,7 +1057,7 @@ pub async fn get_revenue_summary(
     } else { (0, 0) };
 
     let mut open_rows = pool.query(
-        "SELECT COUNT(*) FROM orders WHERE status IN ('open', 'pending_payment') AND is_deleted = 0 AND restaurant_id = ? AND date(created_at) = date('now')", 
+        "SELECT COUNT(*) FROM orders WHERE status IN ('open', 'pending_payment') AND is_deleted = 0 AND restaurant_id = ? AND date(created_at,'localtime') = date('now','localtime')",
         params![restaurant_id]
     ).await.map_err(|e| format!("DB error: {}", e))?;
     let open_orders = if let Some(r) = open_rows.next().await.unwrap_or(None) {
@@ -1032,17 +1073,42 @@ pub async fn get_revenue_by_period(
     restaurant_id: String,
     pool: State<'_, Arc<Connection>>
 ) -> Result<Vec<RevenueByDay>, String> {
+    // "today" buckets revenue by local hour and always returns all 24 hours (gaps filled with 0)
+    // so the chart renders a stable 24-column axis regardless of when the first sale happens.
+    if period == "today" {
+        let mut hour_rows = pool.query(
+            "SELECT strftime('%H', created_at, 'localtime') as hr, COALESCE(SUM(total_usd),0), COUNT(*) \
+             FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? \
+               AND date(created_at,'localtime')=date('now','localtime') \
+             GROUP BY hr",
+            params![restaurant_id]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+
+        let mut by_hour: std::collections::HashMap<i64, (i64, i64)> = std::collections::HashMap::new();
+        while let Some(row) = hour_rows.next().await.map_err(|e| e.to_string())? {
+            let hr: i64 = row.get::<String>(0).unwrap_or_default().parse().unwrap_or(0);
+            by_hour.insert(hr, (row.get::<i64>(1).unwrap_or(0), row.get::<i64>(2).unwrap_or(0)));
+        }
+
+        let mut hourly = Vec::with_capacity(24);
+        for h in 0..24 {
+            let (usd, count) = by_hour.get(&h).copied().unwrap_or((0, 0));
+            hourly.push(RevenueByDay { date: format!("{:02}:00", h), total_usd: usd, order_count: count });
+        }
+        return Ok(hourly);
+    }
+
     let date_filter = match period.as_str() {
-        "week"    => "created_at >= datetime('now','-7 days')",
-        "3months" => "created_at >= datetime('now','-3 months')",
-        "year"    => "strftime('%Y',created_at)=strftime('%Y','now')",
-        _         => "strftime('%Y-%m',created_at)=strftime('%Y-%m','now')",
+        "week"    => "datetime(created_at,'localtime') >= datetime('now','localtime','-7 days')",
+        "3months" => "datetime(created_at,'localtime') >= datetime('now','localtime','-3 months')",
+        "year"    => "strftime('%Y',created_at,'localtime')=strftime('%Y','now','localtime')",
+        _         => "strftime('%Y-%m',created_at,'localtime')=strftime('%Y-%m','now','localtime')",
     };
 
     let query = format!(
-        "SELECT date(created_at) as date, COALESCE(SUM(total_usd),0) as total_usd, COUNT(*) as order_count \
+        "SELECT date(created_at,'localtime') as date, COALESCE(SUM(total_usd),0) as total_usd, COUNT(*) as order_count \
          FROM orders WHERE status='completed' AND is_deleted=0 AND restaurant_id = ? AND {} \
-         GROUP BY date(created_at) ORDER BY date ASC",
+         GROUP BY date(created_at,'localtime') ORDER BY date ASC",
         date_filter
     );
 

@@ -54,7 +54,7 @@ pub async fn get_top_products(period: String, restaurant_id: String, db: State<'
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
-        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', ?)
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND datetime(o.created_at, 'localtime') >= datetime('now', 'localtime', ?)
         GROUP BY p.id
         ORDER BY order_count DESC
         "#
@@ -101,7 +101,7 @@ pub async fn get_revenue_by_category(period: String, restaurant_id: String, db: 
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
         JOIN categories c ON c.id = p.category_id
-        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', ?)
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND datetime(o.created_at, 'localtime') >= datetime('now', 'localtime', ?)
         GROUP BY c.id
         ORDER BY total_revenue DESC
         "#
@@ -141,7 +141,7 @@ pub async fn get_peak_hours(period: String, restaurant_id: String, db: State<'_,
         r#"
         SELECT strftime('%H:00', o.created_at, 'localtime') as hour, COUNT(DISTINCT o.id) as order_count
         FROM orders o
-        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', ?)
+        WHERE o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND datetime(o.created_at, 'localtime') >= datetime('now', 'localtime', ?)
         GROUP BY hour
         ORDER BY hour ASC
         "#
@@ -212,19 +212,28 @@ pub async fn get_top_products_in_range(
 }
 
 #[tauri::command]
-pub async fn get_slow_movers(restaurant_id: String, db: State<'_, Arc<Connection>>) -> Result<Vec<TopProduct>, String> {
+pub async fn get_slow_movers(
+    restaurant_id: String,
+    threshold: Option<i64>,
+    days: Option<i64>,
+    db: State<'_, Arc<Connection>>,
+) -> Result<Vec<TopProduct>, String> {
+    let threshold = threshold.unwrap_or(3).max(0);
+    let days = days.unwrap_or(30).max(1);
+    let days_modifier = format!("-{} days", days);
+
     let query = r#"
         SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) as order_count, COALESCE(SUM(oi.quantity * oi.price_at_order), 0) as total_revenue
         FROM products p
         LEFT JOIN order_items oi ON oi.product_id = p.id
-        LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND o.created_at >= datetime('now', 'localtime', '-30 days')
+        LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'completed' AND o.is_deleted = 0 AND o.restaurant_id = ? AND datetime(o.created_at, 'localtime') >= datetime('now', 'localtime', ?)
         WHERE p.is_available = 1 AND p.is_deleted = 0 AND p.restaurant_id = ?
         GROUP BY p.id
-        HAVING order_count < 3
+        HAVING order_count < ?
         ORDER BY order_count ASC
     "#;
 
-    let mut rows = db.query(query, params![restaurant_id.clone(), restaurant_id]).await.map_err(|e| format!("Database error: {}", e))?;
+    let mut rows = db.query(query, params![restaurant_id.clone(), days_modifier, restaurant_id, threshold]).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut results = Vec::new();
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {

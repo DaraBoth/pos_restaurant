@@ -24,7 +24,7 @@ pub async fn get_restaurant(restaurant_id: Option<String>, pool: State<'_, Arc<C
     };
 
     let mut rows = pool.query(
-        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at, COALESCE(business_type, 'Restaurant/Pub/Bar'), COALESCE(disable_tables, 0), COALESCE(receipt_width, '80mm'), COALESCE(vat_enabled, 0)
+        "SELECT id, name, khmer_name, tin, address, address_kh, phone, website, vat_number, receipt_footer, logo_path, license_expires_at, license_support_contact, is_deleted, created_at, updated_at, COALESCE(business_type, 'Restaurant/Pub/Bar'), COALESCE(disable_tables, 0), COALESCE(receipt_width, '80mm'), COALESCE(vat_enabled, 0), receipt_footer_khmer
          FROM restaurants
          WHERE id = ? AND is_deleted = 0",
          params![id_to_use]
@@ -46,6 +46,7 @@ pub async fn get_restaurant(restaurant_id: Option<String>, pool: State<'_, Arc<C
         website: row.get::<String>(7).ok(),
         vat_number: row.get::<String>(8).ok(),
         receipt_footer: row.get::<String>(9).ok(),
+        receipt_footer_khmer: row.get::<String>(20).ok(),
         receipt_width: row.get::<String>(18).unwrap_or_else(|_| "80mm".to_string()),
         logo_path: row.get::<String>(10).ok(),
         license_expires_at: row.get::<String>(11).ok(),
@@ -98,6 +99,7 @@ pub async fn update_restaurant(
              website = ?,
              vat_number = ?,
              receipt_footer = ?,
+             receipt_footer_khmer = ?,
              receipt_width = ?,
              logo_path = ?,
              business_type = ?,
@@ -115,6 +117,7 @@ pub async fn update_restaurant(
              input.website.unwrap_or_default(),
              input.vat_number.unwrap_or_default(),
              input.receipt_footer.unwrap_or_default(),
+             input.receipt_footer_khmer.unwrap_or_default(),
              input.receipt_width.unwrap_or_else(|| "80mm".to_string()),
              input.logo_path.unwrap_or_default(),
              input.business_type.unwrap_or_else(|| "Restaurant/Pub/Bar".to_string()),

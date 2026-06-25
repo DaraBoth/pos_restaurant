@@ -5,12 +5,15 @@ import {
     X, User, Monitor, Globe, LogOut, Building2, Check, Edit2, 
     ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff, Download 
 } from 'lucide-react';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth, getSessionTimeoutMs, SESSION_TIMEOUT_KEY } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useOrder } from '@/providers/OrderProvider';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
-import { updateUser } from '@/lib/api/auth';
-import { stopSync } from '@/lib/api/system';
+import { updateUser, changePassword } from '@/lib/api/auth';
+import { stopSync, getExchangeRate } from '@/lib/api/system';
+import { formatKhr } from '@/lib/currency';
+import type { ExchangeRate } from '@/types';
 import { useRouter } from 'next/navigation';
 import RestaurantSettingsForm from '../management/RestaurantSettingsForm';
 import ExchangeRateManagement from '@/app/management/exchange-rate/page';
@@ -37,10 +40,13 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     const { user, setUser } = useAuth();
     const { t, lang, setLang } = useLanguage();
     const { theme, setTheme } = useTheme();
+    const { items, localCart } = useOrder();
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<TabType>('account');
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+    const [readonlyRate, setReadonlyRate] = useState<ExchangeRate | null>(null);
+    const [appVersion, setAppVersion] = useState('...');
 
     // Profile Account inputs
     const [fullName, setFullName] = useState(user?.full_name || '');
@@ -54,6 +60,21 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     const [mobile, setMobile] = useState('');
     const [isEditingMobile, setIsEditingMobile] = useState(false);
 
+    // Change Password
+    const [currentPwd, setCurrentPwd] = useState('');
+    const [newPwd, setNewPwd] = useState('');
+    const [confirmPwd, setConfirmPwd] = useState('');
+    const [pwdError, setPwdError] = useState('');
+    const [pwdSuccess, setPwdSuccess] = useState(false);
+    const [savingPwd, setSavingPwd] = useState(false);
+
+    // Logout confirmation
+    const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+    const cartHasItems = items.length > 0 || localCart.length > 0;
+
+    // Auto-logout / session timeout (admin-configurable; all roles inherit it)
+    const [sessionTimeoutMs, setSessionTimeoutMs] = useState<number>(() => getSessionTimeoutMs());
+
     useEffect(() => {
         if (isOpen) {
             setFullName(user?.full_name || '');
@@ -61,6 +82,11 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
             setMobile(user?.phone || '');
             setIsEditingName(false);
             setIsEditingMobile(false);
+            setCurrentPwd('');
+            setNewPwd('');
+            setConfirmPwd('');
+            setPwdError('');
+            setPwdSuccess(false);
             
             if (user) {
                 setUserAvatar(localStorage.getItem(`dineos_user_avatar_${user.id}`));
@@ -86,11 +112,55 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
         };
     }, [isOpen, user]);
 
+    useEffect(() => {
+        if (activeTab === 'exchange' && !isAdmin && user?.restaurant_id) {
+            getExchangeRate(user.restaurant_id)
+                .then(setReadonlyRate)
+                .catch(console.error);
+        }
+    }, [activeTab, isAdmin, user?.restaurant_id]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        import('@tauri-apps/api/app')
+            .then(m => m.getVersion())
+            .then(v => setAppVersion(v))
+            .catch(() => setAppVersion(''));
+    }, []);
+
+    const isAdmin = user?.role === 'admin';
+
     if (!isOpen) return null;
 
-    function handleLogout() {
+    async function handleChangePassword() {
+        if (!user) return;
+        setPwdError('');
+        if (newPwd.length < 6) { setPwdError(t('passwordMinLength') ?? 'New password must be at least 6 characters'); return; }
+        if (newPwd !== confirmPwd) { setPwdError(t('passwordMismatch') ?? 'Passwords do not match'); return; }
+        setSavingPwd(true);
+        try {
+            await changePassword(user.id, currentPwd, newPwd);
+            setCurrentPwd('');
+            setNewPwd('');
+            setConfirmPwd('');
+            setPwdSuccess(true);
+            setTimeout(() => setPwdSuccess(false), 3000);
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes('incorrect')) {
+                setPwdError(t('currentPasswordIncorrect') ?? 'Current password is incorrect');
+            } else {
+                setPwdError(msg);
+            }
+        } finally {
+            setSavingPwd(false);
+        }
+    }
+
+    function confirmLogout() {
         stopSync().catch(() => {});
         setUser(null);
+        setIsLogoutOpen(false);
         onClose();
         router.replace('/login');
     }
@@ -190,8 +260,6 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
         }
     };
 
-    const isAdmin = user?.role === 'admin';
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
             <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl h-[85vh] flex overflow-hidden shadow-2xl animate-scale-up relative">
@@ -288,17 +356,15 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                             <Download size={14} /> Downloads
                         </button>
                         
-                        {/* Exchange Rate (Admin only) */}
-                        {isAdmin && (
-                            <button
-                                onClick={() => setActiveTab('exchange')}
-                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${activeTab === 'exchange' 
-                                    ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
-                                    : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
-                            >
-                                <ArrowRightLeft size={14} /> Exchange Rate
-                            </button>
-                        )}
+                        {/* Exchange Rate — editable for admin, read-only for all other roles */}
+                        <button
+                            onClick={() => setActiveTab('exchange')}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${activeTab === 'exchange'
+                                ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
+                                : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
+                        >
+                            <ArrowRightLeft size={14} /> Exchange Rate
+                        </button>
                         
                         {/* Business Settings Category (Admin only) */}
                         {isAdmin && (
@@ -331,8 +397,8 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                     <Image size={14} /> Logo & Branding
                                 </button>
 
-                                {/* Operational Settings (Only show if Coffee Shop) */}
-                                {restaurant?.business_type === 'Coffee Shop' && (
+                                {/* Operational Settings (available for all business types) */}
+                                {(
                                     <button
                                         onClick={() => setActiveTab('biz_operational')}
                                         className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_operational' 
@@ -357,10 +423,10 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
 
                     {/* Unified Logout at the bottom */}
                     <button
-                        onClick={handleLogout}
+                        onClick={() => setIsLogoutOpen(true)}
                         className="mt-auto flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 border border-transparent active:scale-95 transition-all text-left"
                     >
-                        <LogOut size={14} /> Log Out
+                        <LogOut size={14} /> {t('logout')}
                     </button>
                 </div>
 
@@ -396,7 +462,9 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                 {/* Current version */}
                                 <div className="border-b border-[var(--border)] pb-4 space-y-1">
                                     <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Current Version</label>
-                                    <p className="text-xs font-bold text-[var(--foreground)]">DineOS Professional v1.0.10 (Offline-First Edition)</p>
+                                    <p className="text-xs font-bold text-[var(--foreground)]">
+                                        DineOS Professional {appVersion ? `v${appVersion}` : ''}
+                                    </p>
                                 </div>
 
                                 {/* ID / Username */}
@@ -505,6 +573,49 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                         <Check size={14} /> Profile details updated successfully!
                                     </div>
                                 )}
+
+                                {/* Change Password */}
+                                <div className="space-y-3 pt-2">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">
+                                        {t('changePassword')}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        placeholder={t('currentPassword') ?? 'Current Password'}
+                                        value={currentPwd}
+                                        onChange={e => setCurrentPwd(e.target.value)}
+                                        className="w-full max-w-sm px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
+                                    />
+                                    <input
+                                        type="password"
+                                        placeholder={t('newPassword') ?? 'New Password'}
+                                        value={newPwd}
+                                        onChange={e => setNewPwd(e.target.value)}
+                                        className="w-full max-w-sm px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
+                                    />
+                                    <input
+                                        type="password"
+                                        placeholder={t('confirmNewPassword') ?? 'Confirm New Password'}
+                                        value={confirmPwd}
+                                        onChange={e => setConfirmPwd(e.target.value)}
+                                        className="w-full max-w-sm px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
+                                    />
+                                    {pwdError && (
+                                        <p className="text-xs text-red-400 font-bold">{pwdError}</p>
+                                    )}
+                                    {pwdSuccess && (
+                                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2 animate-fade-in">
+                                            <Check size={14} /> {t('passwordUpdated')}
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleChangePassword}
+                                        disabled={savingPwd || !currentPwd || !newPwd || !confirmPwd}
+                                        className="px-4 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+                                    >
+                                        {savingPwd ? '...' : (t('savePassword') ?? 'Save Password')}
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -538,13 +649,60 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                         ]}
                                     />
                                 </div>
+
+                                {/* Auto-logout — admin only; cashiers inherit this value */}
+                                {isAdmin && (
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">{t('sessionTimeout')}</label>
+                                        <CustomSelect
+                                            value={String(sessionTimeoutMs)}
+                                            onChange={(val) => {
+                                                const ms = parseInt(val, 10) || 0;
+                                                setSessionTimeoutMs(ms);
+                                                localStorage.setItem(SESSION_TIMEOUT_KEY, String(ms));
+                                                window.dispatchEvent(new Event('session-timeout-changed'));
+                                            }}
+                                            options={[
+                                                { label: t('never'), value: '0' },
+                                                { label: '30 minutes', value: String(30 * 60 * 1000) },
+                                                { label: '1 hour', value: String(60 * 60 * 1000) },
+                                                { label: '4 hours', value: String(4 * 60 * 60 * 1000) },
+                                                { label: '8 hours', value: String(8 * 60 * 60 * 1000) },
+                                            ]}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {/* ── EXCHANGE RATE SETTINGS TAB (Admin Only) ── */}
+                        {/* ── EXCHANGE RATE SETTINGS TAB ── */}
                         {activeTab === 'exchange' && isAdmin && (
                             <div className="h-full pr-1">
                                 <ExchangeRateManagement />
+                            </div>
+                        )}
+                        {activeTab === 'exchange' && !isAdmin && (
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">
+                                    {t('currentRate')}
+                                </p>
+                                {readonlyRate ? (
+                                    <>
+                                        <div className="p-4 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl space-y-1">
+                                            <p className="text-sm font-black text-[var(--foreground)]">
+                                                1 USD = {readonlyRate.rate.toLocaleString()} ៛
+                                            </p>
+                                            <p className="text-[10px] text-white/40 font-mono">
+                                                ≈ {formatKhr(readonlyRate.rate)}
+                                            </p>
+                                        </div>
+                                        <p className="text-[10px] text-[var(--text-secondary)] opacity-60">
+                                            {t('lastUpdated') ?? 'Last updated'}: {new Date(readonlyRate.effective_from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <div className="w-5 h-5 border-2 border-white/20 border-t-[var(--accent-blue)] rounded-full animate-spin" />
+                                )}
                             </div>
                         )}
 
@@ -582,6 +740,39 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                     </div>
                 </div>
             </div>
+
+            {/* Logout confirmation dialog */}
+            {isLogoutOpen && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-2xl">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-80 p-6 mx-4">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cartHasItems ? 'bg-red-500/10' : 'bg-[var(--bg-elevated)]'}`}>
+                                <LogOut size={16} className={cartHasItems ? 'text-red-400' : 'text-[var(--text-secondary)]'} />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black text-[var(--foreground)]">{t('logoutConfirmTitle')}</h3>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                                    {cartHasItems ? t('logoutActiveOrderWarning') : t('logoutConfirmDesc')}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setIsLogoutOpen(false)}
+                                className="flex-1 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-colors"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmLogout}
+                                className={`flex-1 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-95 ${cartHasItems ? 'bg-red-500 hover:bg-red-600' : 'bg-[var(--accent)] hover:brightness-110'}`}
+                            >
+                                {t('logout')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

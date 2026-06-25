@@ -31,7 +31,38 @@ export function canAccessAnalyticsDashboard(role: string | null | undefined): bo
 
 export function roleLabel(role: string | null | undefined): string {
     const normalized = normalizeRole(role);
-    if (normalized === 'super_admin') return 'super_admin';
-    if (normalized === 'business_admin') return 'business_admin';
-    return normalized;
+    if (normalized === 'super_admin') return 'Super Admin';
+    if (normalized === 'admin') return 'Admin';
+    if (normalized === 'business_admin') return 'Manager';
+    if (normalized === 'cashier') return 'Cashier';
+    return 'Staff';
+}
+
+export function canApplyDiscount(role: string | null | undefined): boolean {
+    const normalized = normalizeRole(role);
+    return normalized === 'super_admin' || normalized === 'admin' || normalized === 'business_admin';
+}
+
+export function canVoidOrder(role: string | null | undefined): boolean {
+    const normalized = normalizeRole(role);
+    return normalized === 'super_admin' || normalized === 'admin' || normalized === 'business_admin';
+}
+
+export function canCloseShiftReport(role: string | null | undefined): boolean {
+    const normalized = normalizeRole(role);
+    return normalized === 'super_admin' || normalized === 'admin' || normalized === 'business_admin';
+}
+
+export function canEditPrice(role: string | null | undefined): boolean {
+    const normalized = normalizeRole(role);
+    return normalized === 'super_admin' || normalized === 'admin';
+}
+
+export function roleI18nKey(role: string | null | undefined): string {
+    const normalized = normalizeRole(role);
+    if (normalized === 'super_admin') return 'roleSuperAdmin';
+    if (normalized === 'admin') return 'roleAdmin';
+    if (normalized === 'business_admin') return 'roleManager';
+    if (normalized === 'cashier') return 'roleCashier';
+    return 'roleStaff';
 }

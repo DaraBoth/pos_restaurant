@@ -9,24 +9,22 @@ export default function OfflineIndicator() {
     const { t } = useLanguage();
 
     useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-
         async function checkStatus() {
             try {
                 const status = await getDbStatus();
                 setIsLocal(status.mode === 'local');
-            } catch (e) {
+            } catch {
                 setIsLocal(true); // defaults to local fallback
             }
         }
 
         checkStatus();
-        interval = setInterval(checkStatus, 30000);
+        const interval = setInterval(checkStatus, 30000);
         return () => clearInterval(interval);
     }, []);
 
     return (
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${isLocal ? 'status-local' : 'status-offline'}`}>
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${isLocal ? 'status-local' : 'status-synced'}`}>
             {isLocal ? <Database size={14} /> : <Cloud size={14} />}
             <span>{isLocal ? t('localMode') : t('syncedMode')}</span>
         </div>

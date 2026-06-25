@@ -60,6 +60,8 @@ pub struct DailyReportPreview {
     pub inventory_usage: Vec<InventoryUsageRow>,
     pub is_closed: bool,
     pub existing_report_id: Option<String>,
+    pub cash_usd_cents: i64,
+    pub cash_khr_riels: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,7 +130,7 @@ async fn get_daily_sales_summary(
              FROM orders
              WHERE restaurant_id = ?
                AND is_deleted = 0
-               AND date(created_at) = date(?)",
+               AND date(created_at,'localtime') = date(?)",
             params![restaurant_id.to_string(), report_date.to_string()],
         )
         .await
@@ -173,7 +175,7 @@ async fn get_inventory_usage_summary(
              WHERE o.restaurant_id = ?
                AND o.is_deleted = 0
                AND o.status = 'completed'
-               AND date(o.created_at) = date(?)
+               AND date(o.created_at,'localtime') = date(?)
                AND COALESCE(ii.is_deleted, 0) = 0
              GROUP BY ii.id, ii.name, ii.unit_label, ii.cost_per_unit
              HAVING used_quantity > 0
@@ -257,6 +259,26 @@ pub async fn get_daily_report_preview(
     let (inventory_total_usage_qty, inventory_total_cost_usd, inventory_usage) =
         get_inventory_usage_summary(&pool, &restaurant_id, &report_date).await?;
 
+    let (cash_usd_cents, cash_khr_riels) = {
+        let mut cash_rows = pool.query(
+            "SELECT
+                COALESCE(SUM(CASE WHEN p.currency = 'USD' AND p.method = 'cash' THEN p.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN p.currency = 'KHR' AND p.method = 'cash' THEN p.amount ELSE 0 END), 0)
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE o.restaurant_id = ?
+               AND o.is_deleted = 0
+               AND o.status = 'completed'
+               AND date(o.created_at,'localtime') = date(?)",
+            params![restaurant_id.clone(), report_date.clone()],
+        ).await.unwrap_or_else(|_| unreachable!());
+        if let Ok(Some(row)) = cash_rows.next().await {
+            (row.get::<i64>(0).unwrap_or(0), row.get::<i64>(1).unwrap_or(0))
+        } else {
+            (0, 0)
+        }
+    };
+
     let mut existing_rows = pool
         .query(
             "SELECT id, total_expenses_usd, net_profit_usd, status
@@ -284,6 +306,8 @@ pub async fn get_daily_report_preview(
             inventory_usage,
             is_closed: status == "closed",
             existing_report_id: row.get::<String>(0).ok(),
+            cash_usd_cents,
+            cash_khr_riels,
         })
     } else {
         Ok(DailyReportPreview {
@@ -300,6 +324,8 @@ pub async fn get_daily_report_preview(
             inventory_usage,
             is_closed: false,
             existing_report_id: None,
+            cash_usd_cents,
+            cash_khr_riels,
         })
     }
 }

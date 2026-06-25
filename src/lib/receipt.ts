@@ -12,8 +12,11 @@ export interface ReceiptPrintPayload {
     receivedCents?: number;
     changeCents?: number;
     changeKhr?: number;
+    receivedKhr?: number;
     discountPct?: number;
     discountCents?: number;
+    // USD→KHR rate captured at checkout; shown on reprints so KHR is verifiable/stable.
+    exchangeRateUsed?: number;
     items: OrderItem[];
     payments: PaymentInput[];
     totals: {
@@ -23,6 +26,7 @@ export interface ReceiptPrintPayload {
         totalUsdCents: number;
         totalKhr: number;
     };
+    isCopy?: boolean;
 }
 
 function escapeHtml(value: string) {
@@ -137,6 +141,10 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     <tr>
       <td colspan="2"><span class="lbl">Time:</span> <span class="val">${escapeHtml(timeStr)}</span></td>
     </tr>`}
+    ${payload.customerName ? `
+    <tr>
+      <td colspan="2"><span class="lbl">Customer:</span> <span class="val">${escapeHtml(payload.customerName)}</span></td>
+    </tr>` : ''}
   </table>
 
   <div class="d-double"></div>
@@ -188,16 +196,25 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
         <td class="grand-khr">Total (KHR)</td>
         <td class="right grand-khr">${formatKhr(payload.totals.totalKhr)}</td>
       </tr>
+      ${payload.exchangeRateUsed && payload.exchangeRateUsed > 0 ? `
+      <tr>
+        <td style="font-size:${isSmall ? '8px' : '9.5px'};opacity:0.6;">Rate used</td>
+        <td class="right" style="font-size:${isSmall ? '8px' : '9.5px'};opacity:0.6;font-family:monospace;">1 USD = ${payload.exchangeRateUsed.toLocaleString()} ៛</td>
+      </tr>` : ''}
     </table>
   </div>
 
   <div class="footer">
     ${payload.cashierName ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;margin-bottom:3px;">Cashier: ${escapeHtml(payload.cashierName)}</div>` : ''}
     ${(payload.receivedCents ?? 0) > 0 ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;">Paid: ${escapeHtml(formatUsd(payload.receivedCents!))}</div>` : ''}
+    ${(payload.receivedKhr ?? 0) > 0 ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;">Paid: ${escapeHtml(formatKhr(payload.receivedKhr!))}</div>` : ''}
     ${(payload.changeCents ?? 0) > 0 ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;">Change: ${escapeHtml(formatUsd(payload.changeCents!))}${payload.changeKhr ? ` / ${escapeHtml(formatKhr(payload.changeKhr))}` : ''}</div>` : ''}
-    <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you')}</div>
+    ${(payload.changeKhr ?? 0) > 0 && !((payload.changeCents ?? 0) > 0) ? `<div style="font-size:${isSmall ? '9px' : '10px'};opacity:0.7;">Change: ${escapeHtml(formatKhr(payload.changeKhr!))}</div>` : ''}
+    <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you! / អរគុណ!')}</div>
+    ${payload.restaurant.receipt_footer_khmer ? `<div class="msg" style="font-size:${isSmall ? '12px' : '14px'};margin-top:2px;">${escapeHtml(payload.restaurant.receipt_footer_khmer)}</div>` : ''}
     <div class="brand">DineOS</div>
   </div>
+  ${payload.isCopy ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:${isSmall ? '36px' : '48px'};font-weight:900;color:rgba(0,0,0,0.13);pointer-events:none;white-space:nowrap;z-index:9999;user-select:none;letter-spacing:0.05em;">COPY / ចំលង</div>` : ''}
 </body>
 </html>`;
 }

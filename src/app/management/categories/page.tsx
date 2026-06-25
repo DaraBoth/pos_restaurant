@@ -14,6 +14,7 @@ export default function CategoriesManagement() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -33,13 +34,19 @@ export default function CategoriesManagement() {
             alert('Permission denied: delete is only available to Admin roles.');
             return;
         }
-        if (!confirm('Are you sure you want to delete this category? All products in this category will become unassigned.')) return;
+        setDeletePendingId(id);
+    }
+
+    async function confirmDelete() {
+        if (!deletePendingId || !user?.id) return;
+        const id = deletePendingId;
+        setDeletePendingId(null);
         try {
             await deleteCategory(id, user?.restaurant_id || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
-            alert('Failed to delete category');
+            alert(t('error'));
         }
     }
 
@@ -173,6 +180,33 @@ export default function CategoriesManagement() {
                 category={editingCategory}
                 allCategories={categories}
             />
+
+            {deletePendingId && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
+                    <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
+                        <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">
+                            {t('deleteCategory')}
+                        </h3>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                            {t('deleteCannotUndo')}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDeletePendingId(null)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 transition-all"
+                            >
+                                {t('delete')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

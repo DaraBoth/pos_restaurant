@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getOrders, getOrderItems, deleteOrderHistory } from '@/lib/api/orders';
 import { getRestaurant } from '@/lib/api/restaurant';
+import { getExchangeRate } from '@/lib/api/system';
 import { closeDailyReport, getDailyReportDetail, getDailyReportPreview, getDailyReports } from '@/lib/api/reports';
 import { DailyReport, DailyReportDetail, DailyReportExpenseInput, DailyReportPreview, Order, OrderItem, Restaurant } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
@@ -21,10 +22,10 @@ import { format } from 'date-fns';
 import { printDailyClosingReport, printSalesSummary } from '@/lib/reports';
 import { getTopProductsInRange } from '@/lib/api/analytics';
 import { getImageSrc } from '@/lib/image';
-import { canDelete } from '@/lib/permissions';
+import { canDelete, canCloseShiftReport } from '@/lib/permissions';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 
-type StatusFilter = 'all' | 'open' | 'completed' | 'hold';
+type StatusFilter = 'all' | 'open' | 'completed' | 'hold' | 'void';
 type PageTab = 'orders' | 'reports' | 'report-history';
 type ReportFilter = 'all' | 'closed';
 const ORDER_HISTORY_VIEW_MODE_KEY = 'dineos.history.viewMode';
@@ -76,6 +77,7 @@ const STATUS_TABS: { id: StatusFilter; labelKey: any }[] = [
     { id: 'open', labelKey: 'open' },
     { id: 'completed', labelKey: 'completed' },
     { id: 'hold', labelKey: 'hold' },
+    { id: 'void', labelKey: 'voidedFilter' },
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
@@ -113,6 +115,11 @@ export default function HistoryPage() {
     const [reportNotes, setReportNotes] = useState('');
     const [closedReports, setClosedReports] = useState<DailyReport[]>([]);
     const [closingReport, setClosingReport] = useState(false);
+    const [showCloseReportConfirm, setShowCloseReportConfirm] = useState(false);
+    const [exportToast, setExportToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const exportToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [actualCountedCashUsd, setActualCountedCashUsd] = useState('');
+    const [exchangeRateForReport, setExchangeRateForReport] = useState(4100);
     const [adjustments, setAdjustments] = useState<CashAdjustmentRow[]>([
         { id: 'adj-1', date: format(new Date(), 'yyyy-MM-dd'), category: 'Inventory', description: '', price: '' },
     ]);
@@ -156,6 +163,12 @@ export default function HistoryPage() {
         });
     }
 
+    function showExportToast(msg: string, ok: boolean) {
+        if (exportToastTimer.current) clearTimeout(exportToastTimer.current);
+        setExportToast({ msg, ok });
+        exportToastTimer.current = setTimeout(() => setExportToast(null), 3000);
+    }
+
     const normalizedAdjustments = useMemo(() => {
         return adjustments
             .map(row => {
@@ -187,6 +200,12 @@ export default function HistoryPage() {
         try {
             const data = await getRestaurant(restaurantId || undefined);
             setRestaurant(data);
+        } catch (e) {
+            console.error(e);
+        }
+        try {
+            const rateData = await getExchangeRate(restaurantId || undefined);
+            if (rateData?.rate) setExchangeRateForReport(rateData.rate);
         } catch (e) {
             console.error(e);
         }
@@ -304,9 +323,10 @@ export default function HistoryPage() {
             if (new Date(o.created_at) < new Date(g.created_at)) {
                 g.created_at = o.created_at;
             }
-            // Upgrade group status priority: open > hold > completed
+            // Upgrade group status priority: open > hold > completed > void
             if (o.status === 'open') g.status = 'open' as any;
             else if (['hold', 'pending_payment'].includes(o.status) && g.status !== 'open') g.status = 'hold' as any;
+            else if (o.status === 'completed' && g.status === 'void') g.status = 'completed';
         }
         return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }, [orders]);
@@ -400,14 +420,15 @@ export default function HistoryPage() {
 
             // Map data
             const exportData = filtered.map(g => {
-                const isoDate = g.created_at.replace(' ', 'T') + 'Z';
+                const d = new Date(g.created_at.replace(' ', 'T') + 'Z');
                 return {
-                    'ID': g.id.split('-')[0].toUpperCase(),
-                    'Date': new Date(isoDate).toLocaleDateString(),
+                    'Order #': g.id.split('-')[0].toUpperCase(),
+                    'Date': d.toLocaleDateString(),
+                    'Time': d.toLocaleTimeString(),
                     'Table': g.table_id || 'Takeout',
+                    'Total USD': (g.total_usd / 100).toFixed(2),
+                    'Total KHR': g.total_khr.toLocaleString(),
                     'Status': g.status.toUpperCase(),
-                    'USD': (g.total_usd / 100).toFixed(2),
-                    'KHR': g.total_khr.toLocaleString(),
                 };
             });
 
@@ -421,7 +442,7 @@ export default function HistoryPage() {
 
             // Convert to regular array for IPC transfer
             const content = Array.from(new Uint8Array(excelBuffer));
-            const filename = `Report_${startDate}_to_${endDate}.xlsx`;
+            const filename = `dineos-orders-${startDate}_to_${endDate}.xlsx`;
 
             // Invoke native Rust bridge to save file
             const savedPath = await call<string>('save_excel_file', { content, filename });
@@ -431,11 +452,11 @@ export default function HistoryPage() {
                 return;
             }
 
-            window.alert('Success! Report saved to:\n' + savedPath);
+            showExportToast(t('exportSuccessMsg'), true);
             console.log('Report saved to:', savedPath);
         } catch (error: any) {
             console.error('Export critical failure:', error);
-            window.alert('Export Failed: ' + error.message);
+            showExportToast(t('exportFailedMsg'), false);
         }
     };
 
@@ -549,23 +570,25 @@ export default function HistoryPage() {
             const savedPath = await call<string>('save_excel_file', { content, filename });
 
             if (savedPath === 'CANCELLED') return;
-            window.alert('Success! Report saved to:\n' + savedPath);
+            showExportToast(t('exportSuccessMsg'), true);
         } catch (e: any) {
-            window.alert('Export failed: ' + (e?.message || e));
+            console.error('Export failed:', e);
+            showExportToast(t('exportFailedMsg'), false);
         }
     };
 
-    const handleCloseReport = async () => {
+    const handleCloseReport = () => {
         if (!restaurantId || !user?.id) return;
         if (dailyPreview?.is_closed) {
             window.alert('Today\'s report is already closed.');
             return;
         }
+        setShowCloseReportConfirm(true);
+    };
 
-        const confirmed = window.confirm(
-            'Are you sure you want to close today\'s report?\n\nAfter closing:\n- Report becomes read-only\n- Historical record is created\n- Report can be printed and exported'
-        );
-        if (!confirmed) return;
+    const confirmCloseReport = async () => {
+        if (!restaurantId || !user?.id) return;
+        setShowCloseReportConfirm(false);
 
         const expenses: DailyReportExpenseInput[] = normalizedAdjustments.map(row => ({
             date: row.date,
@@ -661,7 +684,11 @@ export default function HistoryPage() {
             inventory_usage: inventoryUsageRows,
         };
 
-        printDailyClosingReport(restaurant, previewDetail);
+        printDailyClosingReport(restaurant, previewDetail, {
+            expectedUsdCents: dailyPreview?.cash_usd_cents ?? 0,
+            expectedKhrRiels: dailyPreview?.cash_khr_riels ?? 0,
+            exchangeRate: exchangeRateForReport,
+        });
     };
 
     useEffect(() => {
@@ -740,7 +767,7 @@ export default function HistoryPage() {
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
                     >
                         <Download size={14} />
-                        {t('exportBtn')}
+                        {t('exportOrders')}
                     </button>
 
                     <button
@@ -759,6 +786,7 @@ export default function HistoryPage() {
                     { label: t('open'), value: String(allGroupedOrders.filter(g => g.status === 'open').length), accent: '#f97316' },
                     { label: t('completed'), value: String(completed.length), accent: '#22c55e' },
                     { label: 'HOLD', value: String(allGroupedOrders.filter(g => g.status === 'hold' || g.status === 'pending_payment').length), accent: '#eab308' },
+                    { label: 'VOID', value: String(allGroupedOrders.filter(g => g.status === 'void').length), accent: '#ef4444' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
@@ -776,7 +804,7 @@ export default function HistoryPage() {
                         : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
                         }`}
                 >
-                    Order History
+                    {t('orderHistory')}
                 </button>
                 <button
                     type="button"
@@ -786,7 +814,7 @@ export default function HistoryPage() {
                         : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
                         }`}
                 >
-                    Close Daily Report
+                    {t('closeDailyReportTab')}
                 </button>
                 <button
                     type="button"
@@ -796,7 +824,7 @@ export default function HistoryPage() {
                         : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
                         }`}
                 >
-                    Report History
+                    {t('reportHistoryTab')}
                 </button>
             </div>
 
@@ -805,7 +833,7 @@ export default function HistoryPage() {
                 <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div>
-                            <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">Daily Sales Closing</h2>
+                            <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">{t('dailySalesClosing')}</h2>
                             <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
                                 Review today's sales, record expenses, and close the daily report.
                             </p>
@@ -816,7 +844,7 @@ export default function HistoryPage() {
                     </div>
 
                     <div className="space-y-3">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Today's Sales Summary</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('todaysSalesSummary')}</h3>
                         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                             <table className="w-full min-w-[640px]">
                                 <thead className="bg-[var(--bg-elevated)]">
@@ -827,22 +855,22 @@ export default function HistoryPage() {
                                 </thead>
                                 <tbody>
                                     <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Report Date</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('reportDateLabel')}</td>
                                         <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{dailyPreview?.report_date || endDate}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Paid Orders</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('paidOrdersLabel')}</td>
                                         <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{dailyPreview?.paid_orders ?? 0}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Total Sales</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('totalSalesLabel')}</td>
                                         <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.total_sales_usd ?? 0)}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)] align-top">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Paid Receipts</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('paidReceiptsLabel')}</td>
                                         <td className="px-3 py-2">
                                             {allGroupedOrders.length === 0 ? (
-                                                <span className="text-xs font-bold text-[var(--text-secondary)] opacity-70">No paid receipts for selected date.</span>
+                                                <span className="text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('noPaidReceipts')}</span>
                                             ) : (
                                                 <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
                                                     <table className="w-full min-w-[420px]">
@@ -877,6 +905,61 @@ export default function HistoryPage() {
                                             )}
                                         </td>
                                     </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Drawer Reconciliation */}
+                    <div className="space-y-3">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('drawerReconciliation')}</h3>
+                        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                            <table className="w-full min-w-[480px]">
+                                <tbody>
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('expectedCashUsd')}</td>
+                                        <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.cash_usd_cents ?? 0)}</td>
+                                    </tr>
+                                    {(dailyPreview?.cash_khr_riels ?? 0) > 0 && (
+                                        <tr className="border-t border-[var(--border)]">
+                                            <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('expectedCashKhr')}</td>
+                                            <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatKhr(dailyPreview?.cash_khr_riels ?? 0)}</td>
+                                        </tr>
+                                    )}
+                                    <tr className="border-t border-[var(--border)]">
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('actualCounted')}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="relative max-w-[160px]">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--text-secondary)]/50">$</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={actualCountedCashUsd}
+                                                    onChange={e => setActualCountedCashUsd(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg pl-6 pr-3 py-1.5 text-xs font-mono font-black text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all"
+                                                />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {actualCountedCashUsd !== '' && (
+                                        <tr className="border-t border-[var(--border)]">
+                                            <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('cashVariance')}</td>
+                                            <td className="px-3 py-2">
+                                                {(() => {
+                                                    const counted = Math.round(parseFloat(actualCountedCashUsd || '0') * 100);
+                                                    const expected = dailyPreview?.cash_usd_cents ?? 0;
+                                                    const variance = counted - expected;
+                                                    return (
+                                                        <span className={`text-xs font-mono font-black ${variance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                            {variance >= 0 ? '+' : ''}{formatUsd(Math.abs(variance))} {variance > 0 ? `(${t('cashVarianceOver')})` : variance < 0 ? `(${t('cashVarianceShort')})` : ''}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -1063,7 +1146,7 @@ export default function HistoryPage() {
                                 disabled={!!dailyPreview?.is_closed}
                                 className="px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 font-black text-xs uppercase tracking-widest"
                             >
-                                Save Draft
+                                {t('saveDraft')}
                             </button>
                             <button
                                 type="button"
@@ -1071,16 +1154,18 @@ export default function HistoryPage() {
                                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all font-black text-xs uppercase tracking-widest"
                             >
                                 <Printer size={14} />
-                                Print Preview
+                                {t('printPreviewBtn')}
                             </button>
-                            <button
-                                onClick={handleCloseReport}
-                                disabled={closingReport || loading || !allGroupedOrders?.length || !!dailyPreview?.is_closed}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-black hover:brightness-110 transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
-                            >
-                                <Printer size={14} />
-                                {closingReport ? 'Closing...' : 'Close Report'}
-                            </button>
+                            {canCloseShiftReport(user?.role) && (
+                                <button
+                                    onClick={handleCloseReport}
+                                    disabled={closingReport || loading || !allGroupedOrders?.length || !!dailyPreview?.is_closed}
+                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-black hover:brightness-110 transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
+                                >
+                                    <Printer size={14} />
+                                    {closingReport ? t('closingLabel') : t('closeReportBtn')}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1091,7 +1176,7 @@ export default function HistoryPage() {
             <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">Report History</h2>
+                        <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">{t('reportHistoryTitle')}</h2>
                         <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
                             Closed reports for the selected date range.
                         </p>
@@ -1237,7 +1322,7 @@ export default function HistoryPage() {
                                 <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border)]">
                                     <tr>
                                         <th className="px-4 py-2.5 w-12"></th>
-                                        {[t('receiptId'), t('timestamp'), t('tableLabel'), t('orderStatus'), t('totalUsd'), t('totalKhr')].map(h => (
+                                        {[t('receiptId'), t('timestamp'), t('tableLabel'), t('orderStatus'), t('totalLabel')].map(h => (
                                             <th
                                                 key={h}
                                                 className="px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60"
@@ -1250,13 +1335,13 @@ export default function HistoryPage() {
                                 <tbody className="divide-y divide-[var(--border)]">
                                     {loading && filtered.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-16 text-center">
+                                            <td colSpan={6} className="px-4 py-16 text-center">
                                                 <RefreshCw size={24} className="animate-spin mx-auto opacity-20" />
                                             </td>
                                         </tr>
                                     ) : filtered.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-16 text-center opacity-30 font-black uppercase tracking-[0.2em] text-xs">
+                                            <td colSpan={6} className="px-4 py-16 text-center opacity-30 font-black uppercase tracking-[0.2em] text-xs">
                                                 {t('noMatchingTransactions')}
                                             </td>
                                         </tr>
@@ -1303,29 +1388,27 @@ export default function HistoryPage() {
                                                                 className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
                                                                 style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                             >
-                                                                {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
+                                                                {g.status === 'void' ? 'VOID / មោឃៈ' : ['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: 'var(--accent)' }}>
-                                                            <div>
-                                                                {formatUsd(g.total_usd)}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2.5 font-mono text-xs opacity-60 font-black">
-                                                            <div>
-                                                                {formatKhr(g.total_khr)}
-                                                            </div>
+                                                            <div>{formatUsd(g.total_usd)}</div>
+                                                            {g.total_khr > 0 && (
+                                                                <div className="text-[10px] font-mono text-[var(--text-secondary)]/60 mt-0.5">
+                                                                    ≈ {formatKhr(g.total_khr)}
+                                                                </div>
+                                                            )}
                                                         </td>
                                                     </tr>
 
                                                     {isExpanded && (
                                                         <tr className="bg-[var(--bg-dark)] animate-fade-in border-l-2 border-[var(--accent)]">
-                                                            <td colSpan={7} className="px-5 py-4">
+                                                            <td colSpan={6} className="px-5 py-4">
                                                                 <div className="space-y-4">
                                                                     <div className="flex items-center justify-between">
                                                                         <div className="flex items-center gap-2">
                                                                             <ReceiptText size={14} className="text-[var(--accent)]" />
-                                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Master Table Receipt</h4>
+                                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">{t('masterTableReceipt')}</h4>
                                                                         </div>
                                                                         <div className="flex items-center gap-4">
                                                                             {user && canDelete(user.role) && (
@@ -1340,6 +1423,7 @@ export default function HistoryPage() {
                                                                                     {t('deleteHistory') || 'Delete Group'}
                                                                                 </button>
                                                                             )}
+                                                                            {g.status !== 'void' && (
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
@@ -1359,17 +1443,44 @@ export default function HistoryPage() {
                                                                                                 pltCents: g.total_plt,
                                                                                                 totalUsdCents: g.total_usd,
                                                                                                 totalKhr: g.total_khr
-                                                                                            }
+                                                                                            },
+                                                                                            exchangeRateUsed: g.orders.find(o => o.exchange_rate_used != null)?.exchange_rate_used,
+                                                                                            isCopy: true,
                                                                                         });
                                                                                     }
                                                                                 }}
                                                                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
                                                                             >
                                                                                 <ReceiptText size={12} />
-                                                                                Print Master Receipt
+                                                                                {t('printMasterReceipt')}
                                                                             </button>
+                                                                            )}
                                                                         </div>
                                                                     </div>
+
+                                                                    {g.status === 'void' && (() => {
+                                                                        const voidInfo = g.orders.find(o => o.status === 'void' && (o.void_reason || o.voided_by_name || o.voided_at));
+                                                                        if (!voidInfo) return null;
+                                                                        return (
+                                                                            <div className="rounded-xl border border-red-600/30 bg-red-600/5 px-3 py-2.5 space-y-1">
+                                                                                {voidInfo.void_reason && (
+                                                                                    <div className="flex items-center gap-2 text-[11px]">
+                                                                                        <span className="font-black uppercase tracking-widest text-red-500 opacity-70">{t('voidReasonHistoryLabel')}:</span>
+                                                                                        <span className="font-bold text-[var(--foreground)]">{voidInfo.void_reason}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {voidInfo.voided_by_name && (
+                                                                                    <div className="flex items-center gap-2 text-[11px]">
+                                                                                        <span className="font-black uppercase tracking-widest text-red-500 opacity-70">{t('voidedBy')}:</span>
+                                                                                        <span className="font-bold text-[var(--foreground)]">{voidInfo.voided_by_name}</span>
+                                                                                        {voidInfo.voided_at && (
+                                                                                            <span className="font-mono text-[10px] opacity-50">{new Date(voidInfo.voided_at + 'Z').toLocaleString()}</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
 
                                                                     <div className="space-y-3">
                                                                         {g.orders.map((o, index) => (
@@ -1466,7 +1577,7 @@ export default function HistoryPage() {
                                                     className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
                                                     style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                 >
-                                                    {['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
+                                                    {g.status === 'void' ? 'VOID / មោឃៈ' : ['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as any)}
                                                 </span>
                                                 {g.table_id ? (
                                                     <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
@@ -1547,6 +1658,28 @@ export default function HistoryPage() {
                                             );
                                         })()}
 
+                                        {/* Void audit info */}
+                                        {g.status === 'void' && (() => {
+                                            const voidInfo = g.orders.find(o => o.status === 'void' && (o.void_reason || o.voided_by_name || o.voided_at));
+                                            if (!voidInfo) return null;
+                                            return (
+                                                <div className="mx-4 mb-2 px-3 py-2 rounded-xl border border-red-600/25 bg-red-600/5 space-y-1">
+                                                    {voidInfo.void_reason && (
+                                                        <p className="text-[10px] font-bold text-[var(--foreground)]">
+                                                            <span className="font-black text-red-500 uppercase tracking-widest opacity-70">{t('voidReasonHistoryLabel')}: </span>
+                                                            {voidInfo.void_reason}
+                                                        </p>
+                                                    )}
+                                                    {voidInfo.voided_by_name && (
+                                                        <p className="text-[10px] font-bold text-[var(--foreground)]">
+                                                            <span className="font-black text-red-500 uppercase tracking-widest opacity-70">{t('voidedBy')}: </span>
+                                                            {voidInfo.voided_by_name}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+
                                         {/* Totals */}
                                         <div className="px-4 pt-2.5 pb-3 border-t border-dashed border-[var(--border)] space-y-1">
                                             <div className="flex items-center justify-between">
@@ -1598,11 +1731,13 @@ export default function HistoryPage() {
                                                                 pltCents: 0,
                                                                 totalUsdCents: g.total_usd,
                                                                 totalKhr: g.total_khr
-                                                            }
+                                                            },
+                                                            exchangeRateUsed: g.orders.find(o => o.exchange_rate_used != null)?.exchange_rate_used,
+                                                            isCopy: true,
                                                         });
                                                     }
                                                 }}
-                                                disabled={!isLoaded || !restaurant}
+                                                disabled={!isLoaded || !restaurant || g.status === 'void'}
                                                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed h-9"
                                             >
                                                 <Printer size={11} strokeWidth={2.5} />
@@ -1615,6 +1750,41 @@ export default function HistoryPage() {
                         </div>
                     ))}
             </div>
+            )}
+
+            {/* Close Daily Report confirmation modal */}
+            {showCloseReportConfirm && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
+                    <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
+                        <h3 className="text-sm font-black text-[var(--accent)] uppercase tracking-widest">
+                            Close Daily Report / បិទរបាយការណ៍ប្រចាំថ្ងៃ
+                        </h3>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                            {t('closeReportConfirmMsg')}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowCloseReportConfirm(false)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmCloseReport}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-[var(--accent)] text-black hover:brightness-110 transition-all"
+                            >
+                                {t('confirm')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {exportToast && (
+                <div className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm font-bold pointer-events-none transition-all ${exportToast.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+                    <span className="text-base">{exportToast.ok ? '✓' : '✕'}</span>
+                    <span>{exportToast.msg}</span>
+                </div>
             )}
         </div>
     );

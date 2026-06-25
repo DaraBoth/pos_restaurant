@@ -26,7 +26,11 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     // Core Product State
     const [name, setName] = useState('');
     const [khmerName, setKhmerName] = useState('');
+    const [description, setDescription] = useState('');
+    const [khmerDescription, setKhmerDescription] = useState('');
+    const [sku, setSku] = useState('');
     const [priceUsd, setPriceUsd] = useState('0.00');
+    const [costPriceUsd, setCostPriceUsd] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [isAvailable, setIsAvailable] = useState(true);
     const [imagePath, setImagePath] = useState('');
@@ -42,7 +46,11 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         if (product) {
             setName(product.name);
             setKhmerName(product.khmer_name || '');
+            setDescription(product.description || '');
+            setKhmerDescription(product.khmer_description || '');
+            setSku(product.sku || '');
             setPriceUsd((product.price_cents / 100).toFixed(2));
+            setCostPriceUsd(product.cost_price_cents != null ? (product.cost_price_cents / 100).toFixed(2) : '');
             setCategoryId(product.category_id || '');
             setIsAvailable(product.is_available === 1);
             setImagePath(product.image_path || '');
@@ -53,7 +61,11 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         } else {
             setName('');
             setKhmerName('');
+            setDescription('');
+            setKhmerDescription('');
+            setSku('');
             setPriceUsd('0.00');
+            setCostPriceUsd('');
             setCategoryId(categories[0]?.id || '');
             setIsAvailable(true);
             setImagePath('');
@@ -100,6 +112,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         const priceCents = Math.round(parseFloat(priceUsd || '0') * 100);
+        const trimmedCost = costPriceUsd.trim();
+        const costPriceCents = trimmedCost === '' ? undefined : Math.round(parseFloat(trimmedCost || '0') * 100);
         setLoading(true);
         try {
             if (product) {
@@ -107,13 +121,18 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     product.id, name, khmerName, priceCents,
                     categoryId, isAvailable, imagePath || undefined,
                     ingredients,
-                    restaurantId || ''
+                    restaurantId || '', sku || undefined,
+                    !!product.sold_out_today,
+                    description || undefined, khmerDescription || undefined,
+                    costPriceCents
                 );
             } else {
                 await createProduct(
-                    categoryId, name, khmerName, priceCents, imagePath, 
+                    categoryId, name, khmerName, priceCents, imagePath,
                     ingredients,
-                    restaurantId || undefined
+                    restaurantId || undefined, sku || undefined,
+                    description || undefined, khmerDescription || undefined,
+                    costPriceCents
                 );
             }
             onSave();
@@ -224,8 +243,49 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     />
                 </div>
 
-                {/* Price + Inventory */}
-                <div className="grid grid-cols-1 gap-3">
+                {/* Description (EN) */}
+                <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                        {t('description')} (EN)
+                    </label>
+                    <textarea
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. Contains peanuts. Spicy."
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all resize-none"
+                    />
+                </div>
+
+                {/* Description (KH) */}
+                <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                        {t('khmerDescription')}
+                    </label>
+                    <textarea
+                        value={khmerDescription}
+                        onChange={e => setKhmerDescription(e.target.value)}
+                        rows={2}
+                        placeholder="មានសណ្តែកដី។ ហឹរ។"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm khmer placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all resize-none"
+                    />
+                </div>
+
+                {/* SKU / Product Code */}
+                <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                        {t('skuCode') ?? 'SKU / Code'}
+                    </label>
+                    <input
+                        value={sku}
+                        onChange={e => setSku(e.target.value)}
+                        placeholder="e.g. BV-001"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
+                    />
+                </div>
+
+                {/* Selling price + Cost price (cost is staff-facing only) */}
+                <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                         <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                             {t('price')}
@@ -244,7 +304,35 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                             />
                         </div>
                     </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                            {t('costPrice')}
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--text-secondary)]">$</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={costPriceUsd}
+                                onChange={e => setCostPriceUsd(e.target.value)}
+                                placeholder="—"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-7 pr-4 py-3 text-[var(--foreground)] font-mono font-bold focus:border-[var(--accent)] outline-none transition-all"
+                            />
+                        </div>
+                    </div>
                 </div>
+                {(() => {
+                    const sell = parseFloat(priceUsd || '0');
+                    const cost = parseFloat(costPriceUsd || '0');
+                    if (costPriceUsd.trim() === '' || !(sell > 0)) return null;
+                    const margin = Math.round(((sell - cost) / sell) * 100);
+                    return (
+                        <p className={`text-[11px] font-bold ${margin >= 0 ? 'text-[var(--accent-green)]' : 'text-red-400'}`}>
+                            {t('profitMargin')}: {margin}%
+                        </p>
+                    );
+                })()}
 
                 {/* Category */}
                 <div className="space-y-1.5">

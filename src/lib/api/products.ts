@@ -10,14 +10,20 @@ export const getProducts = (category_id?: string, restaurant_id?: string) =>
 export const createProduct = (
     category_id: string, name: string,
     khmer_name?: string, price_cents?: number,
-    image_path?: string, ingredients: IngredientInput[] = [], 
-    restaurant_id?: string
+    image_path?: string, ingredients: IngredientInput[] = [],
+    restaurant_id?: string, sku?: string,
+    description?: string, khmer_description?: string,
+    cost_price_cents?: number
 ) => call<string>('create_product', {
     categoryId: category_id, name, khmerName: khmer_name,
     priceCents: price_cents || 0,
     imagePath: image_path,
     ingredients,
-    restaurantId: restaurant_id
+    restaurantId: restaurant_id,
+    sku,
+    description,
+    khmerDescription: khmer_description,
+    costPriceCents: cost_price_cents ?? null,
 });
 
 export const updateProduct = (
@@ -25,14 +31,25 @@ export const updateProduct = (
     price_cents: number, category_id: string,
     is_available: boolean, image_path: string | undefined,
     ingredients: IngredientInput[],
-    restaurant_id: string
+    restaurant_id: string, sku?: string,
+    sold_out_today?: boolean,
+    description?: string, khmer_description?: string,
+    cost_price_cents?: number
 ) => call<void>('update_product', {
     id, name, khmerName: khmer_name, priceCents: price_cents,
     categoryId: category_id,
     isAvailable: is_available, imagePath: image_path,
     ingredients,
-    restaurantId: restaurant_id
+    restaurantId: restaurant_id,
+    sku,
+    soldOutToday: sold_out_today,
+    description,
+    khmerDescription: khmer_description,
+    costPriceCents: cost_price_cents ?? null,
 });
+
+export const setSoldOutToday = (id: string, soldOut: boolean, restaurantId: string) =>
+    call<void>('set_sold_out_today', { id, soldOut, restaurantId });
 
 
 

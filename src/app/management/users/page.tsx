@@ -4,7 +4,7 @@ import { getUsers, deleteUser } from '@/lib/api/auth';
 import { useAuth } from '@/providers/AuthProvider';
 import type { UserSession } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { canDelete, roleLabel } from '@/lib/permissions';
+import { canDelete, normalizeRole, roleI18nKey } from '@/lib/permissions';
 import { Users as UsersIcon, Plus, Search, Edit3, Trash2, Shield } from 'lucide-react';
 import UserModal from '@/components/management/UserModal';
 
@@ -126,12 +126,12 @@ export default function UsersManagement() {
 
                                     <td className="px-4 py-2.5">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border
-                                            ${roleLabel(u.role) === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
-                                            ${roleLabel(u.role) === 'business_admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
-                                            ${roleLabel(u.role) === 'cashier' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : ''}
+                                            ${normalizeRole(u.role) === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20' : ''}
+                                            ${normalizeRole(u.role) === 'business_admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
+                                            ${normalizeRole(u.role) === 'cashier' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : ''}
                                         `}>
                                             <Shield size={10} />
-                                            {roleLabel(u.role).replace('_', ' ')}
+                                            {t(roleI18nKey(u.role))}
                                         </span>
                                     </td>
 
@@ -147,7 +147,7 @@ export default function UsersManagement() {
                                             <button
                                                 onClick={() => { setEditingUser(u); setIsModalOpen(true); }}
                                                 className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-secondary)] transition-all"
-                                                title={t('editProduct')}
+                                                title={t('editUser')}
                                             >
                                                 <Edit3 size={13} />
                                             </button>

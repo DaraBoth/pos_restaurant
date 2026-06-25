@@ -4,26 +4,29 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon, Pencil, Hash, RefreshCw, X, AlertTriangle } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
+import { loginWithPin } from '@/lib/api/auth';
+import { getInventoryItems } from '@/lib/api/inventory';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import { UpdateStatus } from '@/components/ui/UpdateStatus';
-import { canAccessAdminConsole, roleLabel } from '@/lib/permissions';
+import { canAccessAdminConsole, roleI18nKey } from '@/lib/permissions';
 import Link from 'next/link';
 import MySettingsModal from '@/components/layout/MySettingsModal';
 import { useOrder } from '@/providers/OrderProvider';
 
 const NavItem = ({
-    label, icon: Icon, path, pathname, searchParams, collapsed, onClick
-}: { 
-    label: string; 
-    icon: React.ElementType; 
-    path: string; 
-    pathname: string; 
-    searchParams: string; 
+    label, icon: Icon, path, pathname, searchParams, collapsed, onClick, badge
+}: {
+    label: string;
+    icon: React.ElementType;
+    path: string;
+    pathname: string;
+    searchParams: string;
     collapsed: boolean;
     onClick?: () => void;
+    badge?: number;
 }) => {
     // Check if the current route matches the exact path (including query params if provided)
     const active = pathname.startsWith(path.split('?')[0]);
@@ -43,8 +46,20 @@ const NavItem = ({
             } ${collapsed ? 'justify-center px-0' : ''}`}
             title={label}
         >
-            <Icon size={16} strokeWidth={isExact ? 2.5 : 2} className={isExact ? 'text-[var(--accent-blue)]' : ''} />
-            {!collapsed && <span className="truncate">{label}</span>}
+            <span className="relative flex-shrink-0">
+                <Icon size={16} strokeWidth={isExact ? 2.5 : 2} className={isExact ? 'text-[var(--accent-blue)]' : ''} />
+                {collapsed && badge != null && badge > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                        {badge > 99 ? '99+' : badge}
+                    </span>
+                )}
+            </span>
+            {!collapsed && <span className="truncate flex-1">{label}</span>}
+            {!collapsed && badge != null && badge > 0 && (
+                <span className="flex-shrink-0 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1">
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
         </Link>
     );
 };
@@ -53,7 +68,8 @@ export default function SidebarNav() {
     const { t, lang, setLang } = useLanguage();
     const { user, setUser } = useAuth();
     const { theme, toggleTheme } = useTheme();
-    const { clearOrder } = useOrder();
+    const { clearOrder, exchangeRate } = useOrder();
+    const [lowStockCount, setLowStockCount] = useState(0);
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -62,6 +78,10 @@ export default function SidebarNav() {
     const [collapsed, setCollapsed] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
+    const [isSwitchOpen, setIsSwitchOpen] = useState(false);
+    const [switchPin, setSwitchPin] = useState('');
+    const [switchError, setSwitchError] = useState('');
+    const [switchLoading, setSwitchLoading] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -70,6 +90,13 @@ export default function SidebarNav() {
             setUserAvatar(null);
         }
     }, [user]);
+
+    useEffect(() => {
+        if (!user?.restaurant_id) return;
+        getInventoryItems(user.restaurant_id)
+            .then(items => setLowStockCount(items.filter(i => i.stock_qty <= i.min_stock_qty).length))
+            .catch(() => setLowStockCount(0));
+    }, [user?.restaurant_id]);
 
     useEffect(() => {
         function reloadBusiness() {
@@ -110,6 +137,23 @@ export default function SidebarNav() {
         stopSync().catch(() => {});
         setUser(null);
         router.replace('/login');
+    }
+
+    async function handleSwitchUser(e: React.FormEvent) {
+        e.preventDefault();
+        setSwitchError('');
+        setSwitchLoading(true);
+        try {
+            const restaurantId = user?.restaurant_id ?? '';
+            const session = await loginWithPin(restaurantId, switchPin);
+            setUser(session);
+            setIsSwitchOpen(false);
+            setSwitchPin('');
+        } catch {
+            setSwitchError(t('wrongPin'));
+        } finally {
+            setSwitchLoading(false);
+        }
     }
 
     const showTablesTab = restaurant 
@@ -154,7 +198,7 @@ export default function SidebarNav() {
                 
                 <div className="mt-auto flex flex-col gap-0.5 w-full">
                     {canAccessAdminConsole(user?.role) && (
-                        <NavItem label={t('management')} icon={Settings} path="/management" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
+                        <NavItem label={t('management')} icon={Settings} path="/management" pathname={pathname} searchParams={searchStr} collapsed={collapsed} badge={lowStockCount > 0 ? lowStockCount : undefined} />
                     )}
                 </div>
             </nav>
@@ -166,6 +210,36 @@ export default function SidebarNav() {
 
                 {/* Update status — only appears when update is available */}
                 {!collapsed && <UpdateStatus />}
+
+                {/* Exchange rate shortcut */}
+                {exchangeRate > 0 && (
+                    <Link
+                        href="/management/exchange-rate"
+                        className={`flex items-center gap-2 px-3 py-1.5 w-full rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all group ${collapsed ? 'justify-center' : ''}`}
+                        title={`1 USD = ${Math.round(exchangeRate).toLocaleString()} ៛`}
+                    >
+                        {!collapsed ? (
+                            <>
+                                <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] flex-1 truncate">
+                                    1 USD = {Math.round(exchangeRate).toLocaleString()} ៛
+                                </span>
+                                <Pencil size={10} className="text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 flex-shrink-0" />
+                            </>
+                        ) : (
+                            <span className="text-[9px] font-mono font-black text-[var(--text-secondary)]">₭</span>
+                        )}
+                    </Link>
+                )}
+
+                {/* Switch User button */}
+                <button
+                    onClick={() => { setIsSwitchOpen(true); setSwitchPin(''); setSwitchError(''); }}
+                    className={`flex items-center gap-2 px-3 py-1.5 w-full rounded-xl text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-transparent hover:bg-[var(--bg-elevated)] transition-all ${collapsed ? 'justify-center' : ''}`}
+                    title={t('switchUser')}
+                >
+                    <RefreshCw size={13} />
+                    {!collapsed && <span className="text-[11px] font-bold">{t('switchUser')}</span>}
+                </button>
 
                 {/* Unified profile settings button */}
                 <button
@@ -188,7 +262,7 @@ export default function SidebarNav() {
                                 {user?.full_name || user?.username}
                             </p>
                             <p className="text-[9px] font-black text-[var(--text-secondary)] opacity-60 uppercase tracking-widest leading-none mt-1.5">
-                                {roleLabel(user?.role)}
+                                {t(roleI18nKey(user?.role))}
                             </p>
                         </div>
                     )}
@@ -196,10 +270,57 @@ export default function SidebarNav() {
             </div>
 
             {/* Premium Settings Modal */}
-            <MySettingsModal 
-                isOpen={isSettingsOpen} 
-                onClose={() => setIsSettingsOpen(false)} 
+            <MySettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
             />
+
+            {/* Switch User PIN Modal */}
+            {isSwitchOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-72 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-black text-[var(--foreground)]">{t('switchUser')}</h3>
+                            <button onClick={() => setIsSwitchOpen(false)} className="text-[var(--text-secondary)] hover:text-[var(--foreground)]">
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSwitchUser} className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1 block">{t('pin')}</label>
+                                <div className="relative">
+                                    <Hash size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-50" />
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={6}
+                                        value={switchPin}
+                                        onChange={e => setSwitchPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                        autoFocus
+                                        required
+                                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-all font-mono tracking-[0.5em] text-center text-sm"
+                                        placeholder="• • • •"
+                                    />
+                                </div>
+                            </div>
+                            {switchError && (
+                                <div className="flex items-center gap-2 text-red-400 text-xs font-bold">
+                                    <AlertTriangle size={13} />
+                                    {switchError}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={switchLoading || switchPin.length < 4}
+                                className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white font-black text-sm shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {switchLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t('login')}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 }

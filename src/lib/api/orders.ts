@@ -38,11 +38,11 @@ export const addRound = (user_id: string, session_id: string, restaurant_id?: st
 export const checkoutSession = (session_id: string, payments: PaymentInput[], restaurantId: string, discount_cents = 0) =>
     call<void>('checkout_session', { sessionId: session_id, payments, restaurantId, discountCents: discount_cents });
 
-export const checkoutOrder = (order_id: string, payments: PaymentInput[], restaurantId: string, discount_cents = 0) =>
-    call<Order>('checkout_order', { orderId: order_id, payments, restaurantId, discountCents: discount_cents });
+export const checkoutOrder = (order_id: string, payments: PaymentInput[], restaurantId: string, discount_cents = 0, customer_name?: string) =>
+    call<Order>('checkout_order', { orderId: order_id, payments, restaurantId, discountCents: discount_cents, customerName: customer_name });
 
-export const voidOrder = (order_id: string, restaurantId: string) =>
-    call<void>('void_order', { orderId: order_id, restaurantId });
+export const voidOrder = (order_id: string, restaurantId: string, voided_by: string, void_reason: string) =>
+    call<void>('void_order', { orderId: order_id, restaurantId, voidedBy: voided_by, voidReason: void_reason });
 
 export const holdOrder = (order_id: string, restaurantId: string, customer_name?: string, customer_phone?: string) =>
     call<void>('hold_order', { orderId: order_id, restaurantId, customerName: customer_name, customerPhone: customer_phone });

@@ -5,15 +5,19 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { login, getSetupStatus } from '@/lib/tauri-commands';
+import { loginWithPin } from '@/lib/api/auth';
 import { triggerSync } from '@/lib/api/system';
-import { ArrowRight, Lock, User, Globe, ChefHat, AlertTriangle, Sun, Moon } from 'lucide-react';
+import { ArrowRight, Lock, User, Globe, AlertTriangle, Sun, Moon, Hash } from 'lucide-react';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [pin, setPin] = useState('');
+    const [usePinMode, setUsePinMode] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+    const [hasSavedRestaurant, setHasSavedRestaurant] = useState(false);
     const { setUser } = useAuth();
     const { t, lang, setLang } = useLanguage();
     const { theme, toggleTheme } = useTheme();
@@ -40,11 +44,19 @@ export default function LoginPage() {
                 localStorage.removeItem('dineos_remembered_creds');
             }
         }
+        setHasSavedRestaurant(!!localStorage.getItem('dineos_last_restaurant_id'));
 
         import('@tauri-apps/api/core').then(({ invoke }) => {
             invoke('get_restaurant').catch(() => {/* ignore errors */ });
         }).catch(() => {/* not in Tauri env */ });
     }, []);
+
+    function afterLogin(session: { role: string; restaurant_id?: string; id: string; username: string }) {
+        if (session.restaurant_id) {
+            localStorage.setItem('dineos_last_restaurant_id', session.restaurant_id);
+            triggerSync(session.restaurant_id).catch(() => { });
+        }
+    }
 
     async function handleLogin(e: React.FormEvent) {
         e.preventDefault();
@@ -53,9 +65,7 @@ export default function LoginPage() {
         try {
             const session = await login(username, password);
             setUser(session);
-            if (session.restaurant_id) {
-                triggerSync(session.restaurant_id).catch(() => { });
-            }
+            afterLogin(session);
             if (session.role === 'super_admin') {
                 router.replace('/super-admin');
                 return;
@@ -76,8 +86,42 @@ export default function LoginPage() {
             router.replace('/pos/tables');
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
-            if (msg.includes('invalid credentials') || msg.includes('not found') || msg.includes('wrong')) {
+            if (msg.includes('locked')) {
+                setError(t('accountLocked'));
+            } else if (msg.includes('invalid credentials') || msg.includes('not found') || msg.includes('wrong')) {
                 setError(t('wrongCredentials'));
+            } else {
+                setError(t('loginFailed'));
+            }
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function handlePinLogin(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const restaurantId = localStorage.getItem('dineos_last_restaurant_id') ?? '';
+            if (!restaurantId) {
+                setError(t('pinLoginNoRestaurant'));
+                return;
+            }
+            const session = await loginWithPin(restaurantId, pin);
+            setUser(session);
+            afterLogin(session);
+            if (session.role === 'super_admin') {
+                router.replace('/super-admin');
+                return;
+            }
+            router.replace('/pos/tables');
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+            if (msg.includes('locked')) {
+                setError(t('accountLocked'));
+            } else if (msg.includes('invalid pin') || msg.includes('invalid pin format')) {
+                setError(t('wrongPin'));
             } else {
                 setError(t('loginFailed'));
             }
@@ -142,113 +186,187 @@ export default function LoginPage() {
 
                 {/* Main Form Area */}
                 <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24 max-w-[640px] mx-auto w-full">
-                    <div className="mb-12">
+                    <div className="mb-8">
                         <h2 className="text-4xl font-black text-[var(--foreground)] tracking-tight mb-3">{t('signIn')}</h2>
                         <p className="text-[var(--text-secondary)] text-sm font-medium tracking-tight mt-3 max-w-md">
                             {t('firstLoginDesc')}
                         </p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-8">
-                        <div className="space-y-3">
-                            <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
-                                {t('username')}
-                            </label>
-                            <div className="relative group">
-                                <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={username}
-                                    onChange={e => setUsername(e.target.value)}
-                                    required
-                                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
-                                    placeholder="Enter username"
-                                    autoComplete="username"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
-                                {t('password')}
-                            </label>
-                            <div className="relative group">
-                                <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={e => setPassword(e.target.value)}
-                                    required
-                                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between px-1">
-                            <label className="flex items-center gap-3 cursor-pointer group/check">
-                                <div className="relative flex items-center justify-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={rememberMe}
-                                        onChange={e => setRememberMe(e.target.checked)}
-                                        className="peer sr-only"
-                                    />
-                                    <div className="w-5 h-5 rounded-md border-2 border-[var(--border)] bg-[var(--bg-elevated)] peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all group-hover/check:border-emerald-500/50" />
-                                    <svg
-                                        className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform pointer-events-none"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                    >
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                </div>
-                                <span className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest group-hover/check:text-[var(--foreground)] transition-colors">
-                                    {t('rememberMe')}
-                                </span>
-                            </label>
-
-                            <span
-                                onClick={handleOpenSupport}
-                                className="text-[11px] font-black text-emerald-500/50 uppercase tracking-widest hover:text-emerald-500 cursor-pointer transition-colors"
+                    {/* Mode toggle — only show PIN option if a restaurant was logged in before */}
+                    {hasSavedRestaurant && (
+                        <div className="flex gap-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl p-1 mb-6 w-fit">
+                            <button
+                                type="button"
+                                onClick={() => { setUsePinMode(false); setError(''); }}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${!usePinMode ? 'bg-emerald-600 text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                             >
-                                {t('forgotPassword')}
-                            </span>
+                                {t('usePassword')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setUsePinMode(true); setError(''); }}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${usePinMode ? 'bg-emerald-600 text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                            >
+                                <Hash size={11} />
+                                {t('usePin')}
+                            </button>
                         </div>
+                    )}
 
-                        {error && (
-                            <div className="bg-red-500/5 border border-red-500/20 text-red-400 p-5 rounded-2xl text-[13px] font-bold flex items-center gap-4 animate-in shake duration-500">
-                                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                                    <AlertTriangle size={18} />
+                    {usePinMode ? (
+                        <form onSubmit={handlePinLogin} className="space-y-8">
+                            <div className="space-y-3">
+                                <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
+                                    {t('pin')}
+                                </label>
+                                <div className="relative group">
+                                    <Hash size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={6}
+                                        value={pin}
+                                        onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                        required
+                                        autoFocus
+                                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-mono tracking-[0.5em] text-center"
+                                        placeholder="• • • •"
+                                    />
                                 </div>
-                                {error}
+                                <p className="text-[10px] text-[var(--text-secondary)]/50 ml-1">{t('pinHint')}</p>
                             </div>
-                        )}
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="relative group w-full py-3 text-lg font-black uppercase tracking-widest text-white overflow-hidden rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 mt-4 shadow-xl shadow-emerald-500/10"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all group-hover:scale-105" />
-                            <div className="relative flex items-center justify-center gap-3">
-                                {loading ? (
-                                    <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        {t('login')}
-                                        <ArrowRight size={22} className="opacity-70 group-hover:translate-x-1 transition-transform" />
-                                    </>
-                                )}
+                            {error && (
+                                <div className="bg-red-500/5 border border-red-500/20 text-red-400 p-5 rounded-2xl text-[13px] font-bold flex items-center gap-4 animate-in shake duration-500">
+                                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                                        <AlertTriangle size={18} />
+                                    </div>
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading || pin.length < 4}
+                                className="relative group w-full py-3 text-lg font-black uppercase tracking-widest text-white overflow-hidden rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 mt-4 shadow-xl shadow-emerald-500/10"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all group-hover:scale-105" />
+                                <div className="relative flex items-center justify-center gap-3">
+                                    {loading ? (
+                                        <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            {t('login')}
+                                            <ArrowRight size={22} className="opacity-70 group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
+                                </div>
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleLogin} className="space-y-8">
+                            <div className="space-y-3">
+                                <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
+                                    {t('username')}
+                                </label>
+                                <div className="relative group">
+                                    <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={e => setUsername(e.target.value)}
+                                        required
+                                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
+                                        placeholder="Enter username"
+                                        autoComplete="username"
+                                    />
+                                </div>
                             </div>
-                        </button>
-                    </form>
+
+                            <div className="space-y-3">
+                                <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase ml-1">
+                                    {t('password')}
+                                </label>
+                                <div className="relative group">
+                                    <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-emerald-400 transition-colors" />
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        required
+                                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between px-1">
+                                <label className="flex items-center gap-3 cursor-pointer group/check">
+                                    <div className="relative flex items-center justify-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={rememberMe}
+                                            onChange={e => setRememberMe(e.target.checked)}
+                                            className="peer sr-only"
+                                        />
+                                        <div className="w-5 h-5 rounded-md border-2 border-[var(--border)] bg-[var(--bg-elevated)] peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all group-hover/check:border-emerald-500/50" />
+                                        <svg
+                                            className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform pointer-events-none"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                        >
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest group-hover/check:text-[var(--foreground)] transition-colors">
+                                        {t('rememberMe')}
+                                    </span>
+                                </label>
+
+                                <span
+                                    onClick={handleOpenSupport}
+                                    className="text-[11px] font-black text-emerald-500/50 uppercase tracking-widest hover:text-emerald-500 cursor-pointer transition-colors"
+                                >
+                                    {t('forgotPassword')}
+                                </span>
+                            </div>
+
+                            {error && (
+                                <div className="bg-red-500/5 border border-red-500/20 text-red-400 p-5 rounded-2xl text-[13px] font-bold flex items-center gap-4 animate-in shake duration-500">
+                                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                                        <AlertTriangle size={18} />
+                                    </div>
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="relative group w-full py-3 text-lg font-black uppercase tracking-widest text-white overflow-hidden rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 mt-4 shadow-xl shadow-emerald-500/10"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all group-hover:scale-105" />
+                                <div className="relative flex items-center justify-center gap-3">
+                                    {loading ? (
+                                        <div className="w-6 h-6 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            {t('login')}
+                                            <ArrowRight size={22} className="opacity-70 group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
+                                </div>
+                            </button>
+                        </form>
+                    )}
 
                     <div className="mt-12 text-center">
                         <p className="text-[var(--text-secondary)] text-sm font-medium">
-                            Need help? <span 
+                            Need help? <span
                                 onClick={handleOpenSupport}
                                 className="text-emerald-500 font-bold hover:underline cursor-pointer"
                             >

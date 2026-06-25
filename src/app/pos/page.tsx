@@ -152,7 +152,7 @@ export default function POSPage() {
                                         <UtensilsCrossed size={14} className="text-[var(--accent)]" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--accent)] leading-none mb-0.5">DIRECT</p>
+                                        <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--accent)] leading-none mb-0.5">{t('directMode')}</p>
                                         <p className="text-sm font-black text-[var(--foreground)] leading-none">{t('newOrder')}</p>
                                     </div>
                                 </>

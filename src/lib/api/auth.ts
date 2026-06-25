@@ -16,6 +16,9 @@ export const createUser = (
 
 export const getUsers = (restaurantId: string) => call<UserSession[]>('get_users', { restaurantId });
 
+export const unlockUser = (userId: string, restaurantId: string) =>
+    call<void>('unlock_user', { userId, restaurantId });
+
 export const updateUser = (
     id: string, password: string | undefined, role: string,
     restaurantId: string, full_name?: string, khmer_name?: string, phone?: string
@@ -110,6 +113,15 @@ export const superadminGetAllUsers = () =>
 
 export const superadminMoveUser = (params: { userId: string; newRestaurantId: string }) =>
     call<void>('superadmin_move_user', { userId: params.userId, newRestaurantId: params.newRestaurantId });
+
+export const changePassword = (userId: string, currentPassword: string, newPassword: string) =>
+    call<void>('change_password', { userId, currentPassword, newPassword });
+
+export const setUserPin = (restaurantId: string, userId: string, pin: string) =>
+    call<void>('set_user_pin', { restaurantId, userId, pin });
+
+export const loginWithPin = (restaurantId: string, pin: string) =>
+    call<UserSession>('login_with_pin', { restaurantId, pin });
 
 export const createSuperadminAccount = (params: {
     username: string;

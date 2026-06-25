@@ -1,16 +1,17 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { 
-    getProducts, getCategories, deleteProduct, 
-    deleteCategory 
+import { useState, useEffect, useRef } from 'react';
+import {
+    getProducts, getCategories, deleteProduct,
+    deleteCategory, setSoldOutToday
 } from '@/lib/api/products';
 import { useAuth } from '@/providers/AuthProvider';
 import type { Product, Category } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { formatUsd } from '@/lib/currency';
+import { formatUsd, formatKhr, roundKhr } from '@/lib/currency';
+import { getExchangeRate } from '@/lib/api/system';
 import { 
-    Package, Plus, Trash2, Box, Minus, Edit3, 
-    Image as ImageIcon, Search, Layers 
+    Package, Plus, Trash2, Box, Minus, Edit3,
+    Image as ImageIcon, Search, Layers, Ban, Download
 } from 'lucide-react';
 import ProductModal from '@/components/management/ProductModal';
 import CategoryModal from '@/components/management/CategoryModal';
@@ -26,6 +27,11 @@ export default function ProductsManagement() {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
+    const [exchangeRate, setExchangeRate] = useState(0);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'product' | 'category'; id: string; warning?: string } | null>(null);
+    const [exportToast, setExportToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const [exporting, setExporting] = useState(false);
+    const exportToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
@@ -37,14 +43,51 @@ export default function ProductsManagement() {
     async function loadData() {
         if (!restaurantId) return;
         try {
-            const [cats, prods] = await Promise.all([
-                getCategories(restaurantId), 
-                getProducts(undefined, restaurantId)
+            const [cats, prods, rateData] = await Promise.all([
+                getCategories(restaurantId),
+                getProducts(undefined, restaurantId),
+                getExchangeRate(restaurantId),
             ]);
             setCategories(cats);
             setProducts(prods);
+            if (rateData?.rate) setExchangeRate(rateData.rate);
         } catch (e) {
             console.error(e);
+        }
+    }
+
+    function showExportToast(msg: string, ok: boolean) {
+        if (exportToastTimer.current) clearTimeout(exportToastTimer.current);
+        setExportToast({ msg, ok });
+        exportToastTimer.current = setTimeout(() => setExportToast(null), 3000);
+    }
+
+    async function handleExportProducts() {
+        if (products.length === 0) return;
+        setExporting(true);
+        try {
+            const XLSX = await import('xlsx');
+            const catName = (id?: string) => categories.find(c => c.id === id)?.name || '';
+            const rows = products.map(p => ({
+                'Name': p.name,
+                'Khmer Name': p.khmer_name || '',
+                'Category': catName(p.category_id) || p.category_name || '',
+                'Price (USD)': (p.price_cents / 100).toFixed(2),
+                'Price (KHR approx)': exchangeRate > 0 ? roundKhr(p.price_cents, exchangeRate) : '',
+                'SKU': p.sku || '',
+                'Stock Qty': p.stock_quantity ?? '',
+                'Available': p.is_available === 1 ? 'Yes' : 'No',
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Products');
+            XLSX.writeFile(wb, `dineos-products-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            showExportToast(t('exportSuccessMsg'), true);
+        } catch (err) {
+            console.error('Product export failed:', err);
+            showExportToast(t('exportFailedMsg'), false);
+        } finally {
+            setExporting(false);
         }
     }
 
@@ -53,7 +96,11 @@ export default function ProductsManagement() {
             alert('Permission denied: delete is only available to Admin roles.');
             return;
         }
-        if (!confirm('Are you sure you want to delete this product?')) return;
+        setDeleteConfirm({ type: 'product', id });
+    }
+
+    async function confirmDeleteProduct(id: string) {
+        if (!user?.id) return;
         try {
             await deleteProduct(id, restaurantId || '', user.id);
             loadData();
@@ -68,7 +115,6 @@ export default function ProductsManagement() {
             alert('Permission denied: delete is only available to Admin roles.');
             return;
         }
-        // Recursively gather this category and all its descendants
         const getDescendantIds = (catId: string): string[] => {
             const children = categories.filter(c => c.parent_id === catId);
             return [catId, ...children.flatMap(c => getDescendantIds(c.id))];
@@ -76,22 +122,48 @@ export default function ProductsManagement() {
         const allIds = getDescendantIds(id);
         const hasProducts = products.some(p => allIds.includes(p.category_id || ''));
         if (hasProducts) {
-            alert('Cannot delete: this category or one of its sub-categories still contains products. Please move or delete them first.');
+            alert(t('categoryHasProducts') ?? 'Cannot delete: this category still contains products. Please move or delete them first.');
             return;
         }
         const hasChildren = categories.some(c => c.parent_id === id);
         if (hasChildren) {
-            alert('Cannot delete: this category still has sub-categories. Please delete or reassign them first.');
+            alert(t('categoryHasChildren') ?? 'Cannot delete: this category still has sub-categories. Please delete or reassign them first.');
             return;
         }
+        setDeleteConfirm({ type: 'category', id });
+    }
 
-        if (!confirm('Are you sure you want to delete this category?')) return;
+    async function confirmDeleteCategory(id: string) {
+        if (!user?.id) return;
         try {
             await deleteCategory(id, restaurantId || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
-            alert('Failed to delete category');
+            alert(t('error'));
+        }
+    }
+
+    async function executeDelete() {
+        if (!deleteConfirm) return;
+        setDeleteConfirm(null);
+        if (deleteConfirm.type === 'product') {
+            await confirmDeleteProduct(deleteConfirm.id);
+        } else {
+            await confirmDeleteCategory(deleteConfirm.id);
+        }
+    }
+
+    async function handleToggleSoldOut(p: Product) {
+        if (!restaurantId) return;
+        // Optimistic flip so the one-tap toggle feels instant on touch hardware.
+        setProducts(prev => prev.map(x => x.id === p.id ? { ...x, sold_out_today: !p.sold_out_today } : x));
+        try {
+            await setSoldOutToday(p.id, !p.sold_out_today, restaurantId);
+        } catch (e) {
+            console.error(e);
+            alert(t('error'));
+            loadData();
         }
     }
 
@@ -142,6 +214,16 @@ export default function ProductsManagement() {
                             className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors w-44"
                         />
                     </div>
+                    {activeTab === 'products' && (
+                        <button
+                            onClick={handleExportProducts}
+                            disabled={exporting || products.length === 0}
+                            className="px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40"
+                        >
+                            <Download size={13} strokeWidth={2.5} />
+                            {t('exportProducts')}
+                        </button>
+                    )}
                     <button
                         onClick={() => {
                             if (activeTab === 'products') { setEditingProduct(null); setIsProductModalOpen(true); }
@@ -155,6 +237,12 @@ export default function ProductsManagement() {
                 </div>
             </div>
 
+            {exportToast && (
+                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-xl text-xs font-bold shadow-2xl border ${exportToast.ok ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+                    {exportToast.msg}
+                </div>
+            )}
+
             {/* Products table */}
             {activeTab === 'products' ? (
                 <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
@@ -165,7 +253,7 @@ export default function ProductsManagement() {
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] w-12">Visual</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Product</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Category</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Price</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Price / តម្លៃ</th>
                                     <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">Actions</th>
                                 </tr>
                             </thead>
@@ -190,8 +278,12 @@ export default function ProductsManagement() {
                                         <td className="px-4 py-2.5">
                                             <div className="font-semibold text-sm text-white leading-tight">{p.name}</div>
                                             {p.khmer_name && <div className="text-xs text-[var(--text-secondary)] khmer mt-0.5">{p.khmer_name}</div>}
+                                            {p.sku && <div className="text-[10px] text-[var(--text-secondary)]/60 font-mono mt-0.5">{p.sku}</div>}
                                             {p.is_available === 0 && (
-                                                <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold uppercase tracking-wider border border-red-500/20">Hidden</span>
+                                                <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold uppercase tracking-wider border border-red-500/20">{t('unavailable')}</span>
+                                            )}
+                                            {p.sold_out_today && (
+                                                <span className="mt-1 ml-1 inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20">{t('soldOutToday')}</span>
                                             )}
                                         </td>
                                         {/* Category */}
@@ -205,24 +297,43 @@ export default function ProductsManagement() {
                                         {/* Price */}
                                         <td className="px-4 py-2.5 text-right">
                                             <span className="font-mono font-bold text-sm text-[var(--accent)]">{formatUsd(p.price_cents)}</span>
+                                            {exchangeRate > 0 && (
+                                                <div className="text-[10px] font-mono text-[var(--text-secondary)]/60 mt-0.5">
+                                                    ≈ {formatKhr(roundKhr(p.price_cents, exchangeRate))}
+                                                </div>
+                                            )}
                                         </td>
                                         {/* Actions */}
                                         <td className="px-4 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1.5">
                                                 <button
-                                                    onClick={() => { setEditingProduct(p); setIsProductModalOpen(true); }}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white text-white/50 transition-all"
+                                                    onClick={() => handleToggleSoldOut(p)}
+                                                    title={p.sold_out_today ? t('unmarkSoldOut') : t('markSoldOut')}
+                                                    className={`h-7 px-2 flex items-center gap-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                                        p.sold_out_today
+                                                            ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                                                            : 'bg-white/[0.05] border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                                                    }`}
                                                 >
-                                                    <Edit3 size={13} />
+                                                    <Ban size={12} />
+                                                    {p.sold_out_today ? t('unmarkSoldOut') : t('markSoldOut')}
                                                 </button>
-                                                {canDelete(user?.role) && (
+                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
-                                                        onClick={() => handleDeleteProduct(p.id)}
-                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
+                                                        onClick={() => { setEditingProduct(p); setIsProductModalOpen(true); }}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white text-white/50 transition-all"
                                                     >
-                                                        <Trash2 size={13} />
+                                                        <Edit3 size={13} />
                                                     </button>
-                                                )}
+                                                    {canDelete(user?.role) && (
+                                                        <button
+                                                            onClick={() => handleDeleteProduct(p.id)}
+                                                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -319,6 +430,33 @@ export default function ProductsManagement() {
                 category={editingCategory}
                 allCategories={categories}
             />
+
+            {deleteConfirm && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
+                    <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
+                        <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">
+                            {deleteConfirm.type === 'product' ? t('deleteProduct') : t('deleteCategory')}
+                        </h3>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                            {t('deleteCannotUndo')}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={executeDelete}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 transition-all"
+                            >
+                                {t('delete')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

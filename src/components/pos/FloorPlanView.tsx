@@ -136,6 +136,7 @@ export default function FloorPlanView() {
                     <UtensilsCrossed size={18} color={s.text} strokeWidth={2} />
                 )}
                 <span className="text-xs font-black leading-none" style={{ color: s.text }}>{table.name}</span>
+                <span className="text-[8px] font-bold leading-none opacity-75 truncate max-w-full px-1" style={{ color: s.text }}>{t(s.labelKey)}</span>
                 <div className="flex items-center gap-0.5 opacity-70">
                     <Users2 size={9} color={s.text} strokeWidth={2} />
                     <span className="text-[9px] font-bold" style={{ color: s.text }}>{table.seat_count}</span>
@@ -260,14 +261,15 @@ export default function FloorPlanView() {
                         onClick={handleDirectOrder}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-[11px] font-bold hover:bg-[var(--accent)]/20 transition-all active:scale-95"
                     >
-                        <UtensilsCrossed size={13} strokeWidth={2.5} /><span>DIRECT</span>
+                        <UtensilsCrossed size={13} strokeWidth={2.5} /><span>{t('directMode')}</span>
                     </button>
 
                     {/* Status legend chips */}
                     {(['available', 'busy', 'waiting'] as const).map(k => (
                         <div key={k} className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)]">
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS[k].dot }} />
-                            <span className="text-[11px] font-bold text-[var(--text-secondary)]">{counts[k]}</span>
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: STATUS[k].dot }} />
+                            <span className="text-[10px] font-bold" style={{ color: STATUS[k].dot }}>{t(STATUS[k].labelKey)}</span>
+                            <span className="text-[10px] font-black text-[var(--text-secondary)]">({counts[k]})</span>
                         </div>
                     ))}
                 </div>

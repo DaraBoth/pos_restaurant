@@ -12,6 +12,8 @@ pub struct User {
     pub phone: Option<String>,
     pub is_deleted: i64,
     pub created_at: String,
+    #[serde(default)]
+    pub locked_until: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +76,12 @@ pub struct Product {
     pub category_khmer: Option<String>,
     pub ingredients: Vec<ProductIngredient>,
     pub created_at: String,
+    pub stock_quantity: i64,
+    pub sku: Option<String>,
+    pub sold_out_today: i64,
+    pub description: Option<String>,
+    pub khmer_description: Option<String>,
+    pub cost_price_cents: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,6 +105,7 @@ pub struct Restaurant {
     pub website: Option<String>,
     pub vat_number: Option<String>,
     pub receipt_footer: Option<String>,
+    pub receipt_footer_khmer: Option<String>,
     pub receipt_width: String,
     pub logo_path: Option<String>,
     pub license_expires_at: Option<String>,
@@ -131,6 +140,7 @@ pub struct RestaurantUpsertInput {
     pub website: Option<String>,
     pub vat_number: Option<String>,
     pub receipt_footer: Option<String>,
+    pub receipt_footer_khmer: Option<String>,
     pub receipt_width: Option<String>,
     pub logo_path: Option<String>,
     pub business_type: Option<String>,
@@ -163,6 +173,17 @@ pub struct Order {
     pub updated_at: Option<String>,
     pub completed_at: Option<String>,
     pub receipt_number: Option<String>,
+    #[serde(default)]
+    pub voided_by: Option<String>,
+    #[serde(default)]
+    pub voided_at: Option<String>,
+    #[serde(default)]
+    pub void_reason: Option<String>,
+    #[serde(default)]
+    pub voided_by_name: Option<String>,
+    // USD→KHR rate captured at checkout time, for a stable audit trail on reprints.
+    #[serde(default)]
+    pub exchange_rate_used: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,6 +245,9 @@ pub struct ExchangeRate {
     pub id: String,
     pub rate: f64,
     pub effective_from: String,
+    // True when no rate has been set and the arbitrary 4100 fallback is being used.
+    #[serde(default)]
+    pub is_default: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

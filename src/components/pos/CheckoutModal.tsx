@@ -8,6 +8,7 @@ import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '
 import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag, Printer } from 'lucide-react';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
+import { canApplyDiscount } from '@/lib/permissions';
 
 export default function CheckoutModal({
     onClose,
@@ -21,6 +22,7 @@ export default function CheckoutModal({
     const { t } = useLanguage();
 
     const [usdInput, setUsdInput] = useState<string>('');
+    const [khrInput, setKhrInput] = useState<string>('');
     const [method, setMethod] = useState<'cash' | 'khqr' | 'card'>('cash');
     const [loading, setLoading] = useState(false);
     const [paymentError, setPaymentError] = useState<string>('');
@@ -31,6 +33,7 @@ export default function CheckoutModal({
     const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
     const [combinedTotals, setCombinedTotals] = useState(totals);
     const [completedPayload, setCompletedPayload] = useState<ReceiptPrintPayload | null>(null);
+    const [customerNameInput, setCustomerNameInput] = useState('');
 
     useEffect(() => {
         refreshRate();
@@ -94,6 +97,11 @@ export default function CheckoutModal({
     const isUnderpaid = method === 'cash' && usdInputCents > 0 && usdInputCents < discountedTotals.totalUsdCents;
     const shortfallCents = isUnderpaid ? discountedTotals.totalUsdCents - usdInputCents : 0;
 
+    const khrInputRiels = parseInt(khrInput) || 0;
+    const khrChangeRiels = khrInputRiels > 0 ? khrInputRiels - discountedTotals.totalKhr : 0;
+    const isKhrUnderpaid = khrInputRiels > 0 && khrInputRiels < discountedTotals.totalKhr;
+    const mixedCashWarning = usdInputCents > 0 && khrInputRiels > 0;
+
     async function handleConfirm() {
         if (!orderId) return;
         setLoading(true);
@@ -101,43 +109,49 @@ export default function CheckoutModal({
         try {
             const payments: PaymentInput[] = [];
 
-            if (usdInputCents > 0) {
-                // They paid some/all in USD Cash
+            if (khrInputRiels > 0 && usdInputCents === 0) {
+                // KHR cash only
                 payments.push({
                     method: 'cash',
-                    currency: 'USD',
-                    amount: Math.min(usdInputCents, discountedTotals.totalUsdCents) // cap at total
+                    currency: 'KHR',
+                    amount: Math.min(khrInputRiels, discountedTotals.totalKhr)
                 });
-            }
-
-            if (remainingUsdCents > 0) {
-                // For the remainder, they pay using the selected method (typically KHQR)
-                // We log it as KHR if method is KHQR, otherwise USD for card/cash
-                if (method === 'khqr') {
+            } else {
+                if (usdInputCents > 0) {
+                    // They paid some/all in USD Cash
                     payments.push({
-                        method: 'khqr',
-                        currency: 'KHR',
-                        amount: remainingKhr,
-                        bakong_transaction_hash: 'PENDING-APP-VERIFY'
-                    });
-                } else {
-                    payments.push({
-                        method,
+                        method: 'cash',
                         currency: 'USD',
-                        amount: remainingUsdCents
+                        amount: Math.min(usdInputCents, discountedTotals.totalUsdCents)
                     });
+                }
+
+                if (remainingUsdCents > 0) {
+                    if (method === 'khqr') {
+                        payments.push({
+                            method: 'khqr',
+                            currency: 'KHR',
+                            amount: remainingKhr,
+                            bakong_transaction_hash: 'PENDING-APP-VERIFY'
+                        });
+                    } else {
+                        payments.push({
+                            method,
+                            currency: 'USD',
+                            amount: remainingUsdCents
+                        });
+                    }
                 }
             }
 
             let customerName, customerPhone, receiptNumber: string | undefined;
             if (sessionId) {
                 await checkoutSession(sessionId, payments, user?.restaurant_id || '', discountCents);
-                // get details from arbitrary round, usually the active order has customer details
                 const currentOrder = rounds.find(r => r.id === orderId);
                 customerName = currentOrder?.customer_name;
                 customerPhone = currentOrder?.customer_phone;
             } else {
-                const completedOrder = await checkoutOrder(orderId, payments, user?.restaurant_id || '', discountCents);
+                const completedOrder = await checkoutOrder(orderId, payments, user?.restaurant_id || '', discountCents, customerNameInput || undefined);
                 customerName = completedOrder.customer_name;
                 customerPhone = completedOrder.customer_phone;
                 receiptNumber = completedOrder.receipt_number ?? undefined;
@@ -154,8 +168,9 @@ export default function CheckoutModal({
                 customerPhone: customerPhone,
                 cashierName: user?.full_name || user?.username,
                 receivedCents: usdInputCents > 0 ? usdInputCents : undefined,
+                receivedKhr: khrInputRiels > 0 && usdInputCents === 0 ? khrInputRiels : undefined,
                 changeCents: changeUsdCents > 0 ? changeUsdCents : undefined,
-                changeKhr,
+                changeKhr: changeUsdCents > 0 ? changeKhr : (khrChangeRiels > 0 ? khrChangeRiels : undefined),
                 discountPct: discountMode === 'pct' && discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
                 items: combinedItems,
@@ -294,77 +309,99 @@ export default function CheckoutModal({
                             {discountCents > 0 && (
                                 <div className="mt-1.5 text-[10px] font-bold text-yellow-600">
                                     Saving {formatUsd(discountCents)}
+                                    <span className="opacity-70 ml-1">≈ {formatKhr(roundKhr(discountCents, exchangeRate))}</span>
                                 </div>
                             )}
                         </div>
 
-                        {/* Discount */}
+                        {/* Discount — admin/manager only */}
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
                                 <label className="flex items-center gap-1.5 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">
                                     <Tag size={10} />
                                     Discount
                                 </label>
-                                <div className="flex rounded-lg overflow-hidden border border-[var(--border)]">
-                                    <button
-                                        onClick={() => setDiscountMode('pct')}
-                                        className={`px-2 py-1 text-[9px] font-black transition-colors ${discountMode === 'pct' ? 'bg-yellow-500/20 text-yellow-600' : 'bg-[var(--bg-dark)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                                    >%</button>
-                                    <button
-                                        onClick={() => setDiscountMode('fixed')}
-                                        className={`px-2 py-1 text-[9px] font-black transition-colors ${discountMode === 'fixed' ? 'bg-yellow-500/20 text-yellow-600' : 'bg-[var(--bg-dark)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                                    >$</button>
-                                </div>
+                                {canApplyDiscount(user?.role) && (
+                                    <div className="flex rounded-lg overflow-hidden border border-[var(--border)]">
+                                        <button
+                                            onClick={() => setDiscountMode('pct')}
+                                            className={`px-2 py-1 text-[9px] font-black transition-colors ${discountMode === 'pct' ? 'bg-yellow-500/20 text-yellow-600' : 'bg-[var(--bg-dark)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                                        >%</button>
+                                        <button
+                                            onClick={() => setDiscountMode('fixed')}
+                                            className={`px-2 py-1 text-[9px] font-black transition-colors ${discountMode === 'fixed' ? 'bg-yellow-500/20 text-yellow-600' : 'bg-[var(--bg-dark)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                                        >$</button>
+                                    </div>
+                                )}
                             </div>
-                            {discountMode === 'pct' ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="relative w-20 flex-shrink-0">
+                            {canApplyDiscount(user?.role) ? (
+                                discountMode === 'pct' ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative w-20 flex-shrink-0">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="1"
+                                                value={discountPct === 0 ? '' : discountPct}
+                                                onChange={e => {
+                                                    const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                                    setDiscountPct(v);
+                                                }}
+                                                placeholder="0"
+                                                className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
+                                            />
+                                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-black text-[var(--text-secondary)]/50">%</span>
+                                        </div>
+                                        <div className="flex gap-1 flex-1">
+                                            {[5, 10, 15, 20, 50].map(pct => (
+                                                <button
+                                                    key={pct}
+                                                    onClick={() => setDiscountPct(discountPct === pct ? 0 : pct)}
+                                                    className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-colors ${
+                                                        discountPct === pct
+                                                            ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-600'
+                                                            : 'bg-[var(--bg-dark)] border-[var(--border)] text-[var(--text-secondary)] hover:text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500/25'
+                                                    }`}
+                                                >
+                                                    {pct}%
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-[var(--text-secondary)]/50">$</span>
                                         <input
                                             type="number"
                                             min="0"
-                                            max="100"
-                                            step="1"
-                                            value={discountPct === 0 ? '' : discountPct}
-                                            onChange={e => {
-                                                const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                                                setDiscountPct(v);
-                                            }}
-                                            placeholder="0"
-                                            className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
+                                            step="0.01"
+                                            value={discountUsdInput}
+                                            onChange={e => setDiscountUsdInput(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
                                         />
-                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-black text-[var(--text-secondary)]/50">%</span>
                                     </div>
-                                    <div className="flex gap-1 flex-1">
-                                        {[5, 10, 15, 20, 50].map(pct => (
-                                            <button
-                                                key={pct}
-                                                onClick={() => setDiscountPct(discountPct === pct ? 0 : pct)}
-                                                className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-colors ${
-                                                    discountPct === pct
-                                                        ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-600'
-                                                        : 'bg-[var(--bg-dark)] border-[var(--border)] text-[var(--text-secondary)] hover:text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500/25'
-                                                }`}
-                                            >
-                                                {pct}%
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                                )
                             ) : (
-                                <div className="relative">
-                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-[var(--text-secondary)]/50">$</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={discountUsdInput}
-                                        onChange={e => setDiscountUsdInput(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2 text-sm font-mono font-black text-[var(--foreground)] focus:border-yellow-500/60 outline-none transition-all"
-                                    />
-                                </div>
+                                <p className="text-[10px] text-[var(--text-secondary)] opacity-50 italic">{t('askManagerForDiscount')}</p>
                             )}
                         </div>
+
+                        {!tableId && (
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest px-1 opacity-60">
+                                    {t('customerName')}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={customerNameInput}
+                                    onChange={e => setCustomerNameInput(e.target.value)}
+                                    placeholder={t('customerName')}
+                                    className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent-blue)] outline-none transition-all"
+                                />
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest px-1 opacity-60">{t('paymentMethod')}</label>
@@ -435,6 +472,51 @@ export default function CheckoutModal({
                                     <div className="text-xs font-mono text-orange-600/70 mt-0.5">{formatKhr(remainingKhr)}</div>
                                 </div>
                             ) : null}
+
+                            {/* KHR Cash input */}
+                            <div>
+                                <label className="text-[10px] uppercase font-black tracking-widest text-[var(--text-secondary)] mb-2 block opacity-60">
+                                    {t('khrCash')}
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-black text-[var(--text-secondary)]/50">៛</span>
+                                    <input
+                                        type="number"
+                                        step="100"
+                                        min="0"
+                                        placeholder={discountedTotals.totalKhr.toLocaleString()}
+                                        value={khrInput}
+                                        onChange={e => setKhrInput(e.target.value.replace(/\D/g, ''))}
+                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-3 text-xl font-mono font-black text-[var(--foreground)] focus:border-amber-400/60 outline-none transition-all"
+                                    />
+                                </div>
+                                {/* Quick KHR denomination buttons */}
+                                <div className="flex gap-1.5 mt-2">
+                                    {[1000, 2000, 5000, 10000, 20000].map(v => (
+                                        <button
+                                            key={v}
+                                            onClick={() => setKhrInput(v.toString())}
+                                            className="flex-1 py-1.5 rounded-lg bg-[var(--bg-dark)] hover:bg-amber-500/15 text-[9px] font-black border border-[var(--border)] hover:border-amber-400/40 transition-colors text-[var(--text-secondary)] hover:text-amber-400"
+                                        >
+                                            {(v / 1000).toFixed(0)}K
+                                        </button>
+                                    ))}
+                                </div>
+                                {mixedCashWarning && (
+                                    <p className="text-[10px] text-amber-400 font-bold mt-1.5 text-center">{t('mixedCashWarning')}</p>
+                                )}
+                                {khrChangeRiels > 0 && !mixedCashWarning && (
+                                    <div className="mt-2 p-3 rounded-xl bg-green-500/10 border border-green-500/25">
+                                        <div className="text-xs font-bold text-green-600">{t('change')}</div>
+                                        <div className="text-xl font-black font-mono text-green-700">{formatKhr(khrChangeRiels)}</div>
+                                    </div>
+                                )}
+                                {isKhrUnderpaid && !mixedCashWarning && (
+                                    <p className="text-[10px] text-red-400 font-bold mt-1.5 text-center">
+                                        Short {formatKhr(discountedTotals.totalKhr - khrInputRiels)}
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex gap-2">
@@ -459,7 +541,7 @@ export default function CheckoutModal({
                                 )}
                                 <button
                                     onClick={handleConfirm}
-                                    disabled={loading || isUnderpaid}
+                                    disabled={loading || isUnderpaid || isKhrUnderpaid || mixedCashWarning}
                                     className="pos-btn-primary w-full py-4 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 uppercase tracking-widest active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? (

@@ -1,9 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { UserSession, createUser, updateUser } from '@/lib/tauri-commands';
-import { Save, Key, Shield } from 'lucide-react';
+import { setUserPin, unlockUser } from '@/lib/api/auth';
+import { Save, Key, Shield, Hash, AlertTriangle, LockOpen } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
-import { roleLabel } from '@/lib/permissions';
+import { normalizeRole, roleI18nKey } from '@/lib/permissions';
+import { useLanguage } from '@/providers/LanguageProvider';
 import SidebarDrawer from './SidebarDrawer';
  
 interface UserModalProps {
@@ -15,18 +17,40 @@ interface UserModalProps {
  
 export default function UserModal({ isOpen, onClose, onSave, user }: UserModalProps) {
     const { user: currentUser } = useAuth();
+    const { t } = useLanguage();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<'admin' | 'business_admin' | 'cashier'>('cashier');
     const [fullName, setFullName] = useState('');
     const [khmerName, setKhmerName] = useState('');
+    const [pinInput, setPinInput] = useState('');
+    const [pinError, setPinError] = useState('');
+    const [saveError, setSaveError] = useState('');
     const [loading, setLoading] = useState(false);
- 
+    const [unlocking, setUnlocking] = useState(false);
+    const isAdmin = normalizeRole(currentUser?.role) === 'admin' || normalizeRole(currentUser?.role) === 'super_admin';
+    const isLocked = !!user?.locked_until && new Date(user.locked_until.replace(' ', 'T')) > new Date();
+
+    async function handleUnlock() {
+        if (!user) return;
+        setUnlocking(true);
+        try {
+            await unlockUser(user.id, currentUser?.restaurant_id || '');
+            onSave();
+            onClose();
+        } catch (error) {
+            console.error(error);
+            setSaveError(error instanceof Error ? error.message : t('saveFailed'));
+        } finally {
+            setUnlocking(false);
+        }
+    }
+
     useEffect(() => {
         if (user) {
             setUsername(user.username);
             setPassword('');
-            setRole((roleLabel(user.role) as 'admin' | 'business_admin' | 'cashier') || 'cashier');
+            setRole((normalizeRole(user.role) as 'admin' | 'business_admin' | 'cashier') || 'cashier');
             setFullName(user.full_name || '');
             setKhmerName(user.khmer_name || '');
         } else {
@@ -36,39 +60,55 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
             setFullName('');
             setKhmerName('');
         }
+        setPinInput('');
+        setPinError('');
+        setSaveError('');
     }, [user, isOpen]);
  
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        setPinError('');
+        if (pinInput && (pinInput.length < 4 || pinInput.length > 6 || !/^\d+$/.test(pinInput))) {
+            setPinError('PIN must be 4-6 digits.');
+            return;
+        }
         setLoading(true);
         try {
+            const restaurantId = currentUser?.restaurant_id || '';
             if (user) {
                 await updateUser(
-                    user.id, 
-                    password || undefined, 
-                    role, 
-                    currentUser?.restaurant_id || '',
-                    fullName || undefined, 
+                    user.id,
+                    password || undefined,
+                    role,
+                    restaurantId,
+                    fullName || undefined,
                     khmerName || undefined
                 );
+                if (pinInput && restaurantId) {
+                    await setUserPin(restaurantId, user.id, pinInput);
+                }
             } else {
                 if (!password) throw new Error('Password required for new users');
-                if (!currentUser?.restaurant_id) throw new Error('No restaurant context found');
+                if (!restaurantId) throw new Error('No restaurant context found');
 
-                await createUser(
-                    username, 
-                    password, 
-                    role, 
-                    currentUser.restaurant_id,
-                    fullName || undefined, 
+                const newId = await createUser(
+                    username,
+                    password,
+                    role,
+                    restaurantId,
+                    fullName || undefined,
                     khmerName || undefined
                 );
+                if (pinInput && newId) {
+                    await setUserPin(restaurantId, newId, pinInput);
+                }
             }
             onSave();
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Failed to save user');
+            const detail = isAdmin && error instanceof Error ? error.message : '';
+            setSaveError(detail || t('saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -148,11 +188,55 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 }`}
                             >
                                 <Shield size={14} className={role === r ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
-                                <span className="text-xs font-bold capitalize">{r.replace('_', ' ')}</span>
+                                <span className="text-xs font-bold capitalize">{t(roleI18nKey(r))}</span>
                             </button>
                         ))}
                     </div>
                 </div>
+
+                <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+                        Quick PIN <span className="text-[var(--text-secondary)]/40 normal-case tracking-normal font-normal">(optional, 4–6 digits)</span>
+                    </label>
+                    <div className="relative">
+                        <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-50" />
+                        <input
+                            type="password"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
+                            value={pinInput}
+                            onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-10 pr-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-mono tracking-[0.5em] text-center"
+                            placeholder="• • • •"
+                        />
+                    </div>
+                    {pinError && <p className="text-xs text-red-400">{pinError}</p>}
+                </div>
+
+                {user && isAdmin && isLocked && (
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/25">
+                        <div className="flex items-start gap-2 text-amber-400 text-xs font-medium">
+                            <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                            <span>{t('accountLocked')}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleUnlock}
+                            disabled={unlocking}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                        >
+                            <LockOpen size={13} /> {t('unlockAccount')}
+                        </button>
+                    </div>
+                )}
+
+                {saveError && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-red-400 text-xs font-medium">
+                        <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                        <span>{saveError}</span>
+                    </div>
+                )}
 
                 <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)]">
                     <button

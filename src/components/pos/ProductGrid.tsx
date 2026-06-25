@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getProducts, getCategories } from '@/lib/api/products';
 import { getOrderItems } from '@/lib/api/orders';
 import { useOrder } from '@/providers/OrderProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { formatUsd } from '@/lib/currency';
+import { formatUsd, formatKhr, roundKhr } from '@/lib/currency';
 import { getImageSrc } from '@/lib/image';
 import { getTopProducts } from '@/lib/api/analytics';
 import type { Product, Category, TopProduct } from '@/types';
@@ -24,8 +24,10 @@ export default function ProductGrid() {
     const [searchQuery, setSearchQuery] = useState('');
     const [addingId, setAddingId] = useState<string | null>(null);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+    const [soldOutToastId, setSoldOutToastId] = useState<string | null>(null);
+    const soldOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const { orderId, tableId, setOrderId, setItems, addToLocalCart } = useOrder();
+    const { orderId, tableId, setOrderId, setItems, addToLocalCart, exchangeRate } = useOrder();
     const { user } = useAuth();
     const { t, lang } = useLanguage();
 
@@ -52,8 +54,23 @@ export default function ProductGrid() {
         getOrderItems(orderId, user?.restaurant_id || '').then(items => setItems(items)).catch(console.error);
     }, [orderId, setItems, user?.restaurant_id]);
 
+    function showSoldOutToast(productId: string) {
+        setSoldOutToastId(productId);
+        if (soldOutTimerRef.current) clearTimeout(soldOutTimerRef.current);
+        soldOutTimerRef.current = setTimeout(() => setSoldOutToastId(null), 1800);
+    }
+
     async function handleProductClick(product: Product) {
         if (product.is_available === 0) return;
+        if (product.sold_out_today) {
+            showSoldOutToast(product.id);
+            return;
+        }
+        const isSoldOut = (product.stock_quantity ?? 1) <= 0;
+        if (isSoldOut) {
+            showSoldOutToast(product.id);
+            return;
+        }
         setAddingId(product.id);
         try {
             await addToLocalCart(product);
@@ -200,18 +217,22 @@ export default function ProductGrid() {
                         {sortedFiltered.map((product, idx) => {
                             const isAdding = addingId === product.id;
                             const unavailable = product.is_available === 0;
+                            const soldOutToday = !unavailable && !!product.sold_out_today;
+                            const isSoldOut = !unavailable && !soldOutToday && (product.stock_quantity ?? 1) <= 0;
+                            const isBlocked = unavailable || soldOutToday || isSoldOut;
+                            const showingToast = soldOutToastId === product.id;
                             const cardColor = CARD_COLORS[idx % CARD_COLORS.length];
                             const displayName = lang === 'km' ? (product.khmer_name || product.name) : product.name;
+                            const displayDescription = ((lang === 'km' ? product.khmer_description : product.description) || product.description || product.khmer_description || '').trim();
 
                             return (
                                 <button
                                     key={product.id}
                                     onClick={() => handleProductClick(product)}
-                                    disabled={unavailable}
-                                    title={unavailable ? t('unavailable') : displayName}
+                                    title={unavailable ? t('unavailable') : soldOutToday ? t('soldOutToday') : isSoldOut ? t('soldOut') : displayDescription ? `${displayName} — ${displayDescription}` : displayName}
                                     className={`group flex flex-col text-left relative overflow-hidden rounded-xl transition-all duration-150 active:scale-95 ${
                                         isAdding ? 'scale-95 ring-2 ring-[var(--accent-green)]' : ''
-                                    } ${unavailable ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'}`}
+                                    } ${unavailable ? 'opacity-30 cursor-not-allowed' : soldOutToday ? 'opacity-50 cursor-not-allowed' : isSoldOut ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'}`}
                                     style={{ background: cardColor, border: `1px solid rgba(255,255,255,0.08)` }}
                                 >
                                     {/* Image area */}
@@ -229,46 +250,95 @@ export default function ProductGrid() {
                                         )}
 
                                         {/* Badges Overlay */}
-                                        {product.id === bestSellerId && (
+                                        {!isSoldOut && product.id === bestSellerId && (
                                             <div className="absolute top-1.5 left-1.5 bg-orange-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-10 hover:bg-orange-400">
                                                 <Flame size={10} /> {t('bestSeller')}
                                             </div>
                                         )}
-                                        {product.id !== bestSellerId && product.id === recommendedId && (
+                                        {!isSoldOut && product.id !== bestSellerId && product.id === recommendedId && (
                                             <div className="absolute top-1.5 left-1.5 bg-yellow-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-10 hover:bg-yellow-400">
                                                 <Star size={10} /> {t('recommended')}
                                             </div>
                                         )}
-                                        {product.id !== bestSellerId && product.id !== recommendedId && (product.created_at && (now - new Date(product.created_at).getTime() < SEVEN_DAYS_MS)) && (
+                                        {!isSoldOut && product.id !== bestSellerId && product.id !== recommendedId && (product.created_at && (now - new Date(product.created_at).getTime() < SEVEN_DAYS_MS)) && (
                                             <div className="absolute top-1.5 left-1.5 bg-[var(--accent-blue)] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-10 hover:brightness-110">
                                                 <Sparkles size={10} /> {t('new')}
                                             </div>
                                         )}
 
-                                        {/* Unavailable overlay (admin-disabled) */}
-                                        {unavailable && (
-                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                                <span className="text-[10px] font-black text-red-400 uppercase tracking-widest bg-black/60 px-2 py-1 rounded-full">
-                                                    {t('notAvailableShort')}
-                                                </span>
+                                        {/* Sold Out badge */}
+                                        {isSoldOut && (
+                                            <div className="absolute top-1.5 right-1.5 bg-red-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg z-10">
+                                                {t('soldOut')}
                                             </div>
                                         )}
+
+                                        {/* Low-stock badge (only when stock is tracked and > 0) */}
+                                        {!isSoldOut && !unavailable && product.stock_quantity != null && product.stock_quantity > 0 && (
+                                            <div className={`absolute top-1.5 right-1.5 text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg z-10 ${
+                                                product.stock_quantity <= 5
+                                                    ? 'bg-amber-500 text-white'
+                                                    : 'bg-black/50 text-white'
+                                            }`}>
+                                                {product.stock_quantity} {t('stockLeft')}
+                                            </div>
+                                        )}
+
+                                        {/* Sold Out center overlay with toast */}
+                                        {isSoldOut && (
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                {showingToast && (
+                                                    <span className={`text-[10px] font-black text-white uppercase tracking-widest bg-red-600 px-2 py-1 rounded-full ${lang === 'km' ? 'khmer' : ''}`}>
+                                                        {t('soldOut')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Add indicator on hover */}
-                                        {!unavailable && (
+                                        {!isBlocked && (
                                             <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
                                                 <span className="text-white text-xs font-black leading-none">+</span>
                                             </div>
                                         )}
                                     </div>
 
+                                    {/* Unavailable full-card overlay (admin-disabled) */}
+                                    {unavailable && (
+                                        <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 rounded-xl">
+                                            <span className={`text-sm font-black text-white uppercase tracking-wider bg-red-600/80 px-3 py-1.5 rounded-xl shadow-lg ${lang === 'km' ? 'khmer' : ''}`}>
+                                                {t('unavailable')}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Sold Out Today full-card overlay (temporary shift toggle) */}
+                                    {soldOutToday && (
+                                        <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 rounded-xl">
+                                            <span className={`text-xs font-black text-white uppercase tracking-wider text-center bg-red-600/80 px-3 py-1.5 rounded-xl shadow-lg ${lang === 'km' ? 'khmer' : ''}`}>
+                                                {t('soldOutToday')}
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {/* Info area */}
                                     <div className="p-2">
                                         <p className={`text-xs font-semibold text-white leading-tight line-clamp-2 mb-1 ${lang === 'km' ? 'khmer' : ''}`}>
                                             {displayName}
                                         </p>
+                                        {displayDescription && (
+                                            <p className={`text-[10px] text-white/50 leading-tight line-clamp-1 mb-1 ${lang === 'km' ? 'khmer' : ''}`}>
+                                                {displayDescription}
+                                            </p>
+                                        )}
                                         <p className="text-xs font-bold text-[var(--accent-green)] font-mono">
                                             {formatUsd(product.price_cents)}
                                         </p>
+                                        {exchangeRate > 0 && (
+                                            <p className="text-[10px] text-white/40 font-mono leading-tight">
+                                                ≈ {formatKhr(roundKhr(Math.round(product.price_cents / 100 * exchangeRate)))}
+                                            </p>
+                                        )}
                                     </div>
                                 </button>
                             );

@@ -22,6 +22,7 @@ const DEFAULT: RestaurantInput = {
     website: '',
     logo_path: '',
     receipt_footer: 'Thank you',
+    receipt_footer_khmer: '',
     receipt_width: '80mm',
     license_expires_at: '',
     license_support_contact: '',
@@ -160,6 +161,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         website: restaurant.website || '',
                         logo_path: restaurant.logo_path || '',
                         receipt_footer: restaurant.receipt_footer || DEFAULT.receipt_footer,
+                        receipt_footer_khmer: restaurant.receipt_footer_khmer || '',
                         receipt_width: restaurant.receipt_width || '80mm',
                         license_expires_at: restaurant.license_expires_at || '',
                         license_support_contact: restaurant.license_support_contact || '',
@@ -284,7 +286,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'
                         }`}
                     >
-                        <Building2 size={13} /> Identity & Type
+                        <Building2 size={13} /> {t('settingsIdentityType')}
                     </button>
                     <button
                         onClick={() => setActiveSubTab('address')}
@@ -294,7 +296,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'
                         }`}
                     >
-                        <MapPin size={13} /> Address Details
+                        <MapPin size={13} /> {t('settingsAddressDetails')}
                     </button>
                     <button
                         onClick={() => setActiveSubTab('branding')}
@@ -304,7 +306,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'
                         }`}
                     >
-                        <ImageIcon size={13} /> Branding & Receipt
+                        <ImageIcon size={13} /> {t('settingsBrandingReceipt')}
                     </button>
                     <button
                         onClick={() => setActiveSubTab('operational')}
@@ -314,7 +316,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'
                         }`}
                     >
-                        <Info size={13} /> Operational Settings
+                        <Info size={13} /> {t('settingsOperational')}
                     </button>
                 </div>
             )}
@@ -328,7 +330,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         {/* Business Type Dropdown - Autosaves upon selection with Reload Page confirmation warning */}
                         <div className="border-b border-[var(--border)] pb-5 space-y-2.5">
                             <label className="block text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">
-                                Business Type
+                                {t('settingsBusinessType')}
                             </label>
                             <div className="max-w-md">
                                 <CustomSelect
@@ -340,24 +342,24 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                             <div className="bg-amber-500/10 rounded-xl p-3 border border-amber-500/20 text-amber-300 text-[10px] leading-relaxed max-w-xl flex gap-2">
                                 <Info size={14} className="flex-shrink-0 text-amber-400 mt-0.5" />
                                 <p className="font-semibold uppercase tracking-wider">
-                                    Changing your business type will automatically reload the application to correctly configure the POS module components.
+                                    {t('settingsBusinessTypeWarning')}
                                 </p>
                             </div>
                         </div>
 
                         {/* Text fields editable in-place via pencil/checkmark buttons */}
-                        <EditableField label="Business Name (English)" value={info.name || ''} onSave={val => saveField('name', val)} placeholder="Volt Coffee" icon={Building2} />
-                        <EditableField label="Business Name (Khmer)" value={info.khmer_name || ''} onSave={val => saveField('khmer_name', val)} placeholder="ហាងកាហ្វេវ៉ុល" icon={Building2} />
-                        <EditableField label="Phone Number" value={info.phone || ''} onSave={val => saveField('phone', val)} placeholder="+855 12 345 678" icon={Phone} />
-                        <EditableField label="Website Url" value={info.website || ''} onSave={val => saveField('website', val)} placeholder="voltcoffee.kh" icon={Globe} />
+                        <EditableField label={t('settingsBizNameEn')} value={info.name || ''} onSave={val => saveField('name', val)} placeholder="Volt Coffee" icon={Building2} />
+                        <EditableField label={t('settingsBizNameKh')} value={info.khmer_name || ''} onSave={val => saveField('khmer_name', val)} placeholder="ហាងកាហ្វេវ៉ុល" icon={Building2} />
+                        <EditableField label={t('settingsPhoneNumber')} value={info.phone || ''} onSave={val => saveField('phone', val)} placeholder="+855 12 345 678" icon={Phone} />
+                        <EditableField label={t('settingsWebsiteUrl')} value={info.website || ''} onSave={val => saveField('website', val)} placeholder="voltcoffee.kh" icon={Globe} />
                     </div>
                 )}
 
                 {/* 2. ADDRESS DETAILS TAB */}
                 {activeTab === 'address' && (
                     <div className="space-y-6 animate-fade-in">
-                        <EditableField label="Address (English)" value={info.address || ''} onSave={val => saveField('address', val)} placeholder="No. 123, Monivong Blvd, Phnom Penh" icon={MapPin} />
-                        <EditableField label="Address (Khmer)" value={info.address_kh || ''} onSave={val => saveField('address_kh', val)} placeholder="ផ្ទះលេខ ១២៣ មហាវិថីមុនីវង្ស ភ្នំពេញ" icon={MapPin} />
+                        <EditableField label={t('settingsAddressEn')} value={info.address || ''} onSave={val => saveField('address', val)} placeholder="No. 123, Monivong Blvd, Phnom Penh" icon={MapPin} />
+                        <EditableField label={t('settingsAddressKh')} value={info.address_kh || ''} onSave={val => saveField('address_kh', val)} placeholder="ផ្ទះលេខ ១២៣ មហាវិថីមុនីវង្ស ភ្នំពេញ" icon={MapPin} />
                     </div>
                 )}
 
@@ -368,7 +370,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         {/* Logo upload - instant save, no save button */}
                         <div className="border-b border-[var(--border)] pb-5">
                             <label className="block text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 mb-3">
-                                Business Logo Image
+                                {t('settingsLogoImage')}
                             </label>
                             <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl max-w-2xl">
                                 <div className="relative group flex-shrink-0">
@@ -388,16 +390,16 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                                     </label>
                                 </div>
                                 <div className="space-y-1 text-center sm:text-left">
-                                    <h3 className="text-xs font-black text-[var(--foreground)]">Transparent Logo</h3>
+                                    <h3 className="text-xs font-black text-[var(--foreground)]">{t('settingsLogoTitle')}</h3>
                                     <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">
-                                        Upload a PNG logo for print checkouts. It will save and synchronize across all POS views instantly.
+                                        {t('settingsLogoDesc')}
                                     </p>
                                     {info.logo_path && (
-                                        <button 
+                                        <button
                                             onClick={handleLogoRemove}
                                             className="text-[9px] font-black text-red-500 uppercase tracking-widest mt-2 hover:text-red-400 block transition-all"
                                         >
-                                            Remove Business Logo
+                                            {t('settingsLogoRemove')}
                                         </button>
                                     )}
                                 </div>
@@ -407,7 +409,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         {/* Receipt Paper Size Dropdown */}
                         <div className="border-b border-[var(--border)] pb-5 space-y-2.5">
                             <label className="block text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">
-                                Receipt Paper Size
+                                {t('settingsReceiptPaperSize')}
                             </label>
                             <div className="max-w-md">
                                 <CustomSelect
@@ -423,10 +425,18 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
 
                         {/* Receipt Footer Message - editable via Pencil + Checkmark style */}
                         <EditableField
-                            label="Receipt Message Footer"
+                            label={t('settingsReceiptFooter')}
                             value={info.receipt_footer || ''}
                             onSave={val => saveField('receipt_footer', val)}
                             placeholder="Thank you for your visit!\nPlease come again."
+                            icon={StickyNote}
+                            multiline
+                        />
+                        <EditableField
+                            label={t('settingsKhmerFooter')}
+                            value={info.receipt_footer_khmer || ''}
+                            onSave={val => saveField('receipt_footer_khmer', val)}
+                            placeholder="អរគុណ!\nសូមមកម្ដងទៀត"
                             icon={StickyNote}
                             multiline
                         />
@@ -437,15 +447,15 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                 {activeTab === 'operational' && (
                     <div className="space-y-5 animate-fade-in">
                         <h3 className="text-xs font-black text-[var(--foreground)] flex items-center gap-1.5 border-b border-[var(--border)] pb-3">
-                            <Info size={14} className="text-[var(--accent-blue)]" /> Core Module Operations
+                            <Info size={14} className="text-[var(--accent-blue)]" /> {t('settingsCoreModuleOps')}
                         </h3>
 
                         {info.business_type === 'Coffee Shop' ? (
                             <div className="flex items-center justify-between p-4 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl max-w-3xl">
                                 <div className="space-y-1.5 flex-1 pr-4">
-                                    <p className="text-xs font-bold text-[var(--foreground)]">Disable Dining Tables</p>
+                                    <p className="text-xs font-bold text-[var(--foreground)]">{t('settingsDisableTables')}</p>
                                     <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">
-                                        Hide the dining floor plan if your coffee shop operates pure takeaway checkouts. Updates the sidebar navigation immediately.
+                                        {t('settingsDisableTablesDesc')}
                                     </p>
                                 </div>
                                 <button
@@ -466,9 +476,9 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                             <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-2xl flex gap-3 text-[10px] leading-relaxed max-w-3xl">
                                 <Info size={16} className="flex-shrink-0 mt-0.5 text-amber-400" />
                                 <div>
-                                    <p className="font-bold uppercase tracking-wider text-amber-200">Retail / Shop Mode Active</p>
+                                    <p className="font-bold uppercase tracking-wider text-amber-200">{t('settingsRetailModeActive')}</p>
                                     <p className="mt-1">
-                                        Dining floor plans are automatically disabled for this mode. POS runs in high-speed scanning and cashier checkouts exclusively — ideal for Marts, Accessories Shops, Pharmacies, and Bakeries.
+                                        {t('settingsRetailModeDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -476,9 +486,9 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                             <div className="p-4 bg-sky-500/10 border border-sky-500/20 text-sky-300 rounded-2xl flex gap-3 text-[10px] leading-relaxed max-w-3xl">
                                 <Info size={16} className="flex-shrink-0 mt-0.5 text-sky-400" />
                                 <div>
-                                    <p className="font-bold uppercase tracking-wider text-sky-200">Restaurant / Pub / Bar Active</p>
+                                    <p className="font-bold uppercase tracking-wider text-sky-200">{t('settingsRestaurantModeActive')}</p>
                                     <p className="mt-1">
-                                        Dining tables and zones are fully active to coordinate table orders, split guest invoices, and kitchen operations.
+                                        {t('settingsRestaurantModeDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -486,8 +496,8 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
 
                         {info.license_expires_at && (
                             <div className="p-4 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl space-y-1 max-w-3xl">
-                                <p className="text-[9px] font-black uppercase text-[var(--text-secondary)] opacity-60">License Validity</p>
-                                <p className="text-xs font-bold text-[var(--foreground)]">This business license is valid until {info.license_expires_at}.</p>
+                                <p className="text-[9px] font-black uppercase text-[var(--text-secondary)] opacity-60">{t('settingsLicenseValidity')}</p>
+                                <p className="text-xs font-bold text-[var(--foreground)]">{t('settingsLicenseValidUntil')} {info.license_expires_at}.</p>
                             </div>
                         )}
                     </div>
@@ -499,9 +509,9 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
             <div className="space-y-4 mt-4 p-4 border border-[var(--border)] rounded-2xl">
                 <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
-                        <p className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">VAT Registration</p>
+                        <p className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">{t('settingsVatRegistration')}</p>
                         <p className="text-[10px] text-[var(--text-secondary)] opacity-70 max-w-md">
-                            Only enable if your restaurant is registered with GDT for VAT. When enabled, 10% VAT will be added to all receipts. Printing VAT for a non-registered restaurant is illegal under Cambodian tax law.
+                            {t('settingsVatDesc')}
                         </p>
                     </div>
                     <button
@@ -531,7 +541,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         }}
                         className={`px-4 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-all ${activeTab === 'identity' ? 'invisible' : ''}`}
                     >
-                        ← Back
+                        {t('settingsBack')}
                     </button>
 
                     {activeTab === 'operational' ? (
@@ -539,7 +549,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                             onClick={onNext}
                             className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[var(--accent-blue)]/20"
                         >
-                            Get Started <ArrowRight size={14} />
+                            {t('settingsGetStarted')} <ArrowRight size={14} />
                         </button>
                     ) : (
                         <button
@@ -550,7 +560,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                             }}
                             className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[var(--accent-blue)]/20"
                         >
-                            Next <ArrowRight size={14} />
+                            {t('settingsNext')} <ArrowRight size={14} />
                         </button>
                     )}
                 </div>

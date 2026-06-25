@@ -4,7 +4,8 @@ import { createInventoryItem, updateInventoryItem } from '@/lib/api/inventory';
 import type { InventoryItem } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { Save, Package } from 'lucide-react';
+import { Save, Package, AlertTriangle } from 'lucide-react';
+import { normalizeRole } from '@/lib/permissions';
 import SidebarDrawer from './SidebarDrawer';
 
 interface InventoryItemModalProps {
@@ -26,6 +27,8 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
     const [minStockQty, setMinStockQty] = useState(0);
     const [costPerUnit, setCostPerUnit] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const isAdmin = normalizeRole(user?.role) === 'admin' || normalizeRole(user?.role) === 'super_admin';
 
     useEffect(() => {
         if (item) {
@@ -43,6 +46,7 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
             setMinStockQty(5);
             setCostPerUnit(0);
         }
+        setSaveError('');
     }, [item, isOpen]);
 
     async function handleSubmit(e: React.FormEvent) {
@@ -66,7 +70,8 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Failed to save inventory item');
+            const detail = isAdmin && error instanceof Error ? error.message : '';
+            setSaveError(detail || t('saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -76,20 +81,20 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
         <SidebarDrawer
             isOpen={isOpen}
             onClose={onClose}
-            title={item ? 'Edit Ingredient' : 'Add Ingredient'}
-            subtitle={item ? item.name : 'Create a new stock item'}
+            title={item ? t('editStockItem') : t('addStockItem')}
+            subtitle={item ? item.name : t('stockItem')}
         >
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                 {/* Name */}
                 <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
-                        Ingredient Name (EN)
+                        {t('stockItem')} (EN)
                     </label>
                     <input
                         required
                         value={name}
                         onChange={e => setName(e.target.value)}
-                        placeholder="e.g. Jasmine Rice"
+                        placeholder="e.g. Coffee Beans, Straws, Phone Case"
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold placeholder:text-[var(--text-secondary)]/50 focus:border-emerald-500 outline-none transition-all"
                     />
                 </div>
@@ -169,6 +174,13 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                 </div>
 
                 {/* Actions */}
+                {saveError && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-red-400 text-xs font-medium">
+                        <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                        <span>{saveError}</span>
+                    </div>
+                )}
+
                 <div className="flex gap-3 pt-4">
                     <button
                         type="button"

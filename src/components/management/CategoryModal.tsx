@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { createCategory, updateCategory } from '@/lib/api/products';
 import type { Category } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
-import { Save, ChevronDown, Check } from 'lucide-react';
+import { useLanguage } from '@/providers/LanguageProvider';
+import { normalizeRole } from '@/lib/permissions';
+import { Save, ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 
 interface CategoryModalProps {
@@ -21,8 +23,11 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
     const [parentSearch, setParentSearch] = useState('');
     const [isParentPickerOpen, setIsParentPickerOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [saveError, setSaveError] = useState('');
     const { user } = useAuth();
+    const { t } = useLanguage();
     const restaurantId = user?.restaurant_id;
+    const isAdmin = normalizeRole(user?.role) === 'admin' || normalizeRole(user?.role) === 'super_admin';
 
     useEffect(() => {
         if (category) {
@@ -36,6 +41,7 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
         }
         setParentSearch('');
         setIsParentPickerOpen(false);
+        setSaveError('');
     }, [category, isOpen]);
 
     const selectedParent = allCategories.find(c => c.id === parentId);
@@ -53,7 +59,8 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Failed to save category');
+            const detail = isAdmin && error instanceof Error ? error.message : '';
+            setSaveError(detail || t('saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -157,6 +164,13 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
                     )}
                     <p className="text-[10px] text-[var(--text-secondary)]">Assign this as a sub-category of another category.</p>
                 </div>
+
+                {saveError && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-red-400 text-xs font-medium">
+                        <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                        <span>{saveError}</span>
+                    </div>
+                )}
 
                 <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)]">
                     <button

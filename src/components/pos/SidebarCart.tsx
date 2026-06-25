@@ -3,12 +3,24 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds, getRestaurant, getSessionOrderItems } from '@/lib/tauri-commands';
+import { getRevenueSummary } from '@/lib/api/analytics';
+import type { OrderItem, RevenueSummary } from '@/types';
 import { formatUsd, formatKhr, calculateTotals, roundKhr } from '@/lib/currency';
 import { useEffect, useState, useRef } from 'react';
 import { Trash2, ShoppingCart, Plus, Minus, History, CreditCard, XCircle, Pencil, StickyNote, PauseCircle, ClipboardList, Loader2, Check, ChevronLeft, ChevronRight, Printer, X } from 'lucide-react';
 import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 import { getImageSrc } from '@/lib/image';
+import { canVoidOrder } from '@/lib/permissions';
+
+// English value is stored as the canonical void_reason for audit consistency
+// regardless of the cashier's UI language; the i18n key drives the display label.
+const VOID_REASONS = [
+    { value: 'Wrong order', key: 'voidReasonWrongOrder' as const },
+    { value: 'Customer cancelled', key: 'voidReasonCustomerCancelled' as const },
+    { value: 'Test order', key: 'voidReasonTestOrder' as const },
+    { value: 'Other', key: 'voidReasonOther' as const },
+];
 
 export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
     const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
@@ -17,10 +29,13 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+    const [voidReason, setVoidReason] = useState('');
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
     const [committing, setCommitting] = useState(false);
     const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+    const [todaySummary, setTodaySummary] = useState<RevenueSummary | null>(null);
     const roundsScrollRef = useRef<HTMLDivElement>(null);
 
     const scrollRounds = (dir: 'left' | 'right') => {
@@ -45,6 +60,14 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         });
     }, [items, localCart]);
 
+    const isAdmin = user?.role === 'admin';
+
+    useEffect(() => {
+        if (!isAdmin || !user?.restaurant_id) return;
+        getRevenueSummary(user.restaurant_id)
+            .then(setTodaySummary)
+            .catch(console.error);
+    }, [isAdmin, user?.restaurant_id, orderId]);
 
 
     async function handleNoteSave(id: string) {
@@ -110,14 +133,15 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     }
 
     async function handleVoid() {
+        setVoidReason('');
         setShowVoidConfirm(true);
     }
 
     async function confirmVoid() {
-        if (!orderId) return;
+        if (!orderId || !voidReason) return;
         setShowVoidConfirm(false);
         try {
-            await voidOrder(orderId, user?.restaurant_id || '');
+            await voidOrder(orderId, user?.restaurant_id || '', user?.id || '', voidReason);
             clearOrder();
         } catch (e) {
             console.error(e);
@@ -140,6 +164,9 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const totalQty = items.reduce((s, i) => s + i.quantity, 0);
     const localCartTotalCents = localCart.reduce((s, i) => s + i.priceCents * i.qty, 0);
     const localCartTotalQty = localCart.reduce((s, i) => s + i.qty, 0);
+    const displayKhr = orderId
+        ? totals.totalKhr
+        : (exchangeRate > 0 ? roundKhr(localCartTotalCents, exchangeRate) : 0);
 
     async function handlePrintReceipt() {
         if (!user || !user.restaurant_id) return;
@@ -154,7 +181,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 const allItems = await getSessionOrderItems(sessionId, user.restaurant_id!);
 
                 // Group by product_id to combine same items from different rounds
-                const groupedMap = new Map<string, { product_id: string; quantity: number; [key: string]: unknown }>();
+                const groupedMap = new Map<string, OrderItem>();
                 for (const item of allItems) {
                     if (groupedMap.has(item.product_id)) {
                         const existing = groupedMap.get(item.product_id)!;
@@ -265,6 +292,28 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         </button>
                     </div>
                 </div>
+
+                {/* Today's Sales widget — admin/owner only */}
+                {isAdmin && todaySummary && (
+                    <div className="flex-shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-dark)]/60 gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 whitespace-nowrap">
+                            {t('today') ?? 'Today'}
+                        </span>
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="text-center">
+                                <p className="text-[9px] text-[var(--text-secondary)] opacity-50 uppercase tracking-widest">{t('orders') ?? 'Orders'}</p>
+                                <p className="text-xs font-black text-[var(--foreground)] font-mono">{todaySummary.today_orders}</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[9px] text-[var(--text-secondary)] opacity-50 uppercase tracking-widest">{t('revenue') ?? 'Revenue'}</p>
+                                <p className="text-xs font-black text-[var(--accent-green)] font-mono">{formatUsd(todaySummary.today_usd)}</p>
+                                {exchangeRate > 0 && (
+                                    <p className="text-[9px] text-white/30 font-mono">{formatKhr(roundKhr(todaySummary.today_usd, exchangeRate))}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Rounds Scroller (only for table sessions) */}
                 {tableId && sessionId && rounds.length > 0 && (
@@ -528,20 +577,49 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         </div>
                     </div>
 
-                    <div className="flex items-end justify-between">
-                        <div>
-                            <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-1">{t('total')}</p>
-                            <p className="text-3xl font-black font-mono text-[var(--foreground)] leading-none">
-                                {orderId ? formatUsd(totals.totalUsdCents) : formatUsd(localCartTotalCents)}
-                            </p>
-                        </div>
-                        <p className="text-sm font-mono text-[var(--text-secondary)] opacity-50">
-                            {orderId ? formatKhr(totals.totalKhr) : ''}
+                    <div>
+                        <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-1">{t('total')}</p>
+                        <p className="text-3xl font-black font-mono text-[var(--foreground)] leading-none">
+                            {orderId ? formatUsd(totals.totalUsdCents) : formatUsd(localCartTotalCents)}
                         </p>
+                        {displayKhr > 0 && (
+                            <p className="text-sm font-mono text-[var(--text-secondary)] mt-0.5">
+                                ≈ {formatKhr(displayKhr)}
+                            </p>
+                        )}
                     </div>
 
                     {/* LOCAL CART mode: Place Order (table) or Checkout (takeout) */}
                     {!orderId && (
+                        <>
+                        {localCart.length > 0 && (
+                            <div>
+                                {showClearConfirm ? (
+                                    <div className="flex gap-1.5">
+                                        <span className="flex-1 text-[10px] font-bold text-[var(--text-secondary)] flex items-center px-2">{t('clearOrderConfirm')}</span>
+                                        <button
+                                            onClick={() => setShowClearConfirm(false)}
+                                            className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                                        >
+                                            {t('no') ?? 'No'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowClearConfirm(false); clearOrder(); }}
+                                            className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 transition-all"
+                                        >
+                                            {t('yes') ?? 'Yes'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowClearConfirm(true)}
+                                        className="w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-red-500/40 hover:text-red-400 transition-all"
+                                    >
+                                        + {t('newCustomer')}
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         <div className="grid grid-cols-2 gap-1.5">
                             <button
                                 onClick={clearOrder}
@@ -577,18 +655,21 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 </button>
                             )}
                         </div>
+                        </>
                     )}
 
                     {/* ORDER mode: Void + Hold + Checkout */}
                     {orderId && (
-                        <div className="grid grid-cols-3 gap-1.5">
-                            <button
-                                onClick={handleVoid}
-                                className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-red-600 border border-red-700 text-white hover:bg-red-700 transition-all active:scale-95"
-                            >
-                                <XCircle size={16} strokeWidth={2.5} />
-                                {t('voidOrder')}
-                            </button>
+                        <div className={`grid gap-1.5 ${canVoidOrder(user?.role) ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                            {canVoidOrder(user?.role) && (
+                                <button
+                                    onClick={handleVoid}
+                                    className="py-4 rounded-2xl text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 bg-red-600 border border-red-700 text-white hover:bg-red-700 transition-all active:scale-95"
+                                >
+                                    <XCircle size={16} strokeWidth={2.5} />
+                                    {t('voidOrder')}
+                                </button>
+                            )}
                             <button
                                 onClick={onHold}
                                 disabled={isEmpty}
@@ -625,6 +706,22 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                             {t('voidConfirmMessage')}
                         </p>
+                        <div className="space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">{t('voidReasonLabel')}</p>
+                            {VOID_REASONS.map(r => (
+                                <button
+                                    key={r.value}
+                                    onClick={() => setVoidReason(r.value)}
+                                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                        voidReason === r.value
+                                            ? 'bg-red-600/20 border-red-500 text-red-300'
+                                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'
+                                    }`}
+                                >
+                                    {t(r.key)}
+                                </button>
+                            ))}
+                        </div>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setShowVoidConfirm(false)}
@@ -634,7 +731,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             </button>
                             <button
                                 onClick={confirmVoid}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 transition-all"
+                                disabled={!voidReason}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 {t('voidOrder')}
                             </button>

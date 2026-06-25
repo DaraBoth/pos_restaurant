@@ -11,6 +11,7 @@ export interface UserSession {
     khmer_name?: string;
     phone?: string;
     restaurant_id?: string;
+    locked_until?: string;
 }
 
 export interface RestaurantSummary {
@@ -48,6 +49,7 @@ export interface Restaurant {
     website?: string;
     vat_number?: string;
     receipt_footer?: string;
+    receipt_footer_khmer?: string;
     receipt_width?: string;
     logo_path?: string;
     license_expires_at?: string;
@@ -77,6 +79,7 @@ export interface RestaurantInput {
     website?: string;
     vat_number?: string;
     receipt_footer?: string;
+    receipt_footer_khmer?: string;
     receipt_width?: string;
     logo_path?: string;
     license_expires_at?: string;
@@ -126,6 +129,12 @@ export interface Product {
     category_khmer?: string;
     ingredients: ProductIngredient[];
     created_at: string;
+    stock_quantity?: number;
+    sku?: string;
+    sold_out_today?: boolean;
+    description?: string;
+    khmer_description?: string;
+    cost_price_cents?: number;
 }
 
 // --------------- Tables ---------------
@@ -159,6 +168,11 @@ export interface Order {
     updated_at?: string;
     completed_at?: string;
     receipt_number?: string;
+    voided_by?: string;
+    voided_at?: string;
+    void_reason?: string;
+    voided_by_name?: string;
+    exchange_rate_used?: number;
 }
 
 export interface OrderItem {
@@ -324,6 +338,8 @@ export interface DailyReportPreview {
     inventory_usage: InventoryUsageRow[];
     is_closed: boolean;
     existing_report_id?: string;
+    cash_usd_cents: number;
+    cash_khr_riels: number;
 }
 
 export interface InventoryUsageRow {

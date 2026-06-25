@@ -147,6 +147,19 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("restaurants", "disable_tables", "disable_tables INTEGER NOT NULL DEFAULT 0");
     add_col!("restaurants", "receipt_width", "receipt_width TEXT NOT NULL DEFAULT '80mm'");
     add_col!("restaurants", "vat_enabled", "vat_enabled INTEGER NOT NULL DEFAULT 0");
+    add_col!("restaurants", "receipt_footer_khmer", "receipt_footer_khmer TEXT");
+    add_col!("products",    "sku",                  "sku TEXT");
+    add_col!("users",       "pin_hash",             "pin_hash TEXT");
+    add_col!("products",    "sold_out_today",       "sold_out_today INTEGER NOT NULL DEFAULT 0");
+    add_col!("orders",      "voided_by",            "voided_by TEXT");
+    add_col!("orders",      "voided_at",            "voided_at TEXT");
+    add_col!("orders",      "void_reason",          "void_reason TEXT");
+    add_col!("products",    "description",          "description TEXT");
+    add_col!("products",    "khmer_description",    "khmer_description TEXT");
+    add_col!("products",    "cost_price_cents",     "cost_price_cents INTEGER");
+    add_col!("orders",      "exchange_rate_used",   "exchange_rate_used REAL");
+    add_col!("users",       "failed_login_attempts", "failed_login_attempts INTEGER NOT NULL DEFAULT 0");
+    add_col!("users",       "locked_until",          "locked_until TEXT");
 
     // Ensure emergency tables exist
     if let Err(e) = conn.execute(
