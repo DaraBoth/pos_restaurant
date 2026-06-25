@@ -23,13 +23,16 @@ pub async fn get_exchange_rate(restaurant_id: String, pool: State<'_, Arc<Connec
             id: row.get::<String>(0).unwrap_or_default(),
             rate: get_f64_safe(&row, 1),
             effective_from: row.get::<String>(2).unwrap_or_default(),
+            is_default: false,
         })
     } else {
-        // Fallback to a default if no rate set for this restaurant yet
+        // No rate set for this restaurant yet — flag the arbitrary 4100 fallback as a default
+        // so the UI can warn/block instead of showing wrong KHR as if it were real.
         Ok(ExchangeRate {
             id: "default".to_string(),
             rate: 4100.0,
             effective_from: "".to_string(),
+            is_default: true,
         })
     }
 }
@@ -52,6 +55,7 @@ pub async fn set_exchange_rate(
         id,
         rate,
         effective_from: chrono::Utc::now().to_rfc3339(),
+        is_default: false,
     })
 }
 

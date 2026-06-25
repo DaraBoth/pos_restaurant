@@ -27,7 +27,7 @@ export default function ProductGrid() {
     const [soldOutToastId, setSoldOutToastId] = useState<string | null>(null);
     const soldOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const { orderId, tableId, setOrderId, setItems, addToLocalCart, exchangeRate } = useOrder();
+    const { orderId, tableId, setOrderId, setItems, addToLocalCart, exchangeRate, rateIsDefault } = useOrder();
     const { user } = useAuth();
     const { t, lang } = useLanguage();
 
@@ -334,7 +334,7 @@ export default function ProductGrid() {
                                         <p className="text-xs font-bold text-[var(--accent-green)] font-mono">
                                             {formatUsd(product.price_cents)}
                                         </p>
-                                        {exchangeRate > 0 && (
+                                        {exchangeRate > 0 && !rateIsDefault && (
                                             <p className="text-[10px] text-white/40 font-mono leading-tight">
                                                 ≈ {formatKhr(roundKhr(Math.round(product.price_cents / 100 * exchangeRate)))}
                                             </p>

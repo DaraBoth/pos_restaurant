@@ -228,6 +228,7 @@ export interface ExchangeRate {
     id: string;
     rate: number;
     effective_from: string;
+    is_default?: boolean;
 }
 
 export interface DbStatus {

@@ -21,6 +21,7 @@ interface OrderContextValue {
     totals: OrderTotals;
     exchangeRate: number;
     rateEffectiveFrom: string | null;
+    rateIsDefault: boolean;
     tableId: string;
     sessionId: string | null;
     rounds: Order[];
@@ -49,7 +50,7 @@ const EMPTY_TOTALS: OrderTotals = {
 
 const OrderContext = createContext<OrderContextValue>({
     orderId: null, items: [], totals: EMPTY_TOTALS,
-    exchangeRate: 4100, rateEffectiveFrom: null, tableId: '', sessionId: null, rounds: [], isTakeout: false, isDirect: false,
+    exchangeRate: 4100, rateEffectiveFrom: null, rateIsDefault: false, tableId: '', sessionId: null, rounds: [], isTakeout: false, isDirect: false,
     localCart: [],
     setOrderId: () => { }, setItems: () => { }, setTableId: () => { },
     setSessionId: () => { }, setRounds: () => { }, switchRound: async () => {},
@@ -63,6 +64,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [items, setItemsState] = useState<OrderItem[]>([]);
     const [exchangeRate, setExchangeRate] = useState(4100);
     const [rateEffectiveFrom, setRateEffectiveFrom] = useState<string | null>(null);
+    const [rateIsDefault, setRateIsDefault] = useState(false);
     const [tableId, setTableId] = useState('');
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [rounds, setRounds] = useState<Order[]>([]);
@@ -91,6 +93,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             const rate = await getExchangeRate(restaurantId || undefined);
             setExchangeRate(rate.rate);
             setRateEffectiveFrom(rate.effective_from ?? null);
+            setRateIsDefault(!!rate.is_default);
         } catch {
             // Keep default rate if Tauri not available
         }
@@ -201,7 +204,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <OrderContext.Provider value={{
-            orderId, items, totals, exchangeRate, rateEffectiveFrom, tableId, sessionId, rounds, isTakeout, isDirect,
+            orderId, items, totals, exchangeRate, rateEffectiveFrom, rateIsDefault, tableId, sessionId, rounds, isTakeout, isDirect,
             localCart,
             setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout, setDirect,
             refreshRate, clearOrder, loadTableSession, switchRound,

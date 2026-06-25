@@ -1,7 +1,7 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { TableProperties, ShoppingCart, ArrowLeft, ShoppingBag, UtensilsCrossed } from 'lucide-react';
+import { TableProperties, ShoppingCart, ArrowLeft, ShoppingBag, UtensilsCrossed, AlertTriangle } from 'lucide-react';
 import ProductGrid from '@/components/pos/ProductGrid';
 import SidebarCart from '@/components/pos/SidebarCart';
 import CheckoutModal from '@/components/pos/CheckoutModal';
@@ -18,7 +18,7 @@ export default function POSPage() {
     const [isHoldOpen, setIsHoldOpen] = useState(false);
     const searchParams = useSearchParams();
     const mode = searchParams.get('mode');
-    const { tableId, isTakeout, isDirect, items, clearOrder, localCart, orderId, commitLocalCart, setDirect, setTakeout, setTableId, refreshRate } = useOrder();
+    const { tableId, isTakeout, isDirect, items, clearOrder, localCart, orderId, commitLocalCart, setDirect, setTakeout, setTableId, refreshRate, rateIsDefault } = useOrder();
     const { user } = useAuth();
     const { lang, t } = useLanguage();
 
@@ -123,6 +123,16 @@ export default function POSPage() {
     return (
         <>
             <div className="flex flex-col flex-1 w-full min-h-0" style={{ background: 'var(--bg-dark)' }}>
+                {rateIsDefault && (
+                    <button
+                        type="button"
+                        onClick={() => router.push('/management/exchange-rate')}
+                        className="flex-shrink-0 w-full flex items-center gap-2 px-4 py-2 bg-amber-500/15 border-b border-amber-500/40 text-amber-400 text-xs font-bold text-left hover:bg-amber-500/25 transition-colors"
+                    >
+                        <AlertTriangle size={14} className="flex-shrink-0" />
+                        <span className="flex-1">{t('rateNotSetWarning')}</span>
+                    </button>
+                )}
                 <header className="flex-shrink-0 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-card)] backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">

@@ -24,7 +24,7 @@ const VOID_REASONS = [
 
 export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
     const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
-        localCart, addToLocalCart, updateLocalCartQty, commitLocalCart, exchangeRate } = useOrder();
+        localCart, addToLocalCart, updateLocalCartQty, commitLocalCart, exchangeRate, rateIsDefault } = useOrder();
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -582,7 +582,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                         <p className="text-3xl font-black font-mono text-[var(--foreground)] leading-none">
                             {orderId ? formatUsd(totals.totalUsdCents) : formatUsd(localCartTotalCents)}
                         </p>
-                        {displayKhr > 0 && (
+                        {displayKhr > 0 && !rateIsDefault && (
                             <p className="text-sm font-mono text-[var(--text-secondary)] mt-0.5">
                                 ≈ {formatKhr(displayKhr)}
                             </p>
