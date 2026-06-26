@@ -135,6 +135,8 @@ export interface Product {
     description?: string;
     khmer_description?: string;
     cost_price_cents?: number;
+    variants?: ProductVariant[];
+    modifier_groups?: ProductModifierGroup[];
 }
 
 // --------------- Tables ---------------
@@ -188,6 +190,50 @@ export interface OrderItem {
     product_name?: string;
     product_khmer?: string;
     image_path?: string;
+    variant_id?: string;
+    variant_name?: string;
+    modifiers?: OrderItemModifier[];
+}
+
+export interface ProductVariant {
+    id: string;
+    product_id: string;
+    name: string;
+    name_km?: string;
+    sku?: string;
+    price_cents: number;
+    stock_quantity?: number | null;
+    is_active: number;
+    sort_order: number;
+}
+
+export interface ProductModifierOption {
+    id: string;
+    group_id: string;
+    name: string;
+    name_km?: string;
+    price_delta_cents: number;
+    is_active: number;
+    sort_order: number;
+}
+
+export interface ProductModifierGroup {
+    id: string;
+    product_id: string;
+    name: string;
+    name_km?: string;
+    required: number;
+    multi_select: number;
+    sort_order: number;
+    options: ProductModifierOption[];
+}
+
+export interface OrderItemModifier {
+    id: string;
+    order_item_id: string;
+    modifier_option_id?: string;
+    name?: string;
+    price_delta_cents: number;
 }
 
 export interface KitchenOrderItem {
@@ -198,6 +244,8 @@ export interface KitchenOrderItem {
     note?: string;
     kitchen_status: 'pending' | 'cooking' | 'done';
     created_at: string;
+    variant_name?: string;
+    modifier_summary?: string;
 }
 
 export interface KitchenOrder {

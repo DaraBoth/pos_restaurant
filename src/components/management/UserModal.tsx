@@ -130,7 +130,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         value={username}
                         onChange={e => setUsername(e.target.value)}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-medium disabled:opacity-50"
-                        placeholder="e.g. johndoe"
+                        placeholder={t('phUsernameExample')}
                     />
                 </div>
 
@@ -158,7 +158,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                             value={fullName}
                             onChange={e => setFullName(e.target.value)}
                             className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-medium"
-                            placeholder="John Doe"
+                            placeholder={t('phFullNameExample')}
                         />
                     </div>
 

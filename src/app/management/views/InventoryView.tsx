@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { getInventoryItems, deleteInventoryItem, receiveStock } from '@/lib/api/inventory';
 import { useAuth } from '@/providers/AuthProvider';
-import { 
-    BoxesIcon, Search, AlertTriangle, 
-    Plus, Package, Trash2, Edit2, 
-    ArrowUpRight, ArrowDownRight
+import {
+    BoxesIcon, Search, AlertTriangle,
+    Plus, Package, Trash2, Edit2,
+    ArrowUpRight, X
 } from 'lucide-react';
 import InventoryItemModal from '@/components/management/InventoryItemModal';
 import { InventoryItem } from '@/types';
@@ -241,6 +241,13 @@ export default function InventoryView() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
+                                                    onClick={() => { setStockInItemId(item.id); setStockInQty(''); setStockInNote(''); }}
+                                                    className="px-2.5 py-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/20 hover:border-emerald-500/40 transition-all flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider"
+                                                >
+                                                    <ArrowUpRight size={14} strokeWidth={2.5} />
+                                                    {t('stockIn')}
+                                                </button>
+                                                <button
                                                     onClick={() => { setSelectedItem(item); setIsModalOpen(true); }}
                                                     className="p-2 rounded-lg bg-[var(--bg-elevated)] hover:bg-emerald-500/20 text-[var(--text-secondary)] hover:text-emerald-600 border border-transparent hover:border-emerald-500/30 transition-all"
                                                 >
@@ -303,6 +310,79 @@ export default function InventoryView() {
                     </div>
                 </div>
             )}
+
+            {stockInItemId && (() => {
+                const target = items.find(i => i.id === stockInItemId);
+                return (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => !stockInLoading && setStockInItemId(null)}>
+                        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-96 max-w-[90vw] mx-4" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
+                                        <ArrowUpRight size={16} strokeWidth={2.5} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-black text-[var(--foreground)] uppercase tracking-wide leading-none">{t('receiveStock')}</h3>
+                                        {target && (
+                                            <p className="text-[11px] text-[var(--text-secondary)] mt-1 font-semibold">
+                                                {lang === 'km' ? (target.khmer_name || target.name) : target.name}
+                                                <span className="opacity-60"> · {target.stock_qty.toLocaleString()} {target.unit_label}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button onClick={() => !stockInLoading && setStockInItemId(null)} className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-all">
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">{t('quantityReceived')}</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        autoFocus
+                                        value={stockInQty}
+                                        onChange={e => setStockInQty(e.target.value)}
+                                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono font-bold focus:border-emerald-500 outline-none transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">{t('note')} ({t('optional')})</label>
+                                    <input
+                                        type="text"
+                                        value={stockInNote}
+                                        onChange={e => setStockInNote(e.target.value)}
+                                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold placeholder:text-[var(--text-secondary)]/50 focus:border-emerald-500 outline-none transition-all"
+                                    />
+                                </div>
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        onClick={() => setStockInItemId(null)}
+                                        disabled={stockInLoading}
+                                        className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all disabled:opacity-50"
+                                    >
+                                        {t('cancel')}
+                                    </button>
+                                    <button
+                                        onClick={handleStockIn}
+                                        disabled={stockInLoading || !(parseFloat(stockInQty) > 0)}
+                                        className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-emerald-500 text-white hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        {stockInLoading ? (
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <ArrowUpRight size={14} strokeWidth={2.5} />
+                                        )}
+                                        {t('confirm')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

@@ -279,7 +279,7 @@ export default function LoginPage() {
                                         onChange={e => setUsername(e.target.value)}
                                         required
                                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 rounded-2xl pl-12 pr-4 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none transition-all font-medium"
-                                        placeholder="Enter username"
+                                        placeholder={t('phEnterUsername')}
                                         autoComplete="username"
                                     />
                                 </div>

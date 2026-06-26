@@ -81,7 +81,7 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
                         value={name}
                         onChange={e => setName(e.target.value)}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all font-medium"
-                        placeholder="e.g. Beverages"
+                        placeholder={t('phCategoryExample')}
                     />
                 </div>
 
@@ -113,7 +113,7 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
                             <input
                                 value={parentSearch}
                                 onChange={e => setParentSearch(e.target.value)}
-                                placeholder="Search parent category"
+                                placeholder={t('phSearchParentCategory')}
                                 className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--foreground)] text-sm placeholder:text-[var(--text-secondary)]/60 focus:border-[var(--accent)] outline-none transition-all"
                             />
                             <div className="max-h-44 overflow-y-auto rounded-lg border border-[var(--border)]">

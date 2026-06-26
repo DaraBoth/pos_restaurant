@@ -168,6 +168,8 @@ pub async fn add_order_item(
     quantity: i64,
     note: Option<String>,
     restaurant_id: String,
+    variant_id: Option<String>,
+    modifier_option_ids: Option<Vec<String>>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<OrderItem, String> {
     // 1. Verify order belongs to restaurant
@@ -175,7 +177,7 @@ pub async fn add_order_item(
         "SELECT id FROM orders WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
         params![order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| e.to_string())?;
-    
+
     if ord_rows.next().await.map_err(|e| e.to_string())?.is_none() {
         return Err("Order not found or access denied".to_string());
     }
@@ -187,20 +189,59 @@ pub async fn add_order_item(
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let prod_row = prod_rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Product not found".to_string())?;
-    let price_cents = prod_row.get::<i64>(0).unwrap_or(0);
+    let mut price_cents = prod_row.get::<i64>(0).unwrap_or(0);
     let p_name = prod_row.get::<String>(1).unwrap_or_default();
     let p_khmer = prod_row.get::<String>(2).ok();
 
-    // 3. Update existing item if pending
+    // 2b. If a variant was chosen, its price fully overrides the product price
+    // and its name is snapshotted onto the order line.
+    let variant_id = variant_id.filter(|s| !s.is_empty());
+    let mut variant_name: Option<String> = None;
+    if let Some(ref vid) = variant_id {
+        let mut v_rows = pool.query(
+            "SELECT price_cents, name FROM product_variants WHERE id = ? AND product_id = ? AND restaurant_id = ? AND is_deleted = 0",
+            params![vid.clone(), product_id.clone(), restaurant_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+        let v_row = v_rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Variant not found".to_string())?;
+        price_cents = v_row.get::<i64>(0).unwrap_or(price_cents);
+        variant_name = v_row.get::<String>(1).ok().filter(|s| !s.is_empty());
+    }
+
+    // 2c. Resolve chosen modifier options: each adds its price_delta_cents to the
+    // line price and its name is snapshotted onto order_item_modifiers.
+    let option_ids: Vec<String> = modifier_option_ids.unwrap_or_default().into_iter().filter(|s| !s.is_empty()).collect();
+    // (option_id, name, price_delta_cents)
+    let mut chosen_mods: Vec<(String, String, i64)> = Vec::new();
+    for opt_id in &option_ids {
+        let mut o_rows = pool.query(
+            "SELECT name, price_delta_cents FROM product_modifier_options WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+            params![opt_id.clone(), restaurant_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+        if let Some(o_row) = o_rows.next().await.map_err(|e| e.to_string())? {
+            let name = o_row.get::<String>(0).unwrap_or_default();
+            let delta = o_row.get::<i64>(1).unwrap_or(0);
+            price_cents += delta;
+            chosen_mods.push((opt_id.clone(), name, delta));
+        }
+    }
+
+    // 3. Update existing item if pending — only for plain lines (no modifiers),
+    // since each modifier combination is a distinct cart line.
     let mut ext_rows = pool.query(
-        "SELECT oi.id, oi.quantity FROM order_items oi 
+        "SELECT oi.id, oi.quantity FROM order_items oi
          JOIN orders o ON oi.order_id = o.id
-         WHERE oi.order_id = ? AND oi.product_id = ? AND oi.is_deleted = 0 
-           AND oi.kitchen_status = 'pending' AND o.restaurant_id = ?",
-        params![order_id.clone(), product_id.clone(), restaurant_id.clone()]
+         WHERE oi.order_id = ? AND oi.product_id = ? AND oi.is_deleted = 0
+           AND oi.kitchen_status = 'pending' AND o.restaurant_id = ?
+           AND COALESCE(oi.variant_id, '') = COALESCE(?, '')",
+        params![order_id.clone(), product_id.clone(), restaurant_id.clone(), variant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
-    if let Some(ext_row) = ext_rows.next().await.map_err(|e| e.to_string())? {
+    let existing = if chosen_mods.is_empty() {
+        ext_rows.next().await.map_err(|e| e.to_string())?
+    } else {
+        None
+    };
+    if let Some(ext_row) = existing {
         let existing_id = ext_row.get::<String>(0).unwrap_or_default();
         let current_qty = ext_row.get::<i64>(1).unwrap_or(0);
         let new_qty = current_qty + quantity;
@@ -225,15 +266,35 @@ pub async fn add_order_item(
             product_name: Some(p_name),
             product_khmer: p_khmer,
             image_path: None,
+            variant_id,
+            variant_name,
+            modifiers: Vec::new(),
         });
     }
 
-    // 4. Create new item (snapshot product_name + product_khmer so history is preserved even after product deletion)
+    // 4. Create new item (snapshot product_name + product_khmer + variant_name so history is preserved even after product/variant deletion)
     let id = uuid::Uuid::new_v4().to_string();
     pool.execute(
-        "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status, product_name, product_khmer) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-        params![id.clone(), order_id.clone(), product_id.clone(), quantity, price_cents, note.clone().unwrap_or_default(), p_name.clone(), p_khmer.clone().unwrap_or_default()]
+        "INSERT INTO order_items (id, order_id, product_id, quantity, price_at_order, note, kitchen_status, product_name, product_khmer, variant_id, variant_name) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)",
+        params![id.clone(), order_id.clone(), product_id.clone(), quantity, price_cents, note.clone().unwrap_or_default(), p_name.clone(), p_khmer.clone().unwrap_or_default(), variant_id.clone(), variant_name.clone().unwrap_or_default()]
     ).await.map_err(|e| format!("Insert order_items error (order_id={}, product_id={}): {}", order_id, product_id, e))?;
+
+    // Snapshot chosen modifier options onto the line.
+    let mut item_modifiers = Vec::new();
+    for (opt_id, opt_name, delta) in &chosen_mods {
+        let m_id = uuid::Uuid::new_v4().to_string();
+        pool.execute(
+            "INSERT INTO order_item_modifiers (id, order_item_id, modifier_option_id, restaurant_id, name, price_delta_cents) VALUES (?, ?, ?, ?, ?, ?)",
+            params![m_id.clone(), id.clone(), opt_id.clone(), restaurant_id.clone(), opt_name.clone(), *delta]
+        ).await.map_err(|e| format!("Insert order_item_modifiers error: {}", e))?;
+        item_modifiers.push(crate::models::OrderItemModifier {
+            id: m_id,
+            order_item_id: id.clone(),
+            modifier_option_id: Some(opt_id.clone()),
+            name: Some(opt_name.clone()),
+            price_delta_cents: *delta,
+        });
+    }
 
     recalculate_order_totals(&order_id, &restaurant_id, &pool).await?;
 
@@ -248,7 +309,30 @@ pub async fn add_order_item(
         product_name: Some(p_name),
         product_khmer: p_khmer,
         image_path: None,
+        variant_id,
+        variant_name,
+        modifiers: item_modifiers,
     })
+}
+
+async fn load_item_modifiers(pool: &Connection, order_item_id: &str) -> Vec<crate::models::OrderItemModifier> {
+    let mut out = Vec::new();
+    if let Ok(mut rows) = pool.query(
+        "SELECT id, order_item_id, modifier_option_id, name, price_delta_cents
+         FROM order_item_modifiers WHERE order_item_id = ? ORDER BY created_at",
+        params![order_item_id.to_string()]
+    ).await {
+        while let Ok(Some(row)) = rows.next().await {
+            out.push(crate::models::OrderItemModifier {
+                id: row.get::<String>(0).unwrap_or_default(),
+                order_item_id: row.get::<String>(1).unwrap_or_default(),
+                modifier_option_id: row.get::<String>(2).ok().filter(|s| !s.is_empty()),
+                name: row.get::<String>(3).ok().filter(|s| !s.is_empty()),
+                price_delta_cents: row.get::<i64>(4).unwrap_or(0),
+            });
+        }
+    }
+    out
 }
 
 #[tauri::command]
@@ -302,7 +386,7 @@ pub async fn get_order_items(
                 oi.kitchen_status,
                 COALESCE(NULLIF(oi.product_name, ''), p.name)       AS product_name,
                 COALESCE(NULLIF(oi.product_khmer, ''), p.khmer_name) AS product_khmer,
-                p.image_path
+                p.image_path, oi.variant_id, oi.variant_name
          FROM order_items oi
          JOIN orders o ON oi.order_id = o.id
          LEFT JOIN products p ON oi.product_id = p.id
@@ -324,7 +408,13 @@ pub async fn get_order_items(
             product_name: row.get::<String>(7).ok(),
             product_khmer: row.get::<String>(8).ok(),
             image_path: row.get::<String>(9).ok(),
+            variant_id: row.get::<String>(10).ok().filter(|s| !s.is_empty()),
+            variant_name: row.get::<String>(11).ok().filter(|s| !s.is_empty()),
+            modifiers: Vec::new(),
         });
+    }
+    for item in &mut items {
+        item.modifiers = load_item_modifiers(&pool, &item.id).await;
     }
 
     Ok(items)
@@ -479,7 +569,7 @@ pub async fn get_session_order_items(
                 oi.kitchen_status,
                 COALESCE(NULLIF(oi.product_name, ''), p.name)        AS product_name,
                 COALESCE(NULLIF(oi.product_khmer, ''), p.khmer_name)  AS product_khmer,
-                p.image_path
+                p.image_path, oi.variant_id, oi.variant_name
          FROM order_items oi
          JOIN orders o ON oi.order_id = o.id
          LEFT JOIN products p ON oi.product_id = p.id
@@ -501,7 +591,13 @@ pub async fn get_session_order_items(
             product_name: row.get::<String>(7).ok(),
             product_khmer: row.get::<String>(8).ok(),
             image_path: row.get::<String>(9).ok(),
+            variant_id: row.get::<String>(10).ok().filter(|s| !s.is_empty()),
+            variant_name: row.get::<String>(11).ok().filter(|s| !s.is_empty()),
+            modifiers: Vec::new(),
         });
+    }
+    for item in &mut items {
+        item.modifiers = load_item_modifiers(&pool, &item.id).await;
     }
 
     Ok(items)

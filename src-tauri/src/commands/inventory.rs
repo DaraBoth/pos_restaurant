@@ -144,8 +144,22 @@ pub async fn update_inventory_item(
     max_stock_qty: Option<f64>,
     cost_per_unit: f64,
     restaurant_id: String,
+    user_id: Option<String>,
 ) -> Result<InventoryItem, String> {
     let stock_pct = calc_stock_pct(stock_qty, min_stock_qty, max_stock_qty);
+
+    // Capture the previous stock level so a manual edit that changes it is logged
+    // as an "adjustment" movement (delta = new - old) for the audit trail.
+    let prev_stock_qty: Option<f64> = {
+        let mut rows = db.query(
+            "SELECT stock_qty FROM inventory_items WHERE id = ? AND restaurant_id = ?",
+            params![id.clone(), restaurant_id.clone()],
+        ).await.map_err(|e| e.to_string())?;
+        match rows.next().await.map_err(|e| e.to_string())? {
+            Some(row) => Some(get_f64_safe(&row, 0)),
+            None => None,
+        }
+    };
 
     let query = "
         UPDATE inventory_items
@@ -164,13 +178,24 @@ pub async fn update_inventory_item(
         min_stock_qty,
         max_stock_qty,
         cost_per_unit,
-        restaurant_id
+        restaurant_id.clone()
     ]).await.map_err(|e| e.to_string())?;
 
     let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Update failed".to_string())?;
     let sq = get_f64_safe(&row, 4);
     let mn = get_f64_safe(&row, 6);
     let mx = get_f64_opt(&row, 9);
+
+    if let Some(prev) = prev_stock_qty {
+        let delta = sq - prev;
+        if delta.abs() > f64::EPSILON {
+            let movement_id = uuid::Uuid::new_v4().to_string();
+            let _ = db.execute(
+                "INSERT INTO inventory_movements (id, inventory_item_id, movement_type, quantity, note, user_id, restaurant_id) VALUES (?, ?, 'adjustment', ?, NULL, ?, ?)",
+                params![movement_id, id.clone(), delta, user_id.clone(), restaurant_id.clone()],
+            ).await;
+        }
+    }
 
     Ok(InventoryItem {
         id: row.get::<String>(0).unwrap_or_default(),

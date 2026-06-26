@@ -1,11 +1,12 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getOrders, getOrderItems, deleteOrderHistory } from '@/lib/api/orders';
+import { getOrders, getOrderItems, deleteOrderHistory, getPaymentsForOrder } from '@/lib/api/orders';
 import { getRestaurant } from '@/lib/api/restaurant';
+import { getUsers } from '@/lib/api/auth';
 import { getExchangeRate } from '@/lib/api/system';
 import { closeDailyReport, getDailyReportDetail, getDailyReportPreview, getDailyReports, reopenDailyReport } from '@/lib/api/reports';
-import { DailyReport, DailyReportDetail, DailyReportExpenseInput, DailyReportPreview, Order, OrderItem, Restaurant } from '@/types';
+import { DailyReport, DailyReportDetail, DailyReportExpenseInput, DailyReportPreview, Order, OrderItem, Payment, PaymentInput, Restaurant } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { formatUsd, formatKhr } from '@/lib/currency';
 import { printReceipt } from '@/lib/receipt';
@@ -26,6 +27,7 @@ import { getTopProductsInRange } from '@/lib/api/analytics';
 import { getImageSrc } from '@/lib/image';
 import { canDelete, canCloseShiftReport } from '@/lib/permissions';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 type StatusFilter = 'all' | 'open' | 'completed' | 'hold' | 'void';
 type PageTab = 'orders' | 'reports' | 'report-history';
@@ -49,6 +51,18 @@ const EXPENSE_CATEGORIES = [
     'Equipment',
     'Other',
 ];
+
+// Canonical English category value → i18n key. The stored value stays English;
+// only the displayed label is translated.
+const EXPENSE_CATEGORY_KEYS: Record<string, TranslationKey> = {
+    Inventory: 'expenseCategoryInventory',
+    Utility: 'expenseCategoryUtility',
+    Transportation: 'expenseCategoryTransportation',
+    Maintenance: 'expenseCategoryMaintenance',
+    Salary: 'expenseCategorySalary',
+    Equipment: 'expenseCategoryEquipment',
+    Other: 'expenseCategoryOther',
+};
 
 export interface GroupedOrder {
     id: string; // session_id or order_id
@@ -99,6 +113,10 @@ export default function HistoryPage() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
+    const [cashierFilter, setCashierFilter] = useState<string>('all');
+    const [paymentFilter, setPaymentFilter] = useState<string>('all');
+    const [orderPayments, setOrderPayments] = useState<Record<string, Payment[]>>({});
+    const [pendingDeleteGroup, setPendingDeleteGroup] = useState<GroupedOrder | null>(null);
     const [reportFilter, setReportFilter] = useState<ReportFilter>('all');
     const [reportSearch, setReportSearch] = useState('');
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -113,6 +131,7 @@ export default function HistoryPage() {
     const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+    const [usersById, setUsersById] = useState<Record<string, string>>({});
     const [dailyPreview, setDailyPreview] = useState<DailyReportPreview | null>(null);
     const [reportNotes, setReportNotes] = useState('');
     const [closedReports, setClosedReports] = useState<DailyReport[]>([]);
@@ -211,6 +230,34 @@ export default function HistoryPage() {
         } catch (e) {
             console.error(e);
         }
+        try {
+            const users = await getUsers(restaurantId || '');
+            const map: Record<string, string> = {};
+            users.forEach(u => { map[u.id] = u.full_name || u.username; });
+            setUsersById(map);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Reprints must carry the original payment breakdown and cashier name so a
+    // copy can't be mistaken for an unpaid bill (financial-record integrity).
+    async function loadReprintExtras(g: GroupedOrder): Promise<{ payments: PaymentInput[]; cashierName?: string }> {
+        let payments: PaymentInput[] = [];
+        try {
+            const all = await Promise.all(g.orders.map(o => getPaymentsForOrder(o.id, restaurantId || undefined)));
+            payments = all.flat().map(p => ({
+                method: p.method as PaymentInput['method'],
+                currency: p.currency as PaymentInput['currency'],
+                amount: p.amount,
+                bakong_transaction_hash: p.bakong_transaction_hash,
+            }));
+        } catch (e) {
+            console.error('Failed to load payments for reprint', e);
+        }
+        const cashierId = g.orders.find(o => o.user_id)?.user_id;
+        const cashierName = cashierId ? usersById[cashierId] : undefined;
+        return { payments, cashierName };
     }
 
     async function loadOrders() {
@@ -275,15 +322,19 @@ export default function HistoryPage() {
         }
     }
 
-    async function handleDeleteGroup(group: GroupedOrder) {
+    function handleDeleteGroup(group: GroupedOrder) {
         if (!user || !user.id) return;
         if (!canDelete(user.role)) {
-            window.alert('Permission denied: delete is only available to Admin roles.');
+            showExportToast(t('permissionDeniedDelete'), false);
             return;
         }
-        const confirmMsg = t('confirmDeleteHistory') || 'Are you sure you want to permanently delete this order history? This will remove it from both local and cloud databases and sync across all devices.';
-        if (!window.confirm(confirmMsg)) return;
+        setPendingDeleteGroup(group);
+    }
 
+    async function doDeleteGroup() {
+        const group = pendingDeleteGroup;
+        setPendingDeleteGroup(null);
+        if (!group || !user || !user.id) return;
         try {
             // A table order session has session_id, whereas takeout has just order_id
             const hasSession = group.orders.some(o => !!o.session_id);
@@ -294,7 +345,7 @@ export default function HistoryPage() {
             loadOrders();
         } catch (e: unknown) {
             console.error('Failed to delete history', e);
-            window.alert((t('error') || 'Error') + ': ' + ((e as Error)?.message || String(e)));
+            showExportToast((t('error') || 'Error') + ': ' + ((e as Error)?.message || String(e)), false);
         }
     }
 
@@ -333,10 +384,57 @@ export default function HistoryPage() {
         return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }, [orders]);
 
+    // Cashier dropdown options derived from the orders actually in the current range.
+    const cashierOptions = useMemo(() => {
+        const ids = new Set<string>();
+        orders.forEach(o => { if (o.user_id) ids.add(o.user_id); });
+        const opts = Array.from(ids).map(id => ({ value: id, label: usersById[id] || id }));
+        opts.sort((a, b) => a.label.localeCompare(b.label));
+        return [{ value: 'all', label: t('allCashiers') }, ...opts];
+    }, [orders, usersById, t]);
+
+    const paymentOptions = useMemo(() => ([
+        { value: 'all', label: t('allMethods') },
+        { value: 'cash', label: t('cash') },
+        { value: 'khqr', label: t('khqr') },
+        { value: 'card', label: t('card') },
+    ]), [t]);
+
+    // Payment data is only needed when the owner filters by method — load lazily
+    // for any orders not already fetched to avoid an upfront N-call burst.
+    useEffect(() => {
+        if (paymentFilter === 'all') return;
+        const missing = orders.filter(o => !(o.id in orderPayments));
+        if (missing.length === 0) return;
+        let cancelled = false;
+        Promise.all(
+            missing.map(o =>
+                getPaymentsForOrder(o.id, restaurantId || undefined)
+                    .then(p => ({ id: o.id, payments: p }))
+                    .catch(() => ({ id: o.id, payments: [] as Payment[] }))
+            )
+        ).then(results => {
+            if (cancelled) return;
+            setOrderPayments(prev => {
+                const next = { ...prev };
+                results.forEach(r => { next[r.id] = r.payments; });
+                return next;
+            });
+        });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [paymentFilter, orders, restaurantId]);
+
     const groupedOrders = useMemo(() => {
-        if (filter === 'all') return allGroupedOrders;
-        return allGroupedOrders.filter(g => g.status === filter);
-    }, [allGroupedOrders, filter]);
+        let result = filter === 'all' ? allGroupedOrders : allGroupedOrders.filter(g => g.status === filter);
+        if (cashierFilter !== 'all') {
+            result = result.filter(g => g.orders.some(o => o.user_id === cashierFilter));
+        }
+        if (paymentFilter !== 'all') {
+            result = result.filter(g => g.orders.some(o => (orderPayments[o.id] || []).some(p => p.method === paymentFilter)));
+        }
+        return result;
+    }, [allGroupedOrders, filter, cashierFilter, paymentFilter, orderPayments]);
 
     const filteredReports = useMemo(() => {
         const keyword = reportSearch.trim().toLowerCase();
@@ -409,7 +507,7 @@ export default function HistoryPage() {
 
         try {
             if (!filtered || filtered.length === 0) {
-                window.alert(t('noMatchingTransactions'));
+                showExportToast(t('noMatchingTransactions'), false);
                 return;
             }
 
@@ -506,7 +604,7 @@ export default function HistoryPage() {
             const detail = await getDailyReportDetail(report.id, restaurantId);
             printDailyClosingReport(restaurant, detail);
         } catch (e: unknown) {
-            window.alert('Failed to load report detail: ' + ((e as Error)?.message || String(e)));
+            showExportToast(t('failedLoadReportDetail') + ': ' + ((e as Error)?.message || String(e)), false);
         }
     };
 
@@ -592,7 +690,7 @@ export default function HistoryPage() {
     const handleCloseReport = () => {
         if (!restaurantId || !user?.id) return;
         if (dailyPreview?.is_closed) {
-            window.alert('Today\'s report is already closed.');
+            showExportToast(t('reportAlreadyClosed'), false);
             return;
         }
         setShowCloseReportConfirm(true);
@@ -630,7 +728,7 @@ export default function HistoryPage() {
             await loadClosedReports();
             printDailyClosingReport(currentRestaurant, detail);
         } catch (e: unknown) {
-            window.alert('Close report failed: ' + ((e as Error)?.message || String(e)));
+            showExportToast(t('closeReportFailed') + ': ' + ((e as Error)?.message || String(e)), false);
         } finally {
             setClosingReport(false);
         }
@@ -654,7 +752,7 @@ export default function HistoryPage() {
             notes: reportNotes,
             expenses: adjustments,
         }));
-        window.alert('Draft saved.');
+        showExportToast(t('draftSaved'), true);
     };
 
     const handlePrintPreview = () => {
@@ -855,10 +953,10 @@ export default function HistoryPage() {
                         <div>
                             <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">{t('dailySalesClosing')}</h2>
                             <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
-                                Review today&apos;s sales, record expenses, and close the daily report.
+                                {t('closingReportDescription')}
                             </p>
                             <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
-                                {dailyPreview?.is_closed ? `Status: CLOSED (${dailyPreview.report_date})` : `Status: OPEN (${endDate})`}
+                                {dailyPreview?.is_closed ? `${t('reportStatusClosed')} (${dailyPreview.report_date})` : `${t('reportStatusOpen')} (${endDate})`}
                             </p>
                         </div>
                     </div>
@@ -869,8 +967,8 @@ export default function HistoryPage() {
                             <table className="w-full min-w-[640px]">
                                 <thead className="bg-[var(--bg-elevated)]">
                                     <tr>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Metric</th>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Value</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('metricLabel')}</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('valueLabel')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -896,10 +994,10 @@ export default function HistoryPage() {
                                                     <table className="w-full min-w-[420px]">
                                                         <thead className="bg-[var(--bg-card)]">
                                                             <tr>
-                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Time</th>
-                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Receipt</th>
-                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Table</th>
-                                                                <th className="text-right px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">Amount</th>
+                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('timeLabel')}</th>
+                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('receiptLabel')}</th>
+                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('tableNumber')}</th>
+                                                                <th className="text-right px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('amountLabel')}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -912,7 +1010,7 @@ export default function HistoryPage() {
                                                                         {receipt.orders[0]?.receipt_number ?? '-'}
                                                                     </td>
                                                                     <td className="px-2 py-1.5 text-[11px] font-bold text-[var(--foreground)]">
-                                                                        {receipt.table_id || 'Takeout'}
+                                                                        {receipt.table_id || t('takeout')}
                                                                     </td>
                                                                     <td className="px-2 py-1.5 text-[11px] text-right font-mono font-black text-[var(--accent)]">
                                                                         {formatUsd(receipt.total_usd)}
@@ -987,14 +1085,14 @@ export default function HistoryPage() {
 
                     <div className="space-y-3 relative z-20">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Today&apos;s Expenses</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('todaysExpenses')}</h3>
                             <button
                                 type="button"
                                 onClick={addAdjustmentRow}
                                 disabled={!!dailyPreview?.is_closed}
                                 className="px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest"
                             >
-                                + Add Expense
+                                + {t('addExpense')}
                             </button>
                         </div>
 
@@ -1002,10 +1100,10 @@ export default function HistoryPage() {
                         <table className="w-full min-w-[680px] border-separate border-spacing-y-2">
                             <thead>
                                 <tr>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Date</th>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Category</th>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Description</th>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60 w-[180px]">Amount</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('dateLabel')}</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('category')}</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('description')}</th>
+                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60 w-[180px]">{t('amountLabel')}</th>
                                     <th className="px-3 py-2 w-[72px]"></th>
                                 </tr>
                             </thead>
@@ -1025,7 +1123,7 @@ export default function HistoryPage() {
                                             <CustomSelect
                                                 value={row.category}
                                                 onChange={(value) => updateAdjustmentRow(row.id, 'category', value)}
-                                                options={EXPENSE_CATEGORIES.map((cat) => ({ label: cat, value: cat }))}
+                                                options={EXPENSE_CATEGORIES.map((cat) => ({ label: t(EXPENSE_CATEGORY_KEYS[cat]), value: cat }))}
                                                 disabled={!!dailyPreview?.is_closed}
                                                 className="relative z-30 h-11"
                                             />
@@ -1036,7 +1134,7 @@ export default function HistoryPage() {
                                                 value={row.description}
                                                 onChange={(e) => updateAdjustmentRow(row.id, 'description', e.target.value)}
                                                 disabled={!!dailyPreview?.is_closed}
-                                                placeholder="Vegetables purchase, gas refill, delivery..."
+                                                placeholder={t('phExpenseExample')}
                                                 className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black text-[var(--foreground)]"
                                             />
                                         </td>
@@ -1059,7 +1157,7 @@ export default function HistoryPage() {
                                                 disabled={!!dailyPreview?.is_closed}
                                                 className="h-11 px-3 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest"
                                             >
-                                                Remove
+                                                {t('removeBtn')}
                                             </button>
                                         </td>
                                     </tr>
@@ -1070,20 +1168,20 @@ export default function HistoryPage() {
                     </div>
 
                     <div className="space-y-3 pt-1 relative z-0">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Inventory Usage Summary</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('inventoryUsageSummary')}</h3>
                         {inventoryUsageRows.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-4 text-[11px] font-bold text-[var(--text-secondary)] opacity-70">
-                                No linked inventory usage found for completed sales on this date.
+                                {t('noInventoryUsage')}
                             </div>
                         ) : (
                             <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                                 <table className="w-full min-w-[680px]">
                                     <thead className="bg-[var(--bg-elevated)]">
                                         <tr>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Inventory Item</th>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Used Qty</th>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Cost / Unit</th>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Total Cost</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('inventoryItemLabel')}</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('usedQtyLabel')}</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('costPerUnit')}</th>
+                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('totalCostLabel')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1102,63 +1200,63 @@ export default function HistoryPage() {
                     </div>
 
                     <div className="space-y-3 pt-1">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Business Summary</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('businessSummary')}</h3>
                         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                             <table className="w-full min-w-[760px]">
                                 <thead className="bg-[var(--bg-elevated)]">
                                     <tr>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Metric</th>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Value</th>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Edit</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('metricLabel')}</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('valueLabel')}</th>
+                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('editLabel')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Total Sales</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('totalSalesLabel')}</td>
                                         <td className="px-3 py-2 text-xs font-mono font-black text-[var(--foreground)]">{formatUsd(totalSalesCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">Auto (from paid orders)</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('autoFromPaidOrders')}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Total Expenses</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('totalExpensesLabel')}</td>
                                         <td className="px-3 py-2 text-xs font-mono font-black text-orange-400">{formatUsd(adjustmentTotalCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">Editable in Today&apos;s Expenses table</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('editableInExpenses')}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">Inventory Usage Cost</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('inventoryUsageCost')}</td>
                                         <td className="px-3 py-2 text-xs font-mono font-black text-sky-300">{formatUsd(inventoryUsageCostCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">Auto (from linked inventory usage)</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('autoFromInventory')}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)] bg-emerald-500/10">
-                                        <td className="px-3 py-2 text-xs font-black text-emerald-200">Operational Profit</td>
+                                        <td className="px-3 py-2 text-xs font-black text-emerald-200">{t('operationalProfit')}</td>
                                         <td className="px-3 py-2 text-xs font-mono font-black text-emerald-300">{formatUsd(netProfitCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-emerald-200/80">Total Sales - Total Expenses</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-emerald-200/80">{t('operationalProfitFormula')}</td>
                                     </tr>
                                     <tr className="border-t border-[var(--border)] bg-violet-500/10">
-                                        <td className="px-3 py-2 text-xs font-black text-violet-200">Estimated Profit After Inventory</td>
+                                        <td className="px-3 py-2 text-xs font-black text-violet-200">{t('estimatedProfitAfterInventory')}</td>
                                         <td className="px-3 py-2 text-xs font-mono font-black text-violet-300">{formatUsd(estimatedProfitAfterInventoryCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-violet-200/80">Operational Profit - Inventory Usage Cost</td>
+                                        <td className="px-3 py-2 text-xs font-bold text-violet-200/80">{t('estimatedProfitFormula')}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60">Inventory Usage Cost is estimated from linked recipe usage of completed sales for the selected date. Estimated Profit After Inventory = Operational Profit - Inventory Usage Cost.</p>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60">{t('inventoryUsageCostNote')}</p>
                     </div>
 
                     <div className="space-y-2 pt-1">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Daily Notes</h3>
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">Daily Notes</label>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('dailyNotesLabel')}</h3>
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('dailyNotesLabel')}</label>
                         <textarea
                             value={reportNotes}
                             onChange={(e) => setReportNotes(e.target.value)}
                             rows={4}
                             disabled={!!dailyPreview?.is_closed}
-                            placeholder="Kitchen equipment repaired. Supplier delivery delayed."
+                            placeholder={t('phExpenseNoteExample')}
                             className="pos-input px-3 py-2 text-xs w-full bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
                         />
                     </div>
 
                     <div className="space-y-3 border-t border-[var(--border)] mt-3 pt-4">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">Actions</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('actions')}</h3>
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
@@ -1198,7 +1296,7 @@ export default function HistoryPage() {
                     <div>
                         <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">{t('reportHistoryTitle')}</h2>
                         <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
-                            Closed reports for the selected date range.
+                            {t('reportHistoryDescription')}
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1206,7 +1304,7 @@ export default function HistoryPage() {
                             type="text"
                             value={reportSearch}
                             onChange={(e) => setReportSearch(e.target.value)}
-                            placeholder="Search by date, cashier, status..."
+                            placeholder={t('phSearchOrders')}
                             className="pos-input h-10 px-3 text-xs w-[220px] bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
                         />
                         <div className="flex flex-wrap gap-2">
@@ -1235,7 +1333,7 @@ export default function HistoryPage() {
                         <div className="lg:col-span-2 flex items-center justify-center py-16 opacity-40 border border-dashed border-[var(--border)] rounded-2xl">
                             <div className="text-center space-y-2">
                                 <ReceiptText size={28} className="mx-auto" />
-                                <p className="text-xs font-black uppercase tracking-widest">No reports matched this filter</p>
+                                <p className="text-xs font-black uppercase tracking-widest">{t('noReportsMatched')}</p>
                             </div>
                         </div>
                     ) : filteredReports.map(report => (
@@ -1244,7 +1342,7 @@ export default function HistoryPage() {
                                 <div>
                                     <h3 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">{report.report_date}</h3>
                                     <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
-                                        {report.paid_orders} paid orders
+                                        {report.paid_orders} {t('paidOrdersSuffix')}
                                     </p>
                                 </div>
                                 <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
@@ -1264,8 +1362,8 @@ export default function HistoryPage() {
                             </div>
 
                             <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest opacity-70">
-                                <span>Total Expenses {formatUsd(report.total_expenses_usd)}</span>
-                                <span>Net Profit {formatUsd(report.net_profit_usd)}</span>
+                                <span>{t('totalExpensesLabel')} {formatUsd(report.total_expenses_usd)}</span>
+                                <span>{t('netProfit')} {formatUsd(report.net_profit_usd)}</span>
                             </div>
 
                             {report.reopened_by && report.reopened_at && (
@@ -1278,7 +1376,7 @@ export default function HistoryPage() {
 
                             <div className="flex items-center justify-between gap-2 pt-1">
                                 <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60">
-                                    Closed by {report.cashier_name || 'Unknown'}
+                                    {t('closedByLabel')} {report.cashier_name || t('unknownLabel')}
                                 </span>
                                 <div className="flex items-center gap-2">
                                     {report.status === 'closed' && canCloseShiftReport(user?.role) && (
@@ -1295,14 +1393,14 @@ export default function HistoryPage() {
                                         onClick={() => handleExportDailyReport(report)}
                                         className="px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] font-black text-[10px] uppercase tracking-widest transition-all"
                                     >
-                                        Export
+                                        {t('exportBtn')}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handlePrintDailyReport(report)}
                                         className="px-3 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
                                     >
-                                        Print
+                                        {t('printBtn')}
                                     </button>
                                 </div>
                             </div>
@@ -1333,8 +1431,21 @@ export default function HistoryPage() {
                             </button>
                         ))}
                     </div>
-                    {/* View mode toggle */}
-                    <div className="flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-1 flex-shrink-0">
+                    {/* Cashier + payment-method filters and view mode toggle */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <CustomSelect
+                            value={cashierFilter}
+                            onChange={setCashierFilter}
+                            options={cashierOptions}
+                            className="w-40"
+                        />
+                        <CustomSelect
+                            value={paymentFilter}
+                            onChange={setPaymentFilter}
+                            options={paymentOptions}
+                            className="w-36"
+                        />
+                    <div className="flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-1">
                         <button
                             onClick={() => setViewMode('table')}
                             title="Table view"
@@ -1349,6 +1460,7 @@ export default function HistoryPage() {
                         >
                             <LayoutGrid size={15} strokeWidth={2.5} />
                         </button>
+                    </div>
                     </div>
                 </div>
 
@@ -1462,18 +1574,20 @@ export default function HistoryPage() {
                                                                             )}
                                                                             {g.status !== 'void' && (
                                                                             <button
-                                                                                onClick={(e) => {
+                                                                                onClick={async (e) => {
                                                                                     e.stopPropagation();
                                                                                     if (restaurant) {
                                                                                         const allItems = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
+                                                                                        const { payments, cashierName } = await loadReprintExtras(g);
                                                                                         printReceipt({
                                                                                             restaurant,
                                                                                             orderId: g.id,
                                                                                             tableId: g.table_id || undefined,
                                                                                             customerName: undefined,
                                                                                             customerPhone: undefined,
+                                                                                            cashierName,
                                                                                             items: allItems,
-                                                                                            payments: [],
+                                                                                            payments,
                                                                                             totals: {
                                                                                                 subtotalCents: g.total_usd - g.total_vat - g.total_plt,
                                                                                                 vatCents: g.total_vat,
@@ -1524,7 +1638,7 @@ export default function HistoryPage() {
                                                                         {g.orders.map((o, index) => (
                                                                             <div key={o.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-3">
                                                                                 <div className="flex items-center justify-between mb-3 border-b border-[var(--border)] pb-2 text-[10px] font-black uppercase tracking-widest opacity-60">
-                                                                                    <span>{g.table_id ? `Round ${index + 1}` : 'Order Segment'} - #{o.receipt_number ?? '-'}</span>
+                                                                                    <span>{g.table_id ? `${t('roundLabel')} ${index + 1}` : t('orderSegment')} - #{o.receipt_number ?? '-'}</span>
                                                                                     <div className="flex items-center gap-2">
                                                                                         {o.exchange_rate_used != null ? (
                                                                                             <span className="font-mono opacity-70">$1 = {Math.round(o.exchange_rate_used).toLocaleString()}&#x17DB;</span>
@@ -1776,16 +1890,18 @@ export default function HistoryPage() {
                                                 </button>
                                             )}
                                             <button
-                                                onClick={() => {
+                                                onClick={async () => {
                                                     if (restaurant && isLoaded) {
+                                                        const { payments, cashierName } = await loadReprintExtras(g);
                                                         printReceipt({
                                                             restaurant,
                                                             orderId: g.id,
                                                             tableId: g.table_id || undefined,
                                                             customerName: undefined,
                                                             customerPhone: undefined,
+                                                            cashierName,
                                                             items,
-                                                            payments: [],
+                                                            payments,
                                                             totals: {
                                                                 subtotalCents: g.total_usd,
                                                                 vatCents: 0,
@@ -1847,6 +1963,17 @@ export default function HistoryPage() {
                     <span>{exportToast.msg}</span>
                 </div>
             )}
+
+            <ConfirmDialog
+                open={pendingDeleteGroup !== null}
+                danger
+                title={t('deleteHistory') || 'Delete'}
+                message={t('confirmDeleteHistory') || t('deleteOrderConfirm')}
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                onConfirm={doDeleteGroup}
+                onCancel={() => setPendingDeleteGroup(null)}
+            />
         </div>
     );
 }

@@ -35,7 +35,8 @@ export const updateInventoryItem = (data: {
     max_stock_qty?: number | null,
     cost_per_unit: number,
     restaurant_id?: string,
-    restaurantId?: string
+    restaurantId?: string,
+    user_id?: string
 }) => call<InventoryItem>('update_inventory_item', {
     id: data.id,
     name: data.name,
@@ -45,7 +46,8 @@ export const updateInventoryItem = (data: {
     minStockQty: data.min_stock_qty,
     maxStockQty: data.max_stock_qty ?? null,
     costPerUnit: data.cost_per_unit,
-    restaurantId: data.restaurant_id || data.restaurantId
+    restaurantId: data.restaurant_id || data.restaurantId,
+    userId: data.user_id ?? null
 });
 
 export const deleteInventoryItem = (id: string, restaurantId: string, actorUserId: string) =>

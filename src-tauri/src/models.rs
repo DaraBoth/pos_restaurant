@@ -82,6 +82,56 @@ pub struct Product {
     pub description: Option<String>,
     pub khmer_description: Option<String>,
     pub cost_price_cents: Option<i64>,
+    #[serde(default)]
+    pub variants: Vec<ProductVariant>,
+    #[serde(default)]
+    pub modifier_groups: Vec<ProductModifierGroup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductVariant {
+    pub id: String,
+    pub product_id: String,
+    pub name: String,
+    pub name_km: Option<String>,
+    pub sku: Option<String>,
+    pub price_cents: i64,
+    pub stock_quantity: Option<i64>,
+    pub is_active: i64,
+    pub sort_order: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductModifierOption {
+    pub id: String,
+    pub group_id: String,
+    pub name: String,
+    pub name_km: Option<String>,
+    pub price_delta_cents: i64,
+    pub is_active: i64,
+    pub sort_order: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductModifierGroup {
+    pub id: String,
+    pub product_id: String,
+    pub name: String,
+    pub name_km: Option<String>,
+    pub required: i64,
+    pub multi_select: i64,
+    pub sort_order: i64,
+    #[serde(default)]
+    pub options: Vec<ProductModifierOption>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderItemModifier {
+    pub id: String,
+    pub order_item_id: String,
+    pub modifier_option_id: Option<String>,
+    pub name: Option<String>,
+    pub price_delta_cents: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,6 +261,12 @@ pub struct OrderItem {
     pub product_name: Option<String>,
     pub product_khmer: Option<String>,
     pub image_path: Option<String>,
+    #[serde(default)]
+    pub variant_id: Option<String>,
+    #[serde(default)]
+    pub variant_name: Option<String>,
+    #[serde(default)]
+    pub modifiers: Vec<OrderItemModifier>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,6 +278,10 @@ pub struct KitchenOrderItem {
     pub note: Option<String>,
     pub kitchen_status: String,
     pub created_at: String,
+    #[serde(default)]
+    pub variant_name: Option<String>,
+    #[serde(default)]
+    pub modifier_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

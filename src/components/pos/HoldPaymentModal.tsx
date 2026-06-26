@@ -18,15 +18,18 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [loading, setLoading] = useState(false);
+    const [holdError, setHoldError] = useState('');
 
     async function handleHold() {
         if (!orderId) return;
         setLoading(true);
+        setHoldError('');
         try {
             await holdOrder(orderId, user?.restaurant_id || '', customerName.trim() || undefined, customerPhone.trim() || undefined);
             onComplete();
         } catch (e) {
             console.error(e);
+            setHoldError(t('failedHoldOrder'));
         } finally {
             setLoading(false);
         }
@@ -44,7 +47,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                         <div>
                             <h2 className="text-sm font-black text-[var(--foreground)] leading-none">{t('holdForPayment')}</h2>
                             {tableId && (
-                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Table {tableId}</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">{t('tableNumber')} {tableId}</p>
                             )}
                         </div>
                     </div>
@@ -59,7 +62,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                 {/* Body */}
                 <div className="px-5 py-4 space-y-3">
                     <p className="text-[11px] text-[var(--text-secondary)]">
-                        Customer leaves without paying? Save their contact info — the table will be freed immediately and the order stored as a <span className="text-yellow-400 font-semibold">Hold</span> receipt so you can follow up for payment later.
+                        {t('holdOrderDescription')}
                     </p>
 
                     {/* Customer Name */}
@@ -72,7 +75,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                             type="text"
                             value={customerName}
                             onChange={e => setCustomerName(e.target.value)}
-                            placeholder="Optional"
+                            placeholder={t('optional')}
                             className="w-full px-3 py-2 rounded-xl text-sm bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none focus:border-[var(--accent-blue)]/60 transition-colors"
                         />
                     </div>
@@ -87,11 +90,18 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                             type="tel"
                             value={customerPhone}
                             onChange={e => setCustomerPhone(e.target.value)}
-                            placeholder="Optional"
+                            placeholder={t('optional')}
                             className="w-full px-3 py-2 rounded-xl text-sm bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 outline-none focus:border-[var(--accent-blue)]/60 transition-colors"
                         />
                     </div>
                 </div>
+
+                {holdError && (
+                    <div className="mx-5 mb-3 flex items-start gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-500 text-xs font-bold">
+                        <X size={14} className="flex-shrink-0 mt-0.5" />
+                        <span>{holdError}</span>
+                    </div>
+                )}
 
                 {/* Footer */}
                 <div className="px-5 pb-5 flex items-center gap-2">
@@ -99,7 +109,7 @@ export default function HoldPaymentModal({ onClose, onComplete }: Props) {
                         onClick={onClose}
                         className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--foreground)]/20 transition-all"
                     >
-                        Cancel
+                        {t('cancel')}
                     </button>
                     <button
                         onClick={handleHold}

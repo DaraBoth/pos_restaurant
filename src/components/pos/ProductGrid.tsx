@@ -9,7 +9,11 @@ import { formatUsd, formatKhr, roundKhr } from '@/lib/currency';
 import { getImageSrc } from '@/lib/image';
 import { getTopProducts } from '@/lib/api/analytics';
 import type { Product, Category, TopProduct } from '@/types';
-import { Search, ShoppingBag, UtensilsCrossed, Flame, Star, Sparkles, AlertTriangle } from 'lucide-react';
+import { Search, ShoppingBag, UtensilsCrossed, Flame, Star, Sparkles, AlertTriangle, PlusCircle } from 'lucide-react';
+import QuantityModal from './QuantityModal';
+import VariantPickerModal from './VariantPickerModal';
+import ModifierPickerModal from './ModifierPickerModal';
+import type { ProductVariant, ProductModifierOption } from '@/types';
 
 // Palette for products without images
 const CARD_COLORS = [
@@ -25,6 +29,9 @@ export default function ProductGrid() {
     const [addingId, setAddingId] = useState<string | null>(null);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
     const [soldOutToastId, setSoldOutToastId] = useState<string | null>(null);
+    const [qtyModalProduct, setQtyModalProduct] = useState<Product | null>(null);
+    const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
+    const [modifierPickerProduct, setModifierPickerProduct] = useState<Product | null>(null);
     const soldOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { orderId, tableId, setOrderId, setItems, addToLocalCart, exchangeRate, rateIsDefault } = useOrder();
@@ -60,26 +67,73 @@ export default function ProductGrid() {
         soldOutTimerRef.current = setTimeout(() => setSoldOutToastId(null), 1800);
     }
 
-    async function handleProductClick(product: Product) {
-        if (licenseExpiredPending) return;
-        if (product.is_available === 0) return;
+    // Returns true when the product can be added (not blocked); shows the
+    // sold-out toast and returns false otherwise.
+    function ensureAddable(product: Product): boolean {
+        if (licenseExpiredPending) return false;
+        if (product.is_available === 0) return false;
         if (product.sold_out_today) {
             showSoldOutToast(product.id);
-            return;
+            return false;
         }
-        const isSoldOut = (product.stock_quantity ?? 1) <= 0;
-        if (isSoldOut) {
-            showSoldOutToast(product.id);
-            return;
-        }
+        // Stock-based sold-out gate is intentionally NOT applied here: the legacy
+        // products.stock_quantity column is NOT NULL DEFAULT 0, so every product
+        // reads as 0 and was wrongly blocked as "sold out". It is re-enabled once
+        // the nullable stock_quantity migration (task 3e9cf8ae) + stock UI land.
+        return true;
+    }
+
+    function hasVariants(product: Product): boolean {
+        return !!product.variants && product.variants.some(v => v.is_active !== 0);
+    }
+
+    function hasModifiers(product: Product): boolean {
+        return !!product.modifier_groups && product.modifier_groups.some(g => g.options.some(o => o.is_active !== 0));
+    }
+
+    async function addQuantity(product: Product, qty: number, variant?: ProductVariant, modifiers?: ProductModifierOption[]) {
+        if (!ensureAddable(product)) return;
         setAddingId(product.id);
         try {
-            await addToLocalCart(product);
+            await addToLocalCart(product, qty, variant, modifiers);
         } catch (e) {
             console.error('Failed to add item:', e);
         } finally {
             setTimeout(() => setAddingId(null), 300);
         }
+    }
+
+    async function handleProductClick(product: Product, e?: React.MouseEvent) {
+        if (!ensureAddable(product)) return;
+        // Products with variants must be picked before they can be added to the cart.
+        if (hasVariants(product)) {
+            setVariantPickerProduct(product);
+            return;
+        }
+        // Products with modifier groups open the modifier picker.
+        if (hasModifiers(product)) {
+            setModifierPickerProduct(product);
+            return;
+        }
+        // Shift+click is a discoverable power-user shortcut for bulk quantity entry.
+        if (e?.shiftKey) {
+            setQtyModalProduct(product);
+            return;
+        }
+        await addQuantity(product, 1);
+    }
+
+    function openQuantityModal(product: Product) {
+        if (!ensureAddable(product)) return;
+        if (hasVariants(product)) {
+            setVariantPickerProduct(product);
+            return;
+        }
+        if (hasModifiers(product)) {
+            setModifierPickerProduct(product);
+            return;
+        }
+        setQtyModalProduct(product);
     }
 
     const filteredProducts = allProducts.filter(p => {
@@ -231,8 +285,11 @@ export default function ProductGrid() {
                             const isAdding = addingId === product.id;
                             const unavailable = product.is_available === 0;
                             const soldOutToday = !unavailable && !!product.sold_out_today;
-                            const isSoldOut = !unavailable && !soldOutToday && (product.stock_quantity ?? 1) <= 0;
-                            const isBlocked = unavailable || soldOutToday || isSoldOut;
+                            // Stock-based sold-out is disabled until the nullable stock_quantity
+                            // migration (task 3e9cf8ae) lands — the legacy NOT NULL DEFAULT 0
+                            // column made every product read as sold out (bug 10287e2e).
+                            const isSoldOut = false;
+                            const isBlocked = unavailable || soldOutToday;
                             const showingToast = soldOutToastId === product.id;
                             const cardColor = CARD_COLORS[idx % CARD_COLORS.length];
                             const displayName = lang === 'km' ? (product.khmer_name || product.name) : product.name;
@@ -241,7 +298,7 @@ export default function ProductGrid() {
                             return (
                                 <button
                                     key={product.id}
-                                    onClick={() => handleProductClick(product)}
+                                    onClick={(e) => handleProductClick(product, e)}
                                     title={unavailable ? t('unavailable') : soldOutToday ? t('soldOutToday') : isSoldOut ? t('soldOut') : displayDescription ? `${displayName} — ${displayDescription}` : displayName}
                                     className={`group flex flex-col text-left relative overflow-hidden rounded-xl transition-all duration-150 active:scale-95 ${
                                         isAdding ? 'scale-95 ring-2 ring-[var(--accent-green)]' : ''
@@ -314,6 +371,20 @@ export default function ProductGrid() {
                                                 <span className="text-white text-xs font-black leading-none">+</span>
                                             </div>
                                         )}
+
+                                        {/* Bulk quantity entry — opens a keypad to add multiple units at once */}
+                                        {!isBlocked && (
+                                            <span
+                                                role="button"
+                                                tabIndex={0}
+                                                title={t('enterQuantity')}
+                                                onClick={(e) => { e.stopPropagation(); openQuantityModal(product); }}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openQuantityModal(product); } }}
+                                                className="absolute bottom-1.5 left-1.5 w-7 h-7 rounded-full bg-black/55 hover:bg-[var(--accent)] text-white flex items-center justify-center shadow-lg z-10 transition-colors cursor-pointer"
+                                            >
+                                                <PlusCircle size={15} strokeWidth={2.5} />
+                                            </span>
+                                        )}
                                     </div>
 
                                     {/* Unavailable full-card overlay (admin-disabled) */}
@@ -359,6 +430,44 @@ export default function ProductGrid() {
                     </div>
                 )}
             </div>
+
+            {qtyModalProduct && (
+                <QuantityModal
+                    productName={lang === 'km' ? (qtyModalProduct.khmer_name || qtyModalProduct.name) : qtyModalProduct.name}
+                    unitPriceCents={qtyModalProduct.price_cents}
+                    isKhmer={lang === 'km'}
+                    onConfirm={(qty) => {
+                        const product = qtyModalProduct;
+                        setQtyModalProduct(null);
+                        addQuantity(product, qty);
+                    }}
+                    onClose={() => setQtyModalProduct(null)}
+                />
+            )}
+
+            {variantPickerProduct && (
+                <VariantPickerModal
+                    product={variantPickerProduct}
+                    onSelect={(variant) => {
+                        const product = variantPickerProduct;
+                        setVariantPickerProduct(null);
+                        addQuantity(product, 1, variant);
+                    }}
+                    onClose={() => setVariantPickerProduct(null)}
+                />
+            )}
+
+            {modifierPickerProduct && (
+                <ModifierPickerModal
+                    product={modifierPickerProduct}
+                    onConfirm={(options) => {
+                        const product = modifierPickerProduct;
+                        setModifierPickerProduct(null);
+                        addQuantity(product, 1, undefined, options);
+                    }}
+                    onClose={() => setModifierPickerProduct(null)}
+                />
+            )}
         </div>
     );
 }

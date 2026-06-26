@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { 
-    X, User, Monitor, Globe, LogOut, Building2, Check, Edit2, 
-    ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff, Download 
+    X, User, Monitor, Globe, LogOut, Building2, Check, Edit2,
+    ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff, Download,
+    Eye, EyeOff, Lock
 } from 'lucide-react';
 import { useAuth, getSessionTimeoutMs, SESSION_TIMEOUT_KEY } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
@@ -67,6 +68,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     const [pwdError, setPwdError] = useState('');
     const [pwdSuccess, setPwdSuccess] = useState(false);
     const [savingPwd, setSavingPwd] = useState(false);
+    const [showPwd, setShowPwd] = useState(false);
 
     // Logout confirmation
     const [isLogoutOpen, setIsLogoutOpen] = useState(false);
@@ -575,31 +577,40 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                 )}
 
                                 {/* Change Password */}
-                                <div className="space-y-3 pt-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">
-                                        {t('changePassword')}
-                                    </label>
-                                    <input
-                                        type="password"
-                                        placeholder={t('currentPassword') ?? 'Current Password'}
-                                        value={currentPwd}
-                                        onChange={e => setCurrentPwd(e.target.value)}
-                                        className="w-full max-w-sm px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
-                                    />
-                                    <input
-                                        type="password"
-                                        placeholder={t('newPassword') ?? 'New Password'}
-                                        value={newPwd}
-                                        onChange={e => setNewPwd(e.target.value)}
-                                        className="w-full max-w-sm px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
-                                    />
-                                    <input
-                                        type="password"
-                                        placeholder={t('confirmNewPassword') ?? 'Confirm New Password'}
-                                        value={confirmPwd}
-                                        onChange={e => setConfirmPwd(e.target.value)}
-                                        className="w-full max-w-sm px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
-                                    />
+                                <div className="pt-2 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)]/40 p-4 max-w-sm">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
+                                            <Lock size={12} />
+                                            {t('changePassword')}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPwd(v => !v)}
+                                            className="flex items-center gap-1 text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
+                                        >
+                                            {showPwd ? <EyeOff size={13} /> : <Eye size={13} />}
+                                            {showPwd ? t('hide') : t('show')}
+                                        </button>
+                                    </div>
+
+                                    {[
+                                        { label: t('currentPassword') ?? 'Current Password', value: currentPwd, set: setCurrentPwd, auto: 'current-password' },
+                                        { label: t('newPassword') ?? 'New Password', value: newPwd, set: setNewPwd, auto: 'new-password' },
+                                        { label: t('confirmNewPassword') ?? 'Confirm New Password', value: confirmPwd, set: setConfirmPwd, auto: 'new-password' },
+                                    ].map((f, i) => (
+                                        <div key={i} className="space-y-1">
+                                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] opacity-70">{f.label}</label>
+                                            <input
+                                                type={showPwd ? 'text' : 'password'}
+                                                autoComplete={f.auto}
+                                                placeholder={f.label}
+                                                value={f.value}
+                                                onChange={e => f.set(e.target.value)}
+                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-bold text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/40 outline-none focus:border-[var(--accent-blue)] transition-colors"
+                                            />
+                                        </div>
+                                    ))}
+
                                     {pwdError && (
                                         <p className="text-xs text-red-400 font-bold">{pwdError}</p>
                                     )}
@@ -611,7 +622,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                     <button
                                         onClick={handleChangePassword}
                                         disabled={savingPwd || !currentPwd || !newPwd || !confirmPwd}
-                                        className="px-4 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+                                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         {savingPwd ? '...' : (t('savePassword') ?? 'Save Password')}
                                     </button>

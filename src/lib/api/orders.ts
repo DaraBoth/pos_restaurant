@@ -5,8 +5,8 @@ export const createOrder = (user_id: string, table_id?: string, restaurant_id?: 
     call<string>('create_order', { userId: user_id, tableId: table_id, restaurantId: restaurant_id, notes });
 
 export const addOrderItem = (
-    order_id: string, product_id: string, quantity: number, restaurantId: string, note?: string
-) => call<OrderItem>('add_order_item', { orderId: order_id, productId: product_id, quantity, restaurantId, note });
+    order_id: string, product_id: string, quantity: number, restaurantId: string, note?: string, variant_id?: string, modifier_option_ids?: string[]
+) => call<OrderItem>('add_order_item', { orderId: order_id, productId: product_id, quantity, restaurantId, note, variantId: variant_id ?? null, modifierOptionIds: modifier_option_ids ?? null });
 
 export const updateOrderItemQuantity = (item_id: string, quantity: number, restaurantId: string) =>
     call<void>('update_order_item_quantity', { itemId: item_id, quantity, restaurantId });

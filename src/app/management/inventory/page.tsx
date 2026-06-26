@@ -429,7 +429,7 @@ export default function InventoryManagement() {
                                     type="text" required
                                     value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
                                     className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-2xl px-6 py-4 text-[var(--foreground)] focus:border-emerald-500 outline-none"
-                                    placeholder="Milk, Coffee Beans, Vodka..."
+                                    placeholder={t('phInventoryExample')}
                                 />
                             </div>
                             
@@ -498,7 +498,7 @@ export default function InventoryManagement() {
                                         type="number" min="0"
                                         value={formData.max_stock_qty ?? ''}
                                         onChange={e => setFormData({...formData, max_stock_qty: e.target.value === '' ? null : parseFloat(e.target.value)})}
-                                        placeholder="Optional"
+                                        placeholder={t('optional')}
                                         className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-2xl px-6 py-4 text-[var(--foreground)] focus:border-emerald-500 outline-none font-mono placeholder:text-[var(--text-secondary)]"
                                     />
                                 </div>

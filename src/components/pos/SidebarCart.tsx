@@ -14,6 +14,8 @@ import TableOrderHistoryModal from '@/components/pos/TableOrderHistoryModal';
 import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 import { getImageSrc } from '@/lib/image';
 import { canVoidOrder } from '@/lib/permissions';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Toast from '@/components/ui/Toast';
 
 // English value is stored as the canonical void_reason for audit consistency
 // regardless of the cashier's UI language; the i18n key drives the display label.
@@ -45,6 +47,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const [heldOrders, setHeldOrders] = useState<HeldOrderSummary[]>([]);
     const [showHeldDrawer, setShowHeldDrawer] = useState(false);
     const [resumingId, setResumingId] = useState<string | null>(null);
+    const [pendingResume, setPendingResume] = useState<HeldOrderSummary | null>(null);
+    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
     const roundsScrollRef = useRef<HTMLDivElement>(null);
 
     const scrollRounds = (dir: 'left' | 'right') => {
@@ -58,7 +62,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             const next = { ...prev };
 
             for (const item of localCart) {
-                next[`local-${item.productId}`] = String(item.qty);
+                next[`local-${item.productId}|${item.variantId || ''}|${(item.modifierOptionIds || []).join(',')}`] = String(item.qty);
             }
 
             for (const item of items) {
@@ -97,11 +101,16 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         refreshHeldOrders();
     }, [orderId, user?.restaurant_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    async function handleResumeOrder(held: HeldOrderSummary) {
+    function handleResumeOrder(held: HeldOrderSummary) {
         if ((items.length > 0 || localCart.length > 0) && orderId !== held.id) {
-            const ok = window.confirm(t('heldOrders') + ': ' + (t('noHeldOrders') ? '' : ''));
-            if (!ok) return;
+            setPendingResume(held);
+            return;
         }
+        doResumeOrder(held);
+    }
+
+    async function doResumeOrder(held: HeldOrderSummary) {
+        setPendingResume(null);
         setResumingId(held.id);
         try {
             const order = await resumeOrder(held.id, user?.restaurant_id || '');
@@ -112,6 +121,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             refreshHeldOrders();
         } catch (e) {
             console.error('Resume order failed:', e);
+            setToast({ msg: t('failedResumeOrder'), ok: false });
         } finally {
             setResumingId(null);
         }
@@ -127,6 +137,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             }
         } catch (e) {
             console.error(e);
+            setToast({ msg: t('genericError'), ok: false });
         } finally {
             setEditingNoteId(null);
         }
@@ -142,6 +153,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             setItems(updated);
         } catch (e) {
             console.error(e);
+            setToast({ msg: t('genericError'), ok: false });
         }
     }
 
@@ -168,16 +180,17 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
         }
     }
 
-    function handleLocalQtySet(productId: string, rawValue: string, fallbackQty: number) {
+    function handleLocalQtySet(productId: string, rawValue: string, fallbackQty: number, variantId?: string, modifierKey?: string) {
+        const draftKey = `local-${productId}|${variantId || ''}|${modifierKey || ''}`;
         const trimmed = rawValue.trim();
         const parsed = Number.parseInt(trimmed, 10);
 
         if (!trimmed || Number.isNaN(parsed)) {
-            setQuantityDrafts(prev => ({ ...prev, [`local-${productId}`]: String(fallbackQty) }));
+            setQuantityDrafts(prev => ({ ...prev, [draftKey]: String(fallbackQty) }));
             return;
         }
 
-        updateLocalCartQty(productId, Math.max(0, parsed));
+        updateLocalCartQty(productId, Math.max(0, parsed), variantId, modifierKey);
     }
 
     async function handleVoid() {
@@ -193,6 +206,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             clearOrder();
         } catch (e) {
             console.error(e);
+            setToast({ msg: t('failedVoidOrder'), ok: false });
         }
     }
 
@@ -205,6 +219,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             await switchRound(newOrderId);
         } catch (e) {
             console.error('Failed to add round', e);
+            setToast({ msg: t('failedAddRound'), ok: false });
         }
     }
 
@@ -245,11 +260,13 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             } else if (!orderId && localCart.length > 0) {
                 // Map local cart to OrderItem for preview
                 receiptItems = localCart.map(i => ({
-                    id: `local-${i.productId}`,
+                    id: `local-${i.productId}-${i.variantId ?? ''}`,
                     order_id: 'PREVIEW',
                     product_id: i.productId,
                     product_name: i.productName,
                     product_khmer: i.khmerName,
+                    variant_name: i.variantName,
+                    modifiers: (i.modifierLabel ? i.modifierLabel.split(', ').map(n => ({ name: n })) : undefined),
                     quantity: i.qty,
                     price_at_order: i.priceCents,
                     total_at_order: i.priceCents * i.qty,
@@ -291,7 +308,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             await commitLocalCart(user.id);
         } catch (e) {
             console.error('Failed to place order', e);
-            alert('Failed to place order: ' + String(e));
+            setToast({ msg: t('failedPlaceOrder'), ok: false });
         } finally {
             setCommitting(false);
         }
@@ -440,8 +457,13 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             </p>
                         </div>
                     )}
-                    {!orderId && localCart.map(item => (
-                        <div key={item.productId} className="rounded-none border bg-[var(--bg-elevated)] border-[var(--border-strong)] overflow-hidden">
+                    {!orderId && localCart.map(item => {
+                      const modKey = (item.modifierOptionIds || []).join(',');
+                      const lineKey = `${item.productId}|${item.variantId || ''}|${modKey}`;
+                      const draftKey = `local-${lineKey}`;
+                      const variantLabel = lang === 'km' ? (item.variantNameKm || item.variantName) : item.variantName;
+                      return (
+                        <div key={lineKey} className="rounded-none border bg-[var(--bg-elevated)] border-[var(--border-strong)] overflow-hidden">
                             <div className="flex gap-2.5 p-2.5 items-start">
                                 {/* Thumbnail */}
                                 <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[var(--bg-dark)] border border-[var(--border)]">
@@ -456,15 +478,27 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start gap-1 mb-1">
-                                        <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${item.khmerName ? 'khmer' : ''}`}>
-                                            {item.productName}
-                                        </p>
+                                        <div className="min-w-0">
+                                            <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${item.khmerName ? 'khmer' : ''}`}>
+                                                {item.productName}
+                                            </p>
+                                            {variantLabel && (
+                                                <p className={`text-[11px] font-semibold text-[var(--accent-blue)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
+                                                    {variantLabel}
+                                                </p>
+                                            )}
+                                            {item.modifierLabel && (
+                                                <p className="text-[10px] font-medium text-[var(--text-secondary)] truncate leading-tight">
+                                                    {item.modifierLabel}
+                                                </p>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
                                                 {formatUsd(item.priceCents * item.qty)}
                                             </span>
                                             <button
-                                                onClick={() => updateLocalCartQty(item.productId, 0)}
+                                                onClick={() => updateLocalCartQty(item.productId, 0, item.variantId, modKey)}
                                                 className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
                                                 title={t('removeItem')}
                                             >
@@ -477,7 +511,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                     </p>
                                     <div className="flex items-center gap-1 p-0 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] min-h-10">
                                         <button
-                                            onClick={() => updateLocalCartQty(item.productId, item.qty - 1)}
+                                            onClick={() => updateLocalCartQty(item.productId, item.qty - 1, item.variantId, modKey)}
                                             className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-400"
                                         >
                                             {item.qty <= 1 ? <Trash2 size={16} /> : <Minus size={16} />}
@@ -486,28 +520,28 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                             type="number"
                                             min="0"
                                             inputMode="numeric"
-                                            value={quantityDrafts[`local-${item.productId}`] ?? String(item.qty)}
-                                            onChange={(e) => setQuantityDrafts(prev => ({ ...prev, [`local-${item.productId}`]: e.target.value }))}
-                                            onBlur={(e) => handleLocalQtySet(item.productId, e.target.value, item.qty)}
+                                            value={quantityDrafts[draftKey] ?? String(item.qty)}
+                                            onChange={(e) => setQuantityDrafts(prev => ({ ...prev, [draftKey]: e.target.value }))}
+                                            onBlur={(e) => handleLocalQtySet(item.productId, e.target.value, item.qty, item.variantId, modKey)}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     e.currentTarget.blur();
                                                 }
                                                 if (e.key === 'Escape') {
-                                                    setQuantityDrafts(prev => ({ ...prev, [`local-${item.productId}`]: String(item.qty) }));
+                                                    setQuantityDrafts(prev => ({ ...prev, [draftKey]: String(item.qty) }));
                                                     e.currentTarget.blur();
                                                 }
                                             }}
                                             className="font-bold font-mono text-lg flex-1 min-w-0 text-center text-[var(--foreground)] bg-transparent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                         />
                                         <button
-                                            onClick={() => updateLocalCartQty(item.productId, item.qty + 1)}
+                                            onClick={() => updateLocalCartQty(item.productId, item.qty + 1, item.variantId, modKey)}
                                             className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-green)]/20 text-[var(--accent-green)]"
                                         >
                                             <Plus size={16} />
                                         </button>
                                     </div>
-                                    {localNoteProductId === item.productId ? (
+                                    {localNoteProductId === lineKey ? (
                                         <div className="mt-1.5 flex items-center gap-1">
                                             <StickyNote size={10} className="text-[var(--accent-blue)] flex-shrink-0" />
                                             <input
@@ -517,12 +551,12 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                                 onChange={e => setLocalNoteInput(e.target.value)}
                                                 onKeyDown={e => {
                                                     if (e.key === 'Enter' || e.key === 'Escape') {
-                                                        setLocalCartItemNote(item.productId, localNoteInput.trim());
+                                                        setLocalCartItemNote(item.productId, localNoteInput.trim(), item.variantId, modKey);
                                                         setLocalNoteProductId(null);
                                                     }
                                                 }}
                                                 onBlur={() => {
-                                                    setLocalCartItemNote(item.productId, localNoteInput.trim());
+                                                    setLocalCartItemNote(item.productId, localNoteInput.trim(), item.variantId, modKey);
                                                     setLocalNoteProductId(null);
                                                 }}
                                                 placeholder={t('itemNote') + '...'}
@@ -531,7 +565,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                         </div>
                                     ) : (
                                         <button
-                                            onClick={() => { setLocalNoteProductId(item.productId); setLocalNoteInput(item.note ?? ''); }}
+                                            onClick={() => { setLocalNoteProductId(lineKey); setLocalNoteInput(item.note ?? ''); }}
                                             className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
                                         >
                                             <Pencil size={9} />
@@ -544,7 +578,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 </div>
                             </div>
                         </div>
-                    ))}
+                      );
+                    })}
                     {/* ── COMMITTED ORDER (after Place Order) ── */}
                     {orderId && isEmpty && (
                         <div className="h-full flex flex-col items-center justify-center gap-2 opacity-30">
@@ -574,9 +609,19 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start gap-1 mb-0.5">
-                                            <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
-                                                {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
-                                            </p>
+                                            <div className="min-w-0">
+                                                <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
+                                                    {lang === 'km' ? (item.product_khmer || item.product_name) : item.product_name}
+                                                </p>
+                                                {item.variant_name && (
+                                                    <p className="text-[11px] font-semibold text-[var(--accent-blue)] truncate leading-tight">{item.variant_name}</p>
+                                                )}
+                                                {item.modifiers && item.modifiers.length > 0 && (
+                                                    <p className="text-[10px] font-medium text-[var(--text-secondary)] truncate leading-tight">
+                                                        {item.modifiers.map(m => m.name).filter(Boolean).join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
                                             <div className="flex items-center gap-1.5 shrink-0">
                                                 <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
                                                     {formatUsd(item.price_at_order * item.quantity)}
@@ -898,6 +943,17 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                open={pendingResume !== null}
+                title={t('resumeOrder')}
+                message={t('resumeOrderConfirm')}
+                confirmLabel={t('resumeOrder')}
+                cancelLabel={t('cancel')}
+                onConfirm={() => { if (pendingResume) doResumeOrder(pendingResume); }}
+                onCancel={() => setPendingResume(null)}
+            />
+            {toast && <Toast message={toast.msg} variant={toast.ok ? 'success' : 'error'} onClose={() => setToast(null)} />}
         </>
     );
 }

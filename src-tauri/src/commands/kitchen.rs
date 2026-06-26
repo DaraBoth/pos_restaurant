@@ -43,7 +43,9 @@ pub async fn get_kitchen_orders(
                     oi.quantity,
                     oi.note,
                     oi.kitchen_status,
-                    oi.created_at
+                    oi.created_at,
+                    oi.variant_name,
+                    (SELECT GROUP_CONCAT(m.name, ', ') FROM order_item_modifiers m WHERE m.order_item_id = oi.id) AS modifier_summary
              FROM order_items oi
              LEFT JOIN products p ON oi.product_id = p.id
              WHERE oi.order_id = ? AND oi.is_deleted = 0
@@ -64,6 +66,8 @@ pub async fn get_kitchen_orders(
                 note: row.get::<String>(4).ok(),
                 kitchen_status: row.get::<String>(5).unwrap_or_default(),
                 created_at: row.get::<String>(6).unwrap_or_default(),
+                variant_name: row.get::<String>(7).ok().filter(|s| !s.is_empty()),
+                modifier_summary: row.get::<String>(8).ok().filter(|s| !s.is_empty()),
             });
         }
 

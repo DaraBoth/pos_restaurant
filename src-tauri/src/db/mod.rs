@@ -130,6 +130,10 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("products",     "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("products",     "stock_quantity",  "stock_quantity INTEGER NOT NULL DEFAULT 0");
     add_col!("products",     "image_path",      "image_path TEXT");
+    // Product variants: each order line can reference a chosen variant; the
+    // variant name is snapshotted so history survives variant deletion.
+    add_col!("order_items",  "variant_id",      "variant_id TEXT");
+    add_col!("order_items",  "variant_name",    "variant_name TEXT");
     add_col!("inventory_logs", "inventory_item_id", "inventory_item_id TEXT REFERENCES inventory_items(id) ON DELETE CASCADE");
     add_col!("inventory_logs", "product_id",     "product_id TEXT REFERENCES products(id) ON DELETE CASCADE");
     add_col!("inventory_logs", "user_id",        "user_id TEXT REFERENCES users(id) ON DELETE CASCADE");
@@ -288,6 +292,79 @@ async fn ensure_critical_columns(conn: &Connection) {
             created_at TEXT DEFAULT (datetime('now','localtime')),
             restaurant_id TEXT NOT NULL
         )", params![]).await;
+
+    // Product variants: a parent product can have multiple priced child variants
+    // (e.g. Small/Medium/Large). Variant price_cents fully overrides the parent.
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS product_variants (
+            id TEXT PRIMARY KEY,
+            product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            restaurant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            name_km TEXT,
+            sku TEXT,
+            price_cents INTEGER NOT NULL,
+            stock_quantity INTEGER DEFAULT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", params![]).await;
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_variants_product
+         ON product_variants(product_id, restaurant_id)", params![]).await;
+
+    // Product modifier groups + options (e.g. "Sugar Level" → 25%/50%/100%).
+    // Options may carry a price delta; choices are snapshotted onto order lines.
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS product_modifier_groups (
+            id TEXT PRIMARY KEY,
+            product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            restaurant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            name_km TEXT,
+            required INTEGER NOT NULL DEFAULT 0,
+            multi_select INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", params![]).await;
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS product_modifier_options (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL REFERENCES product_modifier_groups(id) ON DELETE CASCADE,
+            restaurant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            name_km TEXT,
+            price_delta_cents INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", params![]).await;
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS order_item_modifiers (
+            id TEXT PRIMARY KEY,
+            order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+            modifier_option_id TEXT,
+            restaurant_id TEXT NOT NULL,
+            name TEXT,
+            price_delta_cents INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )", params![]).await;
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_modifier_groups_product
+         ON product_modifier_groups(product_id, restaurant_id)", params![]).await;
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_modifier_options_group
+         ON product_modifier_options(group_id, restaurant_id)", params![]).await;
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_order_item_modifiers_item
+         ON order_item_modifiers(order_item_id)", params![]).await;
 
     // ── Migration: remove the restrictive CHECK constraint from orders.status ──
     // SQLite doesn't support DROP CONSTRAINT, so we use rename → recreate → copy → drop.

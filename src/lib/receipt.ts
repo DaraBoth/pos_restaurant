@@ -111,11 +111,12 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
         border-bottom: 1px solid #000;
     }
     .items-tbl td { padding: 5px 0; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
-    .col-qty { width: 22px; text-align: center; font-weight: 900; }
-    .col-total { width: ${isSmall ? '55px' : '75px'}; text-align: right; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .col-qty { width: ${isSmall ? '18px' : '20px'}; text-align: center; font-weight: 900; }
+    .col-price { width: ${isSmall ? '42px' : '52px'}; text-align: right; font-variant-numeric: tabular-nums; }
+    .col-total { width: ${isSmall ? '50px' : '60px'}; text-align: right; font-weight: 900; font-variant-numeric: tabular-nums; }
     .item-nm { font-weight: 700; display: block; font-family: 'Inter', system-ui, sans-serif; }
     .item-km { font-size: ${isSmall ? '9.5px' : '11px'}; opacity: 0.8; font-family: 'Inter', system-ui, sans-serif; }
-    .item-pr { font-size: ${isSmall ? '8px' : '9.5px'}; opacity: 0.6; font-family: "Courier New", "Lucida Console", monospace; }
+    .item-mod { display: block; font-size: ${isSmall ? '8.5px' : '10px'}; opacity: 0.75; padding-left: 6px; font-family: 'Inter', system-ui, sans-serif; }
 
     /* ── Summary ── */
     .summary { margin-top: 8px; padding-top: 4px; }
@@ -126,7 +127,6 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
 
     .footer { text-align: center; margin-top: 4px; border-top: 1px dashed #000; padding-top: 4px; }
     .footer .msg { font-size: ${isSmall ? '10.5px' : '12px'}; font-weight: 700; }
-    .footer .brand { font-size: ${isSmall ? '7px' : '8.5px'}; opacity: 0.4; text-transform: uppercase; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -169,20 +169,22 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
   <table class="items-tbl">
     <thead>
       <tr>
+        <th>Item</th>
         <th class="col-qty center">Qty</th>
-        <th>Description</th>
+        <th class="col-price right">Price</th>
         <th class="col-total right">Total</th>
       </tr>
     </thead>
     <tbody>
       ${payload.items.map(item => `
         <tr>
-          <td class="col-qty center">${item.quantity}</td>
           <td>
-            <span class="item-nm">${escapeHtml(truncateName(item.product_name || '', isSmall ? 14 : 22))}</span>
-            ${item.product_khmer ? `<span class="item-km">${escapeHtml(truncateName(item.product_khmer, isSmall ? 12 : 20))}</span>` : ''}
-            <span class="item-pr">${fmtReceiptUsd(item.price_at_order)}</span>
+            <span class="item-nm">${escapeHtml(truncateName(item.product_name || '', isSmall ? 12 : 22))}${item.variant_name ? ' - ' + escapeHtml(truncateName(item.variant_name, isSmall ? 10 : 16)) : ''}</span>
+            ${item.product_khmer ? `<span class="item-km">${escapeHtml(truncateName(item.product_khmer, isSmall ? 11 : 20))}</span>` : ''}
+            ${item.modifiers && item.modifiers.length > 0 ? `<span class="item-mod">+ ${escapeHtml(item.modifiers.map(m => m.name).filter(Boolean).join(', '))}</span>` : ''}
           </td>
+          <td class="col-qty center">${item.quantity}</td>
+          <td class="col-price right">${fmtReceiptUsd(item.price_at_order)}</td>
           <td class="col-total right">${fmtReceiptUsd(item.price_at_order * item.quantity)}</td>
         </tr>
       `).join('')}
@@ -233,7 +235,6 @@ export function getReceiptHtml(payload: ReceiptPrintPayload): string {
     <div class="line" style="margin:4px 0;"></div>
     <div class="msg">${escapeHtml(payload.restaurant.receipt_footer || 'Thank you! / អរគុណ!')}</div>
     ${payload.restaurant.receipt_footer_khmer ? `<div class="msg" style="font-size:${isSmall ? '12px' : '14px'};margin-top:2px;">${escapeHtml(payload.restaurant.receipt_footer_khmer)}</div>` : ''}
-    <div class="brand">DineOS</div>
   </div>
   ${payload.isCopy ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:${isSmall ? '36px' : '48px'};font-weight:900;color:rgba(0,0,0,0.13);pointer-events:none;white-space:nowrap;z-index:9999;user-select:none;letter-spacing:0.05em;">COPY / ចំលង</div>` : ''}
 </body>

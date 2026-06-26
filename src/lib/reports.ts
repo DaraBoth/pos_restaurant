@@ -389,7 +389,6 @@ export function getSalesSummaryHtml(
 
     .footer { text-align: center; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
     .footer .msg { font-size: ${isSmall ? '10px' : '11px'}; font-weight: 700; }
-    .footer .brand { font-size: ${isSmall ? '7px' : '8.5px'}; opacity: 0.4; text-transform: uppercase; margin-top: 4px; }
 
     .legend { font-size: ${isSmall ? '7.5px' : '8.5px'}; opacity: 0.55; margin-top: 4px; text-align: center; }
   </style>
@@ -500,7 +499,6 @@ export function getSalesSummaryHtml(
 
   <div class="footer">
     <div class="msg">${L.endOfReport}</div>
-    <div class="brand">Powered by DineOS</div>
   </div>
 </body>
 </html>`;
@@ -670,7 +668,6 @@ export function printDailyClosingReport(
   </table>` : ''}
 
   <div class="line"></div>
-  <div class="footer">Powered by DineOS</div>
 </body>
 </html>`;
 

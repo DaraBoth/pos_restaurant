@@ -167,7 +167,7 @@ export default function TablesManagementPage() {
                             type="text"
                             value={PRESET_ZONES.includes(zone) ? '' : zone}
                             onChange={e => setZone(e.target.value)}
-                            placeholder="Custom zone..."
+                            placeholder={t('phCustomZone')}
                             onFocus={() => { if (PRESET_ZONES.includes(zone)) setZone(''); }}
                             onBlur={() => { if (!zone.trim()) setZone('Main'); }}
                             className="px-3 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] placeholder-[var(--text-secondary)]/40 outline-none focus:border-[var(--accent-blue)] transition-colors w-28"

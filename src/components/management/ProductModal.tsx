@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { createProduct, updateProduct } from '@/lib/api/products';
+import { createProduct, updateProduct, createProductVariant, updateProductVariant, deleteProductVariant, createModifierGroup, updateModifierGroup, deleteModifierGroup, createModifierOption, updateModifierOption, deleteModifierOption } from '@/lib/api/products';
 import type { Product, Category, InventoryItem, IngredientInput } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -9,6 +9,31 @@ import SidebarDrawer from './SidebarDrawer';
 import { getImageSrc } from '@/lib/image';
 import { getInventoryItems } from '@/lib/api/inventory';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+
+interface VariantDraft {
+    id?: string;
+    name: string;
+    name_km: string;
+    sku: string;
+    priceUsd: string;
+    stockQty: string;
+}
+
+interface ModOptionDraft {
+    id?: string;
+    name: string;
+    name_km: string;
+    priceDeltaUsd: string;
+}
+
+interface ModGroupDraft {
+    id?: string;
+    name: string;
+    name_km: string;
+    required: boolean;
+    multi_select: boolean;
+    options: ModOptionDraft[];
+}
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -41,6 +66,11 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     // Inventory Link State
     const [materials, setMaterials] = useState<InventoryItem[]>([]);
     const [ingredients, setIngredients] = useState<IngredientInput[]>([]);
+    const [variants, setVariants] = useState<VariantDraft[]>([]);
+    const [removedVariantIds, setRemovedVariantIds] = useState<string[]>([]);
+    const [modGroups, setModGroups] = useState<ModGroupDraft[]>([]);
+    const [removedGroupIds, setRemovedGroupIds] = useState<string[]>([]);
+    const [removedOptionIds, setRemovedOptionIds] = useState<string[]>([]);
 
     useEffect(() => {
         if (product) {
@@ -58,6 +88,30 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                 inventory_item_id: ing.inventory_item_id,
                 usage_quantity: ing.usage_quantity
             })));
+            setVariants((product.variants || []).map(v => ({
+                id: v.id,
+                name: v.name,
+                name_km: v.name_km || '',
+                sku: v.sku || '',
+                priceUsd: (v.price_cents / 100).toFixed(2),
+                stockQty: v.stock_quantity != null ? String(v.stock_quantity) : '',
+            })));
+            setRemovedVariantIds([]);
+            setModGroups((product.modifier_groups || []).map(g => ({
+                id: g.id,
+                name: g.name,
+                name_km: g.name_km || '',
+                required: g.required !== 0,
+                multi_select: g.multi_select !== 0,
+                options: g.options.map(o => ({
+                    id: o.id,
+                    name: o.name,
+                    name_km: o.name_km || '',
+                    priceDeltaUsd: (o.price_delta_cents / 100).toFixed(2),
+                })),
+            })));
+            setRemovedGroupIds([]);
+            setRemovedOptionIds([]);
         } else {
             setName('');
             setKhmerName('');
@@ -70,6 +124,11 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setIsAvailable(true);
             setImagePath('');
             setIngredients([]);
+            setVariants([]);
+            setRemovedVariantIds([]);
+            setModGroups([]);
+            setRemovedGroupIds([]);
+            setRemovedOptionIds([]);
         }
         
         // Load materials for linking
@@ -116,6 +175,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         const costPriceCents = trimmedCost === '' ? undefined : Math.round(parseFloat(trimmedCost || '0') * 100);
         setLoading(true);
         try {
+            let productId: string;
             if (product) {
                 await updateProduct(
                     product.id, name, khmerName, priceCents,
@@ -126,8 +186,9 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     description || undefined, khmerDescription || undefined,
                     costPriceCents
                 );
+                productId = product.id;
             } else {
-                await createProduct(
+                productId = await createProduct(
                     categoryId, name, khmerName, priceCents, imagePath,
                     ingredients,
                     restaurantId || undefined, sku || undefined,
@@ -135,6 +196,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     costPriceCents
                 );
             }
+            await persistVariants(productId);
+            await persistModifiers(productId);
             onSave();
             onClose();
         } catch (error) {
@@ -143,6 +206,102 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         } finally {
             setLoading(false);
         }
+    }
+
+    async function persistVariants(productId: string) {
+        const rid = restaurantId || '';
+        // Delete variants the user removed
+        for (const vid of removedVariantIds) {
+            await deleteProductVariant(vid, rid);
+        }
+        // Create/update the current rows (skip blank rows)
+        for (let i = 0; i < variants.length; i++) {
+            const v = variants[i];
+            if (!v.name.trim()) continue;
+            const price_cents = Math.round(parseFloat(v.priceUsd || '0') * 100);
+            const stock_quantity = v.stockQty.trim() === '' ? null : Math.round(parseFloat(v.stockQty));
+            if (v.id) {
+                await updateProductVariant({
+                    id: v.id, name: v.name.trim(), name_km: v.name_km.trim() || undefined,
+                    sku: v.sku.trim() || undefined, price_cents, stock_quantity, sort_order: i, restaurant_id: rid,
+                });
+            } else {
+                await createProductVariant({
+                    product_id: productId, name: v.name.trim(), name_km: v.name_km.trim() || undefined,
+                    sku: v.sku.trim() || undefined, price_cents, stock_quantity, sort_order: i, restaurant_id: rid,
+                });
+            }
+        }
+    }
+
+    function updateVariant(idx: number, patch: Partial<VariantDraft>) {
+        setVariants(prev => prev.map((v, i) => i === idx ? { ...v, ...patch } : v));
+    }
+
+    function removeVariant(idx: number) {
+        setVariants(prev => {
+            const v = prev[idx];
+            if (v?.id) setRemovedVariantIds(ids => [...ids, v.id!]);
+            return prev.filter((_, i) => i !== idx);
+        });
+    }
+
+    function addVariant() {
+        setVariants(prev => [...prev, { name: '', name_km: '', sku: '', priceUsd: priceUsd, stockQty: '' }]);
+    }
+
+    async function persistModifiers(productId: string) {
+        const rid = restaurantId || '';
+        for (const oid of removedOptionIds) await deleteModifierOption(oid, rid);
+        for (const gid of removedGroupIds) await deleteModifierGroup(gid, rid);
+        for (let gi = 0; gi < modGroups.length; gi++) {
+            const g = modGroups[gi];
+            if (!g.name.trim()) continue;
+            let groupId = g.id;
+            if (groupId) {
+                await updateModifierGroup({ id: groupId, name: g.name.trim(), name_km: g.name_km.trim() || undefined, required: g.required, multi_select: g.multi_select, sort_order: gi, restaurant_id: rid });
+            } else {
+                groupId = await createModifierGroup({ product_id: productId, name: g.name.trim(), name_km: g.name_km.trim() || undefined, required: g.required, multi_select: g.multi_select, sort_order: gi, restaurant_id: rid });
+            }
+            for (let oi = 0; oi < g.options.length; oi++) {
+                const o = g.options[oi];
+                if (!o.name.trim()) continue;
+                const delta = Math.round(parseFloat(o.priceDeltaUsd || '0') * 100);
+                if (o.id) {
+                    await updateModifierOption({ id: o.id, name: o.name.trim(), name_km: o.name_km.trim() || undefined, price_delta_cents: delta, sort_order: oi, restaurant_id: rid });
+                } else {
+                    await createModifierOption({ group_id: groupId, name: o.name.trim(), name_km: o.name_km.trim() || undefined, price_delta_cents: delta, sort_order: oi, restaurant_id: rid });
+                }
+            }
+        }
+    }
+
+    function addModGroup() {
+        setModGroups(prev => [...prev, { name: '', name_km: '', required: false, multi_select: false, options: [] }]);
+    }
+    function updateModGroup(gi: number, patch: Partial<ModGroupDraft>) {
+        setModGroups(prev => prev.map((g, i) => i === gi ? { ...g, ...patch } : g));
+    }
+    function removeModGroup(gi: number) {
+        setModGroups(prev => {
+            const g = prev[gi];
+            if (g?.id) setRemovedGroupIds(ids => [...ids, g.id!]);
+            return prev.filter((_, i) => i !== gi);
+        });
+    }
+    function addModOption(gi: number) {
+        setModGroups(prev => prev.map((g, i) => i === gi ? { ...g, options: [...g.options, { name: '', name_km: '', priceDeltaUsd: '0.00' }] } : g));
+    }
+    function updateModOption(gi: number, oi: number, patch: Partial<ModOptionDraft>) {
+        setModGroups(prev => prev.map((g, i) => i === gi ? { ...g, options: g.options.map((o, j) => j === oi ? { ...o, ...patch } : o) } : g));
+    }
+    function removeModOption(gi: number, oi: number) {
+        setModGroups(prev => prev.map((g, i) => {
+            if (i !== gi) return g;
+            const o = g.options[oi];
+            if (o?.id) setRemovedOptionIds(ids => [...ids, o.id!]);
+            return { ...g, options: g.options.filter((_, j) => j !== oi) };
+        }));
     }
 
     return (
@@ -225,7 +384,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         required
                         value={name}
                         onChange={e => setName(e.target.value)}
-                        placeholder="e.g. Fried Rice"
+                        placeholder={t('phProductExample')}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
                     />
                 </div>
@@ -252,7 +411,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         value={description}
                         onChange={e => setDescription(e.target.value)}
                         rows={2}
-                        placeholder="e.g. Contains peanuts. Spicy."
+                        placeholder={t('phAllergenExample')}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all resize-none"
                     />
                 </div>
@@ -279,7 +438,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     <input
                         value={sku}
                         onChange={e => setSku(e.target.value)}
-                        placeholder="e.g. BV-001"
+                        placeholder={t('phSkuExample')}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
                     />
                 </div>
@@ -408,7 +567,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                                 newIngs[idx].usage_quantity = parseFloat(e.target.value) || 0;
                                                 setIngredients(newIngs);
                                             }}
-                                            placeholder="Usage Amount"
+                                            placeholder={t('phUsageAmount')}
                                             className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] font-mono placeholder:text-[var(--text-secondary)]/40 outline-none focus:border-emerald-500"
                                         />
                                     </div>
@@ -438,6 +597,151 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                             {isAvailable ? t('available') : t('unavailable')}
                         </span>
                     </label>
+                </div>
+
+                {/* Variants */}
+                <div className="space-y-2 border border-[var(--border)] rounded-xl p-3 bg-[var(--bg-elevated)]/40">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-widest text-[var(--text-secondary)]">{t('variants')}</span>
+                        <button
+                            type="button"
+                            onClick={addVariant}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-wider hover:bg-[var(--accent)]/20 transition-all"
+                        >
+                            <Plus size={12} strokeWidth={3} /> {t('addVariant')}
+                        </button>
+                    </div>
+                    {variants.length === 0 ? (
+                        <p className="text-[11px] text-[var(--text-secondary)] opacity-60 py-1">{t('noVariants')}</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {variants.map((v, idx) => (
+                                <div key={v.id ?? `new-${idx}`} className="flex flex-wrap items-center gap-1.5 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
+                                    <input
+                                        value={v.name}
+                                        onChange={e => updateVariant(idx, { name: e.target.value })}
+                                        placeholder={t('variantName')}
+                                        className="flex-1 min-w-[90px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                                    />
+                                    <input
+                                        value={v.name_km}
+                                        onChange={e => updateVariant(idx, { name_km: e.target.value })}
+                                        placeholder="ខ្មែរ"
+                                        className="flex-1 min-w-[80px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--foreground)] khmer outline-none focus:border-[var(--accent)]"
+                                    />
+                                    <input
+                                        type="number" step="0.01" min="0"
+                                        value={v.priceUsd}
+                                        onChange={e => updateVariant(idx, { priceUsd: e.target.value })}
+                                        placeholder={t('variantPrice')}
+                                        title={t('variantPrice')}
+                                        className="w-[80px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                                    />
+                                    <input
+                                        type="number" step="1" min="0"
+                                        value={v.stockQty}
+                                        onChange={e => updateVariant(idx, { stockQty: e.target.value })}
+                                        placeholder={t('stockLeft') ?? 'Stock'}
+                                        title={t('stockLeft') ?? 'Stock'}
+                                        className="w-[64px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => removeVariant(idx)}
+                                        className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Modifier groups */}
+                <div className="space-y-2 border border-[var(--border)] rounded-xl p-3 bg-[var(--bg-elevated)]/40">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-widest text-[var(--text-secondary)]">{t('modifierGroups')}</span>
+                        <button
+                            type="button"
+                            onClick={addModGroup}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-wider hover:bg-[var(--accent)]/20 transition-all"
+                        >
+                            <Plus size={12} strokeWidth={3} /> {t('addModifierGroup')}
+                        </button>
+                    </div>
+                    {modGroups.length === 0 ? (
+                        <p className="text-[11px] text-[var(--text-secondary)] opacity-60 py-1">{t('noModifierGroups')}</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {modGroups.map((g, gi) => (
+                                <div key={g.id ?? `ng-${gi}`} className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 space-y-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            value={g.name}
+                                            onChange={e => updateModGroup(gi, { name: e.target.value })}
+                                            placeholder={t('groupName')}
+                                            className="flex-1 min-w-[80px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                                        />
+                                        <input
+                                            value={g.name_km}
+                                            onChange={e => updateModGroup(gi, { name_km: e.target.value })}
+                                            placeholder="ខ្មែរ"
+                                            className="flex-1 min-w-[70px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--foreground)] khmer outline-none focus:border-[var(--accent)]"
+                                        />
+                                        <button type="button" onClick={() => removeModGroup(gi)} className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-all">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[10px] font-bold text-[var(--text-secondary)]">
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input type="checkbox" checked={g.required} onChange={e => updateModGroup(gi, { required: e.target.checked })} />
+                                            {t('required')}
+                                        </label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input type="checkbox" checked={g.multi_select} onChange={e => updateModGroup(gi, { multi_select: e.target.checked })} />
+                                            {t('multiSelect')}
+                                        </label>
+                                    </div>
+                                    <div className="space-y-1.5 pl-1">
+                                        {g.options.map((o, oi) => (
+                                            <div key={o.id ?? `no-${oi}`} className="flex items-center gap-1.5">
+                                                <input
+                                                    value={o.name}
+                                                    onChange={e => updateModOption(gi, oi, { name: e.target.value })}
+                                                    placeholder={t('variantName')}
+                                                    className="flex-1 min-w-[70px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                                                />
+                                                <input
+                                                    value={o.name_km}
+                                                    onChange={e => updateModOption(gi, oi, { name_km: e.target.value })}
+                                                    placeholder="ខ្មែរ"
+                                                    className="flex-1 min-w-[60px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--foreground)] khmer outline-none focus:border-[var(--accent)]"
+                                                />
+                                                <input
+                                                    type="number" step="0.01"
+                                                    value={o.priceDeltaUsd}
+                                                    onChange={e => updateModOption(gi, oi, { priceDeltaUsd: e.target.value })}
+                                                    title={t('priceDelta')}
+                                                    className="w-[64px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-mono text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                                                />
+                                                <button type="button" onClick={() => removeModOption(gi, oi)} className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-all">
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => addModOption(gi)}
+                                            className="flex items-center gap-1 text-[10px] font-bold text-[var(--accent-blue)] hover:brightness-110 transition-all"
+                                        >
+                                            <Plus size={11} /> {t('addOption')}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Actions */}

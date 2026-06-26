@@ -124,6 +124,18 @@ export default function SidebarNav() {
         };
     }, [user]);
 
+    // Reflect the restaurant's own name in the OS window/taskbar title so staff
+    // (incl. Khmer-only users) can identify the app; falls back to the product name.
+    useEffect(() => {
+        const name = restaurant ? (lang === 'km' ? (restaurant.khmer_name || restaurant.name) : restaurant.name) : '';
+        const title = name ? `${name} — DineOS` : 'DineOS';
+        let cancelled = false;
+        import('@tauri-apps/api/window')
+            .then(({ getCurrentWindow }) => { if (!cancelled) getCurrentWindow().setTitle(title); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [restaurant, lang]);
+
     // Auto redirect if user is on table view but it is disabled
     useEffect(() => {
         if (!restaurant) return;

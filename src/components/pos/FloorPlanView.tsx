@@ -284,7 +284,7 @@ export default function FloorPlanView() {
                         type="text"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search table..."
+                        placeholder={t('phSearchTable')}
                         className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-semibold text-[var(--foreground)] placeholder-[var(--text-secondary)]/50 outline-none focus:border-[var(--accent-blue)] transition-colors"
                     />
                     {search && (

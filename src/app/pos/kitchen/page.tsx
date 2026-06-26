@@ -14,6 +14,8 @@ type KitchenStatus = KitchenOrderItem['kitchen_status'];
 interface AggregatedItem {
     product_name: string;
     product_khmer: string | null;
+    variant_name: string | null;
+    modifier_summary: string | null;
     pendingItems: KitchenOrderItem[];
     cookingItems: KitchenOrderItem[];
     doneItems: KitchenOrderItem[];
@@ -121,17 +123,20 @@ export default function KitchenPage() {
         const map = new Map<string, AggregatedItem>();
         for (const order of orders) {
             for (const item of order.items) {
-                if (!map.has(item.product_name)) {
-                    map.set(item.product_name, {
+                const key = `${item.product_name}|${item.variant_name ?? ''}|${item.modifier_summary ?? ''}`;
+                if (!map.has(key)) {
+                    map.set(key, {
                         product_name: item.product_name,
                         product_khmer: item.product_khmer ?? null,
+                        variant_name: item.variant_name ?? null,
+                        modifier_summary: item.modifier_summary ?? null,
                         pendingItems: [],
                         cookingItems: [],
                         doneItems: [],
                         tableIds: [],
                     });
                 }
-                const entry = map.get(item.product_name)!;
+                const entry = map.get(key)!;
                 if (item.kitchen_status === 'pending') entry.pendingItems.push(item);
                 else if (item.kitchen_status === 'cooking') entry.cookingItems.push(item);
                 else entry.doneItems.push(item);
@@ -309,7 +314,7 @@ export default function KitchenPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                         {aggregated.map(item => (
                             <AggregatedCard
-                                key={item.product_name}
+                                key={`${item.product_name}|${item.variant_name ?? ''}|${item.modifier_summary ?? ''}`}
                                 item={item}
                                 lang={lang}
                                 updatingIds={updatingIds}
@@ -350,7 +355,9 @@ function AggregatedCard({
     const totalQty   = pendingQty + cookingQty + doneQty;
     const isAnyUpdating = [...item.pendingItems, ...item.cookingItems].some(i => updatingIds.has(i.id));
 
-    const displayName = lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name;
+    const displayName = (lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name)
+        + (item.variant_name ? ` - ${item.variant_name}` : '')
+        + (item.modifier_summary ? ` (${item.modifier_summary})` : '');
 
     // Determine dominant state for card color
     const cardBorder = item.pendingItems.length > 0
@@ -470,7 +477,7 @@ function KitchenOrderCard({
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5 mb-0.5">
                                         <span className="text-xs font-bold text-[var(--foreground)] truncate">
-                                            {lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name}
+                                            {(lang === 'km' ? (item.product_khmer ?? item.product_name) : item.product_name)}{item.variant_name ? ` - ${item.variant_name}` : ''}{item.modifier_summary ? ` (${item.modifier_summary})` : ''}
                                         </span>
                                         <span className="text-xs font-black text-[var(--text-secondary)] flex-shrink-0">×{item.quantity}</span>
                                     </div>

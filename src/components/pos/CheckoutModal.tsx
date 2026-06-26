@@ -313,7 +313,7 @@ export default function CheckoutModal({
                             </div>
                             {discountCents > 0 && (
                                 <div className="mt-1.5 text-[10px] font-bold text-yellow-600">
-                                    Saving {formatUsd(discountCents)}
+                                    {t('discountSaving')} {formatUsd(discountCents)}
                                     <span className="opacity-70 ml-1">≈ {formatKhr(roundKhr(discountCents, exchangeRate))}</span>
                                 </div>
                             )}
@@ -452,7 +452,7 @@ export default function CheckoutModal({
 
                         <div className="space-y-3 flex-1">
                             <div>
-                                <label className="text-[10px] uppercase font-black tracking-widest text-[var(--text-secondary)] mb-2 block opacity-60">Cash USD Received</label>
+                                <label className="text-[10px] uppercase font-black tracking-widest text-[var(--text-secondary)] mb-2 block opacity-60">{t('cashUsdReceived')}</label>
                                 <div className="relative">
                                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-black text-[var(--text-secondary)]/50">$</span>
                                     <input
@@ -486,7 +486,7 @@ export default function CheckoutModal({
                                 </div>
                             ) : remainingUsdCents > 0 && usdInputCents > 0 ? (
                                 <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/25">
-                                    <div className="text-xs font-bold text-orange-600">Remaining via {method.toUpperCase()}</div>
+                                    <div className="text-xs font-bold text-orange-600">{t('remainingVia')} {method.toUpperCase()}</div>
                                     <div className="text-xl font-black font-mono text-orange-700">{formatUsd(remainingUsdCents)}</div>
                                     <div className="text-xs font-mono text-orange-600/70 mt-0.5">{formatKhr(remainingKhr)}</div>
                                 </div>

@@ -10,6 +10,8 @@ import type { RestaurantInput } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Toast from '@/components/ui/Toast';
 
 const DEFAULT: RestaurantInput = {
     name: '',
@@ -142,6 +144,9 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activeSubTab, setActiveSubTab] = useState<SubTabType>('identity');
+    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
+    const [pendingBizType, setPendingBizType] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -197,7 +202,7 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
             return true;
         } catch (error) {
             console.error(error);
-            alert('Failed to update business configuration.');
+            setToast({ msg: t('failedUpdateBusiness'), ok: false });
             return false;
         }
     }
@@ -221,45 +226,45 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
             await saveField('logo_path', dataUri);
         } catch (error) {
             console.error('Failed to save logo:', error);
-            alert('Failed to process business logo.');
+            setToast({ msg: t('failedProcessLogo'), ok: false });
         }
     }
 
-    async function handleLogoRemove() {
-        if (window.confirm('Are you sure you want to remove the business logo?')) {
-            await saveField('logo_path', '');
-        }
+    function handleLogoRemove() {
+        setConfirmRemoveLogo(true);
     }
 
-    // Business type dynamic redirect & warning alert change handler
-    const handleBusinessTypeChange = async (newType: string) => {
+    async function doLogoRemove() {
+        setConfirmRemoveLogo(false);
+        await saveField('logo_path', '');
+    }
+
+    // Business type dynamic redirect & warning change handler
+    const handleBusinessTypeChange = (newType: string) => {
         if (newType === info.business_type) return;
-        
-        const confirmChange = window.confirm(
-            "WARNING:\nChanging the Business Type will re-configure your core POS features. This action requires a full page reload to apply the new UI elements.\n\nAre you sure you want to change your Business Type?"
-        );
-        
-        if (confirmChange) {
-            // Reset disable tables flag if not coffee shop
-            const disableTablesVal = newType === 'Coffee Shop' ? info.disable_tables : 0;
-            
-            const updatedInfo = { 
-                ...info, 
-                business_type: newType,
-                disable_tables: disableTablesVal
-            };
-            
-            try {
-                await updateRestaurant(updatedInfo, restaurantId || undefined);
-                // Dispatch event and reload immediately
-                window.dispatchEvent(new Event('business-updated'));
-                window.location.reload();
-            } catch (e) {
-                console.error(e);
-                alert('Failed to update business type.');
-            }
-        }
+        setPendingBizType(newType);
     };
+
+    async function doBusinessTypeChange() {
+        const newType = pendingBizType;
+        setPendingBizType(null);
+        if (!newType) return;
+        // Reset disable tables flag if not coffee shop
+        const disableTablesVal = newType === 'Coffee Shop' ? info.disable_tables : 0;
+        const updatedInfo = {
+            ...info,
+            business_type: newType,
+            disable_tables: disableTablesVal
+        };
+        try {
+            await updateRestaurant(updatedInfo, restaurantId || undefined);
+            window.dispatchEvent(new Event('business-updated'));
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+            setToast({ msg: t('failedUpdateBusinessType'), ok: false });
+        }
+    }
 
     if (loading) {
         return (
@@ -565,6 +570,27 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                     )}
                 </div>
             )}
+
+            <ConfirmDialog
+                open={confirmRemoveLogo}
+                danger
+                title={t('removeLogo')}
+                message={t('removeLogoConfirm')}
+                confirmLabel={t('removeLogo')}
+                cancelLabel={t('cancel')}
+                onConfirm={doLogoRemove}
+                onCancel={() => setConfirmRemoveLogo(false)}
+            />
+            <ConfirmDialog
+                open={pendingBizType !== null}
+                title={t('changeBusinessType')}
+                message={t('changeBusinessTypeWarning')}
+                confirmLabel={t('confirm')}
+                cancelLabel={t('cancel')}
+                onConfirm={doBusinessTypeChange}
+                onCancel={() => setPendingBizType(null)}
+            />
+            {toast && <Toast message={toast.msg} variant={toast.ok ? 'success' : 'error'} onClose={() => setToast(null)} />}
         </div>
     );
 }

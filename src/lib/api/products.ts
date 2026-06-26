@@ -1,5 +1,5 @@
 import { call } from './client';
-import type { Category, Product, IngredientInput } from '@/types';
+import type { Category, Product, IngredientInput, ProductVariant, ProductModifierGroup } from '@/types';
 
 export const getCategories = (restaurant_id?: string) => 
     call<Category[]>('get_categories', { restaurantId: restaurant_id });
@@ -67,3 +67,66 @@ export const deleteCategory = (id: string, restaurant_id: string, actorUserId: s
 
 export const saveProductImage = (filename: string, content: Uint8Array) =>
     call<string>('save_product_image', { filename, content: Array.from(content) });
+
+// ── Product variants ──
+export const getProductVariants = (product_id: string, restaurant_id: string) =>
+    call<ProductVariant[]>('get_product_variants', { productId: product_id, restaurantId: restaurant_id });
+
+export const createProductVariant = (data: {
+    product_id: string; name: string; name_km?: string; sku?: string;
+    price_cents: number; stock_quantity?: number | null; sort_order?: number; restaurant_id: string;
+}) => call<string>('create_product_variant', {
+    productId: data.product_id, name: data.name, nameKm: data.name_km ?? null, sku: data.sku ?? null,
+    priceCents: data.price_cents, stockQuantity: data.stock_quantity ?? null, sortOrder: data.sort_order ?? 0,
+    restaurantId: data.restaurant_id,
+});
+
+export const updateProductVariant = (data: {
+    id: string; name: string; name_km?: string; sku?: string; price_cents: number;
+    stock_quantity?: number | null; is_active?: boolean; sort_order?: number; restaurant_id: string;
+}) => call<void>('update_product_variant', {
+    id: data.id, name: data.name, nameKm: data.name_km ?? null, sku: data.sku ?? null,
+    priceCents: data.price_cents, stockQuantity: data.stock_quantity ?? null,
+    isActive: data.is_active ?? true, sortOrder: data.sort_order ?? 0, restaurantId: data.restaurant_id,
+});
+
+export const deleteProductVariant = (id: string, restaurant_id: string) =>
+    call<void>('delete_product_variant', { id, restaurantId: restaurant_id });
+
+// ── Product modifier groups + options ──
+export const getModifierGroups = (product_id: string, restaurant_id: string) =>
+    call<ProductModifierGroup[]>('get_modifier_groups', { productId: product_id, restaurantId: restaurant_id });
+
+export const createModifierGroup = (data: {
+    product_id: string; name: string; name_km?: string; required?: boolean; multi_select?: boolean; sort_order?: number; restaurant_id: string;
+}) => call<string>('create_modifier_group', {
+    productId: data.product_id, name: data.name, nameKm: data.name_km ?? null,
+    required: data.required ?? false, multiSelect: data.multi_select ?? false, sortOrder: data.sort_order ?? 0, restaurantId: data.restaurant_id,
+});
+
+export const updateModifierGroup = (data: {
+    id: string; name: string; name_km?: string; required?: boolean; multi_select?: boolean; sort_order?: number; restaurant_id: string;
+}) => call<void>('update_modifier_group', {
+    id: data.id, name: data.name, nameKm: data.name_km ?? null,
+    required: data.required ?? false, multiSelect: data.multi_select ?? false, sortOrder: data.sort_order ?? 0, restaurantId: data.restaurant_id,
+});
+
+export const deleteModifierGroup = (id: string, restaurant_id: string) =>
+    call<void>('delete_modifier_group', { id, restaurantId: restaurant_id });
+
+export const createModifierOption = (data: {
+    group_id: string; name: string; name_km?: string; price_delta_cents: number; sort_order?: number; restaurant_id: string;
+}) => call<string>('create_modifier_option', {
+    groupId: data.group_id, name: data.name, nameKm: data.name_km ?? null,
+    priceDeltaCents: data.price_delta_cents, sortOrder: data.sort_order ?? 0, restaurantId: data.restaurant_id,
+});
+
+export const updateModifierOption = (data: {
+    id: string; name: string; name_km?: string; price_delta_cents: number; is_active?: boolean; sort_order?: number; restaurant_id: string;
+}) => call<void>('update_modifier_option', {
+    id: data.id, name: data.name, nameKm: data.name_km ?? null,
+    priceDeltaCents: data.price_delta_cents, isActive: data.is_active ?? true, sortOrder: data.sort_order ?? 0, restaurantId: data.restaurant_id,
+});
+
+export const deleteModifierOption = (id: string, restaurant_id: string) =>
+    call<void>('delete_modifier_option', { id, restaurantId: restaurant_id });

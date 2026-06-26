@@ -2,7 +2,7 @@ use tauri::State;
 use libsql::{Connection, params};
 use std::sync::Arc;
 use crate::commands::rbac;
-use crate::models::{Category, Product};
+use crate::models::{Category, Product, ProductVariant, ProductModifierGroup, ProductModifierOption};
 
 fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
     match row.get_value(idx) {
@@ -124,6 +124,73 @@ pub async fn get_products(
             });
         }
 
+        let mut variants = Vec::new();
+        let mut v_rows = pool.query(
+            "SELECT id, product_id, name, name_km, sku, price_cents, stock_quantity, is_active, sort_order
+             FROM product_variants
+             WHERE product_id = ? AND restaurant_id = ? AND is_deleted = 0
+             ORDER BY sort_order, name",
+            params![product_id.clone(), restaurant_id.clone()]
+        ).await.map_err(|e| format!("Variant fetch error: {}", e))?;
+        while let Some(v_row) = v_rows.next().await.map_err(|e| e.to_string())? {
+            variants.push(crate::models::ProductVariant {
+                id: v_row.get::<String>(0).unwrap_or_default(),
+                product_id: v_row.get::<String>(1).unwrap_or_default(),
+                name: v_row.get::<String>(2).unwrap_or_default(),
+                name_km: v_row.get::<String>(3).ok().filter(|s| !s.is_empty()),
+                sku: v_row.get::<String>(4).ok().filter(|s| !s.is_empty()),
+                price_cents: v_row.get::<i64>(5).unwrap_or(0),
+                stock_quantity: v_row.get::<i64>(6).ok(),
+                is_active: v_row.get::<i64>(7).unwrap_or(1),
+                sort_order: v_row.get::<i64>(8).unwrap_or(0),
+            });
+        }
+
+        // Load modifier groups + their options
+        let mut modifier_groups = Vec::new();
+        let mut g_rows = pool.query(
+            "SELECT id, product_id, name, name_km, required, multi_select, sort_order
+             FROM product_modifier_groups
+             WHERE product_id = ? AND restaurant_id = ? AND is_deleted = 0
+             ORDER BY sort_order, name",
+            params![product_id.clone(), restaurant_id.clone()]
+        ).await.map_err(|e| format!("Modifier group fetch error: {}", e))?;
+        let mut group_ids: Vec<(String, crate::models::ProductModifierGroup)> = Vec::new();
+        while let Some(g_row) = g_rows.next().await.map_err(|e| e.to_string())? {
+            let gid = g_row.get::<String>(0).unwrap_or_default();
+            group_ids.push((gid.clone(), crate::models::ProductModifierGroup {
+                id: gid,
+                product_id: g_row.get::<String>(1).unwrap_or_default(),
+                name: g_row.get::<String>(2).unwrap_or_default(),
+                name_km: g_row.get::<String>(3).ok().filter(|s| !s.is_empty()),
+                required: g_row.get::<i64>(4).unwrap_or(0),
+                multi_select: g_row.get::<i64>(5).unwrap_or(0),
+                sort_order: g_row.get::<i64>(6).unwrap_or(0),
+                options: Vec::new(),
+            }));
+        }
+        for (gid, mut group) in group_ids {
+            let mut o_rows = pool.query(
+                "SELECT id, group_id, name, name_km, price_delta_cents, is_active, sort_order
+                 FROM product_modifier_options
+                 WHERE group_id = ? AND restaurant_id = ? AND is_deleted = 0
+                 ORDER BY sort_order, name",
+                params![gid, restaurant_id.clone()]
+            ).await.map_err(|e| format!("Modifier option fetch error: {}", e))?;
+            while let Some(o_row) = o_rows.next().await.map_err(|e| e.to_string())? {
+                group.options.push(crate::models::ProductModifierOption {
+                    id: o_row.get::<String>(0).unwrap_or_default(),
+                    group_id: o_row.get::<String>(1).unwrap_or_default(),
+                    name: o_row.get::<String>(2).unwrap_or_default(),
+                    name_km: o_row.get::<String>(3).ok().filter(|s| !s.is_empty()),
+                    price_delta_cents: o_row.get::<i64>(4).unwrap_or(0),
+                    is_active: o_row.get::<i64>(5).unwrap_or(1),
+                    sort_order: o_row.get::<i64>(6).unwrap_or(0),
+                });
+            }
+            modifier_groups.push(group);
+        }
+
         products.push(Product {
             id: product_id,
             category_id: row.get::<String>(1).ok(),
@@ -142,6 +209,8 @@ pub async fn get_products(
             description: row.get::<String>(13).ok().filter(|s| !s.is_empty()),
             khmer_description: row.get::<String>(14).ok().filter(|s| !s.is_empty()),
             cost_price_cents: row.get::<i64>(15).ok(),
+            variants,
+            modifier_groups,
         });
     }
 
@@ -447,4 +516,274 @@ pub async fn save_product_image(
     std::fs::write(&path, content).map_err(|e| e.to_string())?;
 
     Ok(full_path)
+}
+
+// ─── Product variants ───────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn get_product_variants(
+    product_id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Vec<ProductVariant>, String> {
+    let mut rows = pool.query(
+        "SELECT id, product_id, name, name_km, sku, price_cents, stock_quantity, is_active, sort_order
+         FROM product_variants
+         WHERE product_id = ? AND restaurant_id = ? AND is_deleted = 0
+         ORDER BY sort_order, name",
+        params![product_id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut variants = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        variants.push(ProductVariant {
+            id: row.get::<String>(0).unwrap_or_default(),
+            product_id: row.get::<String>(1).unwrap_or_default(),
+            name: row.get::<String>(2).unwrap_or_default(),
+            name_km: row.get::<String>(3).ok().filter(|s| !s.is_empty()),
+            sku: row.get::<String>(4).ok().filter(|s| !s.is_empty()),
+            price_cents: row.get::<i64>(5).unwrap_or(0),
+            stock_quantity: row.get::<i64>(6).ok(),
+            is_active: row.get::<i64>(7).unwrap_or(1),
+            sort_order: row.get::<i64>(8).unwrap_or(0),
+        });
+    }
+    Ok(variants)
+}
+
+#[tauri::command]
+pub async fn create_product_variant(
+    product_id: String,
+    name: String,
+    name_km: Option<String>,
+    sku: Option<String>,
+    price_cents: i64,
+    stock_quantity: Option<i64>,
+    sort_order: Option<i64>,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<String, String> {
+    // Ownership check: product must belong to this restaurant
+    let mut p = pool.query(
+        "SELECT id FROM products WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![product_id.clone(), restaurant_id.clone()]
+    ).await.map_err(|e| e.to_string())?;
+    if p.next().await.map_err(|e| e.to_string())?.is_none() {
+        return Err("Product not found or access denied".to_string());
+    }
+
+    let id = uuid::Uuid::new_v4().to_string();
+    pool.execute(
+        "INSERT INTO product_variants (id, product_id, restaurant_id, name, name_km, sku, price_cents, stock_quantity, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        params![id.clone(), product_id, restaurant_id, name, name_km.unwrap_or_default(), sku.unwrap_or_default(), price_cents, stock_quantity, sort_order.unwrap_or(0)]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(id)
+}
+
+#[tauri::command]
+pub async fn update_product_variant(
+    id: String,
+    name: String,
+    name_km: Option<String>,
+    sku: Option<String>,
+    price_cents: i64,
+    stock_quantity: Option<i64>,
+    is_active: Option<bool>,
+    sort_order: Option<i64>,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE product_variants SET name=?, name_km=?, sku=?, price_cents=?, stock_quantity=?, is_active=?, sort_order=?, updated_at=datetime('now')
+         WHERE id=? AND restaurant_id=?",
+        params![name, name_km.unwrap_or_default(), sku.unwrap_or_default(), price_cents, stock_quantity, is_active.unwrap_or(true) as i64, sort_order.unwrap_or(0), id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_product_variant(
+    id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE product_variants SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+// ─── Product modifier groups + options ──────────────────────────────────────
+
+#[tauri::command]
+pub async fn get_modifier_groups(
+    product_id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Vec<ProductModifierGroup>, String> {
+    let mut g_rows = pool.query(
+        "SELECT id, product_id, name, name_km, required, multi_select, sort_order
+         FROM product_modifier_groups
+         WHERE product_id = ? AND restaurant_id = ? AND is_deleted = 0
+         ORDER BY sort_order, name",
+        params![product_id, restaurant_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut groups: Vec<ProductModifierGroup> = Vec::new();
+    while let Some(g) = g_rows.next().await.map_err(|e| e.to_string())? {
+        groups.push(ProductModifierGroup {
+            id: g.get::<String>(0).unwrap_or_default(),
+            product_id: g.get::<String>(1).unwrap_or_default(),
+            name: g.get::<String>(2).unwrap_or_default(),
+            name_km: g.get::<String>(3).ok().filter(|s| !s.is_empty()),
+            required: g.get::<i64>(4).unwrap_or(0),
+            multi_select: g.get::<i64>(5).unwrap_or(0),
+            sort_order: g.get::<i64>(6).unwrap_or(0),
+            options: Vec::new(),
+        });
+    }
+    for group in &mut groups {
+        let mut o_rows = pool.query(
+            "SELECT id, group_id, name, name_km, price_delta_cents, is_active, sort_order
+             FROM product_modifier_options
+             WHERE group_id = ? AND restaurant_id = ? AND is_deleted = 0
+             ORDER BY sort_order, name",
+            params![group.id.clone(), restaurant_id.clone()]
+        ).await.map_err(|e| format!("Database error: {}", e))?;
+        while let Some(o) = o_rows.next().await.map_err(|e| e.to_string())? {
+            group.options.push(ProductModifierOption {
+                id: o.get::<String>(0).unwrap_or_default(),
+                group_id: o.get::<String>(1).unwrap_or_default(),
+                name: o.get::<String>(2).unwrap_or_default(),
+                name_km: o.get::<String>(3).ok().filter(|s| !s.is_empty()),
+                price_delta_cents: o.get::<i64>(4).unwrap_or(0),
+                is_active: o.get::<i64>(5).unwrap_or(1),
+                sort_order: o.get::<i64>(6).unwrap_or(0),
+            });
+        }
+    }
+    Ok(groups)
+}
+
+#[tauri::command]
+pub async fn create_modifier_group(
+    product_id: String,
+    name: String,
+    name_km: Option<String>,
+    required: Option<bool>,
+    multi_select: Option<bool>,
+    sort_order: Option<i64>,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<String, String> {
+    let mut p = pool.query(
+        "SELECT id FROM products WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![product_id.clone(), restaurant_id.clone()]
+    ).await.map_err(|e| e.to_string())?;
+    if p.next().await.map_err(|e| e.to_string())?.is_none() {
+        return Err("Product not found or access denied".to_string());
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    pool.execute(
+        "INSERT INTO product_modifier_groups (id, product_id, restaurant_id, name, name_km, required, multi_select, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        params![id.clone(), product_id, restaurant_id, name, name_km.unwrap_or_default(), required.unwrap_or(false) as i64, multi_select.unwrap_or(false) as i64, sort_order.unwrap_or(0)]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(id)
+}
+
+#[tauri::command]
+pub async fn update_modifier_group(
+    id: String,
+    name: String,
+    name_km: Option<String>,
+    required: Option<bool>,
+    multi_select: Option<bool>,
+    sort_order: Option<i64>,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE product_modifier_groups SET name=?, name_km=?, required=?, multi_select=?, sort_order=?, updated_at=datetime('now')
+         WHERE id=? AND restaurant_id=?",
+        params![name, name_km.unwrap_or_default(), required.unwrap_or(false) as i64, multi_select.unwrap_or(false) as i64, sort_order.unwrap_or(0), id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_modifier_group(
+    id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE product_modifier_groups SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![id.clone(), restaurant_id.clone()]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    let _ = pool.execute(
+        "UPDATE product_modifier_options SET is_deleted=1, updated_at=datetime('now') WHERE group_id=? AND restaurant_id=?",
+        params![id, restaurant_id]
+    ).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn create_modifier_option(
+    group_id: String,
+    name: String,
+    name_km: Option<String>,
+    price_delta_cents: i64,
+    sort_order: Option<i64>,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<String, String> {
+    let mut g = pool.query(
+        "SELECT id FROM product_modifier_groups WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![group_id.clone(), restaurant_id.clone()]
+    ).await.map_err(|e| e.to_string())?;
+    if g.next().await.map_err(|e| e.to_string())?.is_none() {
+        return Err("Modifier group not found or access denied".to_string());
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    pool.execute(
+        "INSERT INTO product_modifier_options (id, group_id, restaurant_id, name, name_km, price_delta_cents, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        params![id.clone(), group_id, restaurant_id, name, name_km.unwrap_or_default(), price_delta_cents, sort_order.unwrap_or(0)]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(id)
+}
+
+#[tauri::command]
+pub async fn update_modifier_option(
+    id: String,
+    name: String,
+    name_km: Option<String>,
+    price_delta_cents: i64,
+    is_active: Option<bool>,
+    sort_order: Option<i64>,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE product_modifier_options SET name=?, name_km=?, price_delta_cents=?, is_active=?, sort_order=?, updated_at=datetime('now')
+         WHERE id=? AND restaurant_id=?",
+        params![name, name_km.unwrap_or_default(), price_delta_cents, is_active.unwrap_or(true) as i64, sort_order.unwrap_or(0), id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_modifier_option(
+    id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<(), String> {
+    pool.execute(
+        "UPDATE product_modifier_options SET is_deleted=1, updated_at=datetime('now') WHERE id=? AND restaurant_id=?",
+        params![id, restaurant_id]
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    Ok(())
 }
