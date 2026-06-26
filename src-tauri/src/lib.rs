@@ -117,6 +117,7 @@ pub fn run() {
             stop_sync,
             db::sync::trigger_sync_reset,
             db::sync::is_restaurant_synced,
+            db::sync::get_sync_conflict_count,
             // Auth
             commands::auth::login,
             commands::auth::create_user,
@@ -169,6 +170,8 @@ pub fn run() {
             commands::orders::checkout_order,
             commands::orders::checkout_session,
             commands::orders::hold_order,
+            commands::orders::get_held_orders,
+            commands::orders::resume_order,
             commands::orders::void_order,
             commands::orders::delete_order_history,
             commands::orders::get_revenue_summary,
@@ -179,6 +182,8 @@ pub fn run() {
             commands::inventory::create_inventory_item,
             commands::inventory::update_inventory_item,
             commands::inventory::delete_inventory_item,
+            commands::inventory::receive_stock,
+            commands::inventory::get_stock_movements,
             // Analytics
             commands::analytics::get_top_products,
             commands::analytics::get_top_products_in_range,
@@ -207,6 +212,7 @@ pub fn run() {
             commands::reports::close_daily_report,
             commands::reports::get_daily_reports,
             commands::reports::get_daily_report_detail,
+            commands::reports::reopen_daily_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

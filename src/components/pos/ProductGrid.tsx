@@ -9,7 +9,7 @@ import { formatUsd, formatKhr, roundKhr } from '@/lib/currency';
 import { getImageSrc } from '@/lib/image';
 import { getTopProducts } from '@/lib/api/analytics';
 import type { Product, Category, TopProduct } from '@/types';
-import { Search, ShoppingBag, UtensilsCrossed, Flame, Star, Sparkles } from 'lucide-react';
+import { Search, ShoppingBag, UtensilsCrossed, Flame, Star, Sparkles, AlertTriangle } from 'lucide-react';
 
 // Palette for products without images
 const CARD_COLORS = [
@@ -19,7 +19,7 @@ const CARD_COLORS = [
 
 export default function ProductGrid() {
     const [categories, setCategories] = useState<Category[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [addingId, setAddingId] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function ProductGrid() {
     const soldOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { orderId, tableId, setOrderId, setItems, addToLocalCart, exchangeRate, rateIsDefault } = useOrder();
-    const { user } = useAuth();
+    const { user, licenseExpiredPending } = useAuth();
     const { t, lang } = useLanguage();
 
     useEffect(() => {
@@ -36,18 +36,18 @@ export default function ProductGrid() {
             try {
                 const [cats, prods, tops] = await Promise.all([
                     getCategories(user?.restaurant_id || undefined),
-                    getProducts(selectedCategory || undefined, user?.restaurant_id || undefined),
+                    getProducts(undefined, user?.restaurant_id || undefined),
                     getTopProducts('month', user?.restaurant_id || undefined)
                 ]);
                 setCategories(cats);
-                setProducts(prods);
+                setAllProducts(prods);
                 setTopProducts(tops);
             } catch (e) {
                 console.error(e);
             }
         }
         load();
-    }, [selectedCategory]);
+    }, [user?.restaurant_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!orderId) return;
@@ -61,6 +61,7 @@ export default function ProductGrid() {
     }
 
     async function handleProductClick(product: Product) {
+        if (licenseExpiredPending) return;
         if (product.is_available === 0) return;
         if (product.sold_out_today) {
             showSoldOutToast(product.id);
@@ -81,10 +82,13 @@ export default function ProductGrid() {
         }
     }
 
-    const filteredProducts = products.filter(p => {
-        if (!searchQuery) return true;
-        const q = searchQuery.toLowerCase();
-        return p.name.toLowerCase().includes(q) || (p.khmer_name && p.khmer_name.toLowerCase().includes(q));
+    const filteredProducts = allProducts.filter(p => {
+        if (selectedCategory && p.category_id !== selectedCategory) return false;
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            if (!p.name.toLowerCase().includes(q) && !(p.khmer_name && p.khmer_name.toLowerCase().includes(q))) return false;
+        }
+        return true;
     });
 
     const bestSellerId = topProducts[0]?.id;
@@ -104,7 +108,16 @@ export default function ProductGrid() {
     });
 
     return (
-        <div className="flex flex-col min-h-0 h-full bg-[var(--bg-dark)]">
+        <div className="flex flex-col min-h-0 h-full bg-[var(--bg-dark)] relative">
+
+            {licenseExpiredPending && (
+                <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+                    <div className="mx-4 px-5 py-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-center max-w-xs">
+                        <AlertTriangle size={20} className="text-amber-400 mx-auto mb-2" />
+                        <p className="text-xs font-black text-amber-300 leading-relaxed">{t('finishCurrentOrder')}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Search + Category bar */}
             <div className="flex-shrink-0 px-3 pt-3 pb-2 border-b border-[var(--border)] bg-[var(--bg-card)]">

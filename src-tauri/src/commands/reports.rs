@@ -43,6 +43,9 @@ pub struct DailyReport {
     pub closed_at: String,
     pub created_at: String,
     pub updated_at: String,
+    pub reopened_by: Option<String>,
+    pub reopened_at: Option<String>,
+    pub exchange_rate_snapshot: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,12 +78,23 @@ pub struct InventoryUsageRow {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaymentBreakdown {
+    pub cash_usd_cents: i64,
+    pub cash_khr_riels: i64,
+    pub khqr_usd_cents: i64,
+    pub khqr_khr_riels: i64,
+    pub card_usd_cents: i64,
+    pub card_khr_riels: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyReportDetail {
     pub report: DailyReport,
     pub expenses: Vec<DailyReportExpense>,
     pub inventory_total_usage_qty: f64,
     pub inventory_total_cost_usd: i64,
     pub inventory_usage: Vec<InventoryUsageRow>,
+    pub payment_breakdown: PaymentBreakdown,
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +125,9 @@ fn map_daily_report(row: &Row) -> DailyReport {
         closed_at: row.get::<String>(14).unwrap_or_default(),
         created_at: row.get::<String>(15).unwrap_or_default(),
         updated_at: row.get::<String>(16).unwrap_or_default(),
+        reopened_by: row.get::<String>(17).ok(),
+        reopened_at: row.get::<String>(18).ok(),
+        exchange_rate_snapshot: row.get::<f64>(19).ok(),
     }
 }
 
@@ -208,6 +225,46 @@ async fn get_inventory_usage_summary(
     }
 
     Ok((total_usage_qty, total_cost_usd, inventory_usage))
+}
+
+async fn get_payment_breakdown(
+    conn: &Connection,
+    restaurant_id: &str,
+    report_date: &str,
+) -> Result<PaymentBreakdown, String> {
+    let mut rows = conn
+        .query(
+            "SELECT
+                COALESCE(SUM(CASE WHEN p.method='cash'  AND p.currency='USD' THEN p.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN p.method='cash'  AND p.currency='KHR' THEN p.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN p.method='khqr'  AND p.currency='USD' THEN p.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN p.method='khqr'  AND p.currency='KHR' THEN p.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN p.method='card'  AND p.currency='USD' THEN p.amount ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN p.method='card'  AND p.currency='KHR' THEN p.amount ELSE 0 END), 0)
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE o.restaurant_id = ?
+               AND o.is_deleted = 0
+               AND o.status = 'completed'
+               AND COALESCE(p.is_deleted, 0) = 0
+               AND date(o.created_at, 'localtime') = date(?)",
+            params![restaurant_id.to_string(), report_date.to_string()],
+        )
+        .await
+        .map_err(|e| format!("Failed to get payment breakdown: {}", e))?;
+
+    if let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        Ok(PaymentBreakdown {
+            cash_usd_cents:   row.get::<i64>(0).unwrap_or(0),
+            cash_khr_riels:   row.get::<i64>(1).unwrap_or(0),
+            khqr_usd_cents:   row.get::<i64>(2).unwrap_or(0),
+            khqr_khr_riels:   row.get::<i64>(3).unwrap_or(0),
+            card_usd_cents:   row.get::<i64>(4).unwrap_or(0),
+            card_khr_riels:   row.get::<i64>(5).unwrap_or(0),
+        })
+    } else {
+        Ok(PaymentBreakdown { cash_usd_cents: 0, cash_khr_riels: 0, khqr_usd_cents: 0, khqr_khr_riels: 0, card_usd_cents: 0, card_khr_riels: 0 })
+    }
 }
 
 fn normalize_expenses(expenses: &[DailyReportExpenseInput]) -> Vec<DailyReportExpenseInput> {
@@ -370,7 +427,26 @@ pub async fn close_daily_report(
     let total_expenses_usd = normalized_expenses
         .iter()
         .fold(0_i64, |sum, e| sum.saturating_add(e.amount_usd_cents));
-    let net_profit_usd = summary.total_sales_usd.saturating_sub(total_expenses_usd);
+
+    let (_, inventory_total_cost_usd, _) =
+        get_inventory_usage_summary(&pool, &restaurant_id, &report_date).await?;
+
+    // Net profit = gross sales − cash expenses − inventory usage cost
+    let net_profit_usd = summary.total_sales_usd
+        .saturating_sub(total_expenses_usd)
+        .saturating_sub(inventory_total_cost_usd);
+
+    let exchange_rate_snapshot: Option<f64> = {
+        let mut rate_rows = pool.query(
+            "SELECT rate FROM exchange_rates WHERE restaurant_id = ? ORDER BY effective_from DESC LIMIT 1",
+            params![restaurant_id.clone()],
+        ).await.ok();
+        if let Some(ref mut rows) = rate_rows {
+            rows.next().await.ok().flatten().and_then(|row| row.get::<f64>(0).ok())
+        } else {
+            None
+        }
+    };
 
     let report_id = uuid::Uuid::new_v4().to_string();
 
@@ -381,14 +457,14 @@ pub async fn close_daily_report(
             total_sales_usd, total_sales_khr,
             total_expenses_usd, net_profit_usd,
             notes, status, cashier_name, closed_by_user_id,
-            closed_at, created_at, updated_at
+            closed_at, created_at, updated_at, exchange_rate_snapshot
         ) VALUES (
             ?, ?, ?,
             ?, ?, ?,
             ?, ?,
             ?, ?,
             ?, 'closed', ?, ?,
-            datetime('now'), datetime('now'), datetime('now')
+            datetime('now'), datetime('now'), datetime('now'), ?
         )",
         params![
             report_id.clone(),
@@ -404,6 +480,7 @@ pub async fn close_daily_report(
             notes.clone().unwrap_or_default(),
             cashier_name.clone().unwrap_or_default(),
             actor_user_id.clone(),
+            exchange_rate_snapshot,
         ],
     )
     .await
@@ -480,7 +557,8 @@ pub async fn get_daily_reports(
                 total_sales_usd, total_sales_khr,
                 total_expenses_usd, net_profit_usd,
                 notes, status, cashier_name, closed_by_user_id,
-                closed_at, created_at, updated_at
+                closed_at, created_at, updated_at,
+                reopened_by, reopened_at
          FROM daily_reports
          WHERE {}
          ORDER BY report_date DESC, created_at DESC",
@@ -513,7 +591,8 @@ pub async fn get_daily_report_detail(
                     total_sales_usd, total_sales_khr,
                     total_expenses_usd, net_profit_usd,
                     notes, status, cashier_name, closed_by_user_id,
-                    closed_at, created_at, updated_at
+                    closed_at, created_at, updated_at,
+                    reopened_by, reopened_at, exchange_rate_snapshot
              FROM daily_reports
              WHERE id = ? AND restaurant_id = ? AND is_deleted = 0
              LIMIT 1",
@@ -556,11 +635,71 @@ pub async fn get_daily_report_detail(
     let (inventory_total_usage_qty, inventory_total_cost_usd, inventory_usage) =
         get_inventory_usage_summary(&pool, &restaurant_id, &report.report_date).await?;
 
+    let payment_breakdown =
+        get_payment_breakdown(&pool, &restaurant_id, &report.report_date).await?;
+
     Ok(DailyReportDetail {
         report,
         expenses,
         inventory_total_usage_qty,
         inventory_total_cost_usd,
         inventory_usage,
+        payment_breakdown,
     })
+}
+
+/// Reopen a closed daily report so admin can amend expenses and notes.
+/// Sales totals are immutable — always recalculated from actual orders.
+#[tauri::command]
+pub async fn reopen_daily_report(
+    report_id: String,
+    restaurant_id: String,
+    actor_user_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<DailyReport, String> {
+    let actor_role = ensure_can_close_report(&pool, &actor_user_id, &restaurant_id).await?;
+    if actor_role != "admin" && actor_role != "manager" {
+        return Err("Permission denied: only admin or manager can reopen a report.".to_string());
+    }
+
+    let mut rows = pool
+        .query(
+            "SELECT id, status FROM daily_reports WHERE id = ? AND restaurant_id = ? AND is_deleted = 0 LIMIT 1",
+            params![report_id.clone(), restaurant_id.clone()],
+        )
+        .await
+        .map_err(|e| format!("Failed checking report: {}", e))?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Report not found.".to_string())?;
+    let status = row.get::<String>(1).unwrap_or_default();
+    if status != "closed" {
+        return Err("Only closed reports can be reopened.".to_string());
+    }
+
+    pool.execute(
+        "UPDATE daily_reports
+         SET status = 'draft', reopened_by = ?, reopened_at = datetime('now'), updated_at = datetime('now')
+         WHERE id = ? AND restaurant_id = ?",
+        params![actor_user_id.clone(), report_id.clone(), restaurant_id.clone()],
+    )
+    .await
+    .map_err(|e| format!("Failed to reopen report: {}", e))?;
+
+    let mut updated_rows = pool
+        .query(
+            "SELECT id, restaurant_id, report_date,
+                    total_orders, paid_orders, voided_orders,
+                    total_sales_usd, total_sales_khr,
+                    total_expenses_usd, net_profit_usd,
+                    notes, status, cashier_name, closed_by_user_id,
+                    closed_at, created_at, updated_at,
+                    reopened_by, reopened_at, exchange_rate_snapshot
+             FROM daily_reports WHERE id = ? AND restaurant_id = ? LIMIT 1",
+            params![report_id, restaurant_id],
+        )
+        .await
+        .map_err(|e| format!("Failed loading updated report: {}", e))?;
+
+    let updated_row = updated_rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Report not found after update.".to_string())?;
+    Ok(map_daily_report(&updated_row))
 }

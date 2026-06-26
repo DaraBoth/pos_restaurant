@@ -153,11 +153,12 @@ export default function ExchangeRateManagement() {
                         <div className="flex items-start gap-3 mb-4">
                             <AlertTriangle size={22} className="text-amber-400 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className="font-black text-sm text-amber-300 mb-1">Rate change warning</p>
+                                <p className="font-black text-sm text-amber-300 mb-1">{t('rateChangeWarningTitle')}</p>
                                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                                    {rateWarning.count} completed order{rateWarning.count !== 1 ? 's' : ''} today used{' '}
-                                    <span className="font-bold text-[var(--foreground)]">{formatKhr(rateWarning.oldRate)}</span> per USD.
-                                    Changing the rate now will affect future orders only — past receipts keep their original amounts.
+                                    <span className="font-bold text-amber-300">{rateWarning.count}</span>{' '}
+                                    completed order{rateWarning.count !== 1 ? 's' : ''} today used{' '}
+                                    <span className="font-bold text-amber-300">{formatKhr(rateWarning.oldRate)}</span>{' '}
+                                    per USD. {t('rateChangeWarningBody')}
                                 </p>
                             </div>
                         </div>
@@ -166,13 +167,13 @@ export default function ExchangeRateManagement() {
                                 onClick={() => setRateWarning(null)}
                                 className="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-[var(--border)] text-[var(--text-secondary)] hover:bg-white/[0.05] transition-all"
                             >
-                                Cancel
+                                {t('cancel')}
                             </button>
                             <button
                                 onClick={() => handleUpdate(true)}
                                 className="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-500 text-black hover:bg-amber-400 transition-all"
                             >
-                                Change anyway
+                                {t('changeAnyway')}
                             </button>
                         </div>
                     </div>

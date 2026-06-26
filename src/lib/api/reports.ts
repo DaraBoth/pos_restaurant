@@ -41,3 +41,6 @@ export const getDailyReports = (
 
 export const getDailyReportDetail = (reportId: string, restaurantId: string) =>
     call<DailyReportDetail>('get_daily_report_detail', { reportId, restaurantId });
+
+export const reopenDailyReport = (reportId: string, restaurantId: string, actorUserId: string) =>
+    call<DailyReport>('reopen_daily_report', { reportId, restaurantId, actorUserId });

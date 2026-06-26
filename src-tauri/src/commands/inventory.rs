@@ -12,14 +12,43 @@ fn get_f64_safe(row: &libsql::Row, idx: i32) -> f64 {
     }
 }
 
+fn get_f64_opt(row: &libsql::Row, idx: i32) -> Option<f64> {
+    match row.get_value(idx) {
+        Ok(libsql::Value::Integer(i)) => Some(i as f64),
+        Ok(libsql::Value::Real(f)) => Some(f),
+        _ => None,
+    }
+}
+
+fn calc_stock_pct(stock_qty: f64, min_stock_qty: f64, max_stock_qty: Option<f64>) -> f64 {
+    if let Some(max) = max_stock_qty {
+        if max > 0.0 {
+            return (stock_qty / max * 100.0).clamp(0.0, 100.0);
+        }
+    }
+    if min_stock_qty <= 0.0 {
+        return 100.0;
+    }
+    if stock_qty <= min_stock_qty {
+        // at or below min → 0–25% danger zone (linear, capped at 25%)
+        (stock_qty / min_stock_qty * 25.0).clamp(0.0, 25.0)
+    } else if stock_qty <= min_stock_qty * 3.0 {
+        // min to min*3 → 25–75%
+        25.0 + ((stock_qty - min_stock_qty) / (min_stock_qty * 2.0) * 50.0)
+    } else {
+        // above min*3 → 75–100%
+        (75.0 + ((stock_qty - min_stock_qty * 3.0) / (min_stock_qty * 3.0) * 25.0)).min(100.0)
+    }
+}
+
 #[tauri::command]
 pub async fn get_inventory_items(
     db: State<'_, Arc<Connection>>,
     restaurant_id: String,
 ) -> Result<Vec<InventoryItem>, String> {
     let mut rows = db.query(
-        "SELECT id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at 
-         FROM inventory_items 
+        "SELECT id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at, max_stock_qty
+         FROM inventory_items
             WHERE restaurant_id = ? AND COALESCE(is_deleted, 0) = 0
          ORDER BY name ASC",
          params![restaurant_id]
@@ -29,14 +58,19 @@ pub async fn get_inventory_items(
 
     let mut items = Vec::new();
     while let Ok(Some(row)) = rows.next().await {
+        let stock_qty = get_f64_safe(&row, 4);
+        let min_stock_qty = get_f64_safe(&row, 6);
+        let max_stock_qty = get_f64_opt(&row, 9);
+        let stock_pct = calc_stock_pct(stock_qty, min_stock_qty, max_stock_qty);
         items.push(InventoryItem {
             id: row.get::<String>(0).unwrap_or_default(),
             name: row.get::<String>(1).unwrap_or_default(),
             khmer_name: row.get::<String>(2).ok(),
             unit_label: row.get::<String>(3).unwrap_or_default(),
-            stock_qty: get_f64_safe(&row, 4),
-            stock_pct: get_f64_safe(&row, 5),
-            min_stock_qty: get_f64_safe(&row, 6),
+            stock_qty,
+            stock_pct,
+            min_stock_qty,
+            max_stock_qty,
             cost_per_unit: get_f64_safe(&row, 7),
             created_at: row.get::<String>(8).unwrap_or_default(),
         });
@@ -53,16 +87,17 @@ pub async fn create_inventory_item(
     unit_label: String,
     stock_qty: f64,
     min_stock_qty: f64,
+    max_stock_qty: Option<f64>,
     cost_per_unit: f64,
     restaurant_id: String,
 ) -> Result<InventoryItem, String> {
     let id = uuid::Uuid::new_v4().to_string();
-    let stock_pct = if min_stock_qty > 0.0 { (stock_qty / (min_stock_qty * 2.0)) * 100.0 } else { 100.0 };
-    
+    let stock_pct = calc_stock_pct(stock_qty, min_stock_qty, max_stock_qty);
+
     let query = "
-        INSERT INTO inventory_items (id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, restaurant_id, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
-        RETURNING id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at
+        INSERT INTO inventory_items (id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, max_stock_qty, cost_per_unit, restaurant_id, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))
+        RETURNING id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at, max_stock_qty
     ";
 
     let mut rows = db.query(query, params![
@@ -73,20 +108,25 @@ pub async fn create_inventory_item(
         stock_qty,
         stock_pct,
         min_stock_qty,
+        max_stock_qty,
         cost_per_unit,
         restaurant_id
     ]).await.map_err(|e| e.to_string())?;
 
     let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Insert failed".to_string())?;
+    let sq = get_f64_safe(&row, 4);
+    let mn = get_f64_safe(&row, 6);
+    let mx = get_f64_opt(&row, 9);
 
     Ok(InventoryItem {
         id: row.get::<String>(0).unwrap_or_default(),
         name: row.get::<String>(1).unwrap_or_default(),
         khmer_name: row.get::<String>(2).ok(),
         unit_label: row.get::<String>(3).unwrap_or_default(),
-        stock_qty: get_f64_safe(&row, 4),
-        stock_pct: get_f64_safe(&row, 5),
-        min_stock_qty: get_f64_safe(&row, 6),
+        stock_qty: sq,
+        stock_pct: calc_stock_pct(sq, mn, mx),
+        min_stock_qty: mn,
+        max_stock_qty: mx,
         cost_per_unit: get_f64_safe(&row, 7),
         created_at: row.get::<String>(8).unwrap_or_default(),
     })
@@ -101,16 +141,17 @@ pub async fn update_inventory_item(
     unit_label: String,
     stock_qty: f64,
     min_stock_qty: f64,
+    max_stock_qty: Option<f64>,
     cost_per_unit: f64,
     restaurant_id: String,
 ) -> Result<InventoryItem, String> {
-    let stock_pct = if min_stock_qty > 0.0 { (stock_qty / (min_stock_qty * 2.0)) * 100.0 } else { 100.0 };
+    let stock_pct = calc_stock_pct(stock_qty, min_stock_qty, max_stock_qty);
 
     let query = "
-        UPDATE inventory_items 
-        SET name = ?2, khmer_name = ?3, unit_label = ?4, stock_qty = ?5, stock_pct = ?6, min_stock_qty = ?7, cost_per_unit = ?8, updated_at = datetime('now')
-        WHERE id = ?1 AND restaurant_id = ?9
-        RETURNING id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at
+        UPDATE inventory_items
+        SET name = ?2, khmer_name = ?3, unit_label = ?4, stock_qty = ?5, stock_pct = ?6, min_stock_qty = ?7, max_stock_qty = ?8, cost_per_unit = ?9, updated_at = datetime('now')
+        WHERE id = ?1 AND restaurant_id = ?10
+        RETURNING id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, cost_per_unit, created_at, max_stock_qty
     ";
 
     let mut rows = db.query(query, params![
@@ -121,20 +162,25 @@ pub async fn update_inventory_item(
         stock_qty,
         stock_pct,
         min_stock_qty,
+        max_stock_qty,
         cost_per_unit,
         restaurant_id
     ]).await.map_err(|e| e.to_string())?;
 
     let row = rows.next().await.map_err(|e| e.to_string())?.ok_or_else(|| "Update failed".to_string())?;
+    let sq = get_f64_safe(&row, 4);
+    let mn = get_f64_safe(&row, 6);
+    let mx = get_f64_opt(&row, 9);
 
     Ok(InventoryItem {
         id: row.get::<String>(0).unwrap_or_default(),
         name: row.get::<String>(1).unwrap_or_default(),
         khmer_name: row.get::<String>(2).ok(),
         unit_label: row.get::<String>(3).unwrap_or_default(),
-        stock_qty: get_f64_safe(&row, 4),
-        stock_pct: get_f64_safe(&row, 5),
-        min_stock_qty: get_f64_safe(&row, 6),
+        stock_qty: sq,
+        stock_pct: calc_stock_pct(sq, mn, mx),
+        min_stock_qty: mn,
+        max_stock_qty: mx,
         cost_per_unit: get_f64_safe(&row, 7),
         created_at: row.get::<String>(8).unwrap_or_default(),
     })
@@ -168,5 +214,91 @@ pub async fn delete_inventory_item(
     ).await;
 
     Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct StockMovement {
+    pub id: String,
+    pub inventory_item_id: String,
+    pub movement_type: String,
+    pub quantity: f64,
+    pub note: Option<String>,
+    pub user_id: Option<String>,
+    pub created_at: String,
+}
+
+#[tauri::command]
+pub async fn receive_stock(
+    inventory_item_id: String,
+    quantity: f64,
+    note: Option<String>,
+    user_id: String,
+    restaurant_id: String,
+    db: State<'_, Arc<Connection>>,
+) -> Result<InventoryItem, String> {
+    if quantity <= 0.0 {
+        return Err("Quantity must be greater than zero".to_string());
+    }
+
+    db.execute(
+        "UPDATE inventory_items SET stock_qty = stock_qty + ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?",
+        params![quantity, inventory_item_id.clone(), restaurant_id.clone()],
+    ).await.map_err(|e| format!("Update stock failed: {}", e))?;
+
+    let movement_id = uuid::Uuid::new_v4().to_string();
+    db.execute(
+        "INSERT INTO inventory_movements (id, inventory_item_id, movement_type, quantity, note, user_id, restaurant_id) VALUES (?, ?, 'receive', ?, ?, ?, ?)",
+        params![movement_id, inventory_item_id.clone(), quantity, note.clone(), user_id.clone(), restaurant_id.clone()],
+    ).await.map_err(|e| format!("Insert movement failed: {}", e))?;
+
+    let mut rows = db.query(
+        "SELECT id, name, khmer_name, unit_label, stock_qty, stock_pct, min_stock_qty, max_stock_qty, cost_per_unit, created_at FROM inventory_items WHERE id = ? AND restaurant_id = ?",
+        params![inventory_item_id.clone(), restaurant_id.clone()],
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let row = rows.next().await.map_err(|e| e.to_string())?.ok_or("Item not found")?;
+    Ok(InventoryItem {
+        id: row.get::<String>(0).unwrap_or_default(),
+        name: row.get::<String>(1).unwrap_or_default(),
+        khmer_name: row.get::<String>(2).ok(),
+        unit_label: row.get::<String>(3).unwrap_or_default(),
+        stock_qty: get_f64_safe(&row, 4),
+        stock_pct: get_f64_safe(&row, 5),
+        min_stock_qty: get_f64_safe(&row, 6),
+        max_stock_qty: get_f64_opt(&row, 7),
+        cost_per_unit: get_f64_safe(&row, 8),
+        created_at: row.get::<String>(9).unwrap_or_default(),
+    })
+}
+
+#[tauri::command]
+pub async fn get_stock_movements(
+    inventory_item_id: String,
+    restaurant_id: String,
+    limit: Option<i64>,
+    db: State<'_, Arc<Connection>>,
+) -> Result<Vec<StockMovement>, String> {
+    let lim = limit.unwrap_or(10);
+    let mut rows = db.query(
+        "SELECT id, inventory_item_id, movement_type, quantity, note, user_id, created_at
+         FROM inventory_movements
+         WHERE inventory_item_id = ? AND restaurant_id = ?
+         ORDER BY created_at DESC LIMIT ?",
+        params![inventory_item_id, restaurant_id, lim],
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut movements = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        movements.push(StockMovement {
+            id: row.get::<String>(0).unwrap_or_default(),
+            inventory_item_id: row.get::<String>(1).unwrap_or_default(),
+            movement_type: row.get::<String>(2).unwrap_or_default(),
+            quantity: get_f64_safe(&row, 3),
+            note: row.get::<String>(4).ok(),
+            user_id: row.get::<String>(5).ok(),
+            created_at: row.get::<String>(6).unwrap_or_default(),
+        });
+    }
+    Ok(movements)
 }
 

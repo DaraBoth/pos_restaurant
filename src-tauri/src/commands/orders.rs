@@ -42,6 +42,7 @@ pub async fn create_order(
     user_id: String,
     table_id: Option<String>,
     restaurant_id: String,
+    notes: Option<String>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     // ── Pre-flight: verify FK targets exist locally ────────────────────────
@@ -128,9 +129,25 @@ pub async fn create_order(
     // Use explicit NULL for takeout orders (no table); store "" (empty) only for table orders
     let table_id_val = table_id.clone().unwrap_or_default();
     let session_id_val = session_id.unwrap_or_default();
+
+    let takeout_counter: Option<i64> = if table_id.is_none() {
+        let mut cnt_rows = pool.query(
+            "SELECT COUNT(*) FROM orders WHERE restaurant_id = ? AND table_id IS NULL AND date(created_at,'localtime') = date('now','localtime')",
+            params![restaurant_id.clone()],
+        ).await.ok();
+        let count = if let Some(ref mut rows) = cnt_rows {
+            rows.next().await.ok().flatten().and_then(|r| r.get::<i64>(0).ok()).unwrap_or(0)
+        } else {
+            0
+        };
+        Some(count + 1)
+    } else {
+        None
+    };
+
     pool.execute(
-        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status, restaurant_id) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 'open', ?)",
-        params![id.clone(), user_id.clone(), table_id_val.clone(), session_id_val.clone(), round_number, restaurant_id.clone()]
+        "INSERT INTO orders (id, user_id, table_id, session_id, round_number, status, restaurant_id, notes, takeout_counter) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 'open', ?, NULLIF(?, ''), ?)",
+        params![id.clone(), user_id.clone(), table_id_val.clone(), session_id_val.clone(), round_number, restaurant_id.clone(), notes.clone().unwrap_or_default(), takeout_counter]
     ).await.map_err(|e| format!("Insert orders error (id={}, user_id={}, table_id={}, session_id={}): {}", id, user_id, table_id_val, session_id_val, e))?;
 
     if let Some(table_name) = &table_id {
@@ -343,7 +360,7 @@ pub async fn get_orders(
                 o.bakong_bill_number, o.notes, o.customer_name, o.customer_phone, o.created_at, o.updated_at, o.completed_at,
                 o.receipt_number, o.voided_by, o.voided_at, o.void_reason,
                 COALESCE(NULLIF(vu.full_name, ''), vu.username) AS voided_by_name,
-                o.exchange_rate_used
+                o.exchange_rate_used, o.takeout_counter
          FROM orders o LEFT JOIN users vu ON o.voided_by = vu.id
          WHERE o.is_deleted = 0 AND o.restaurant_id = ?"
     );
@@ -395,6 +412,7 @@ pub async fn get_orders(
             void_reason: row.get::<String>(20).ok(),
             voided_by_name: row.get::<String>(21).ok(),
             exchange_rate_used: row.get::<f64>(22).ok(),
+            takeout_counter: row.get::<i64>(23).ok(),
         });
     }
 
@@ -443,6 +461,7 @@ pub async fn get_session_rounds(
             void_reason: None,
             voided_by_name: None,
             exchange_rate_used: None,
+            takeout_counter: None,
         });
     }
 
@@ -530,6 +549,7 @@ pub async fn get_active_order_for_table(
             void_reason: None,
             voided_by_name: None,
             exchange_rate_used: None,
+            takeout_counter: None,
         }))
     } else {
         Ok(None)
@@ -578,6 +598,7 @@ pub async fn get_orders_for_table(
             void_reason: None,
             voided_by_name: None,
             exchange_rate_used: None,
+            takeout_counter: None,
         });
     }
 
@@ -591,6 +612,7 @@ pub async fn checkout_order(
     discount_cents: Option<i64>,
     restaurant_id: String,
     customer_name: Option<String>,
+    notes: Option<String>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<Order, String> {
     let mut tb_rows = pool.query("SELECT table_id, user_id FROM orders WHERE id = ? AND restaurant_id = ?", params![order_id.clone(), restaurant_id.clone()])
@@ -627,6 +649,7 @@ pub async fn checkout_order(
          SET total_usd = ?, total_khr = ?, tax_vat = 0, tax_plt = 0, exchange_rate_used = ?,
              status = 'completed', updated_at = datetime('now'), completed_at = datetime('now'),
              customer_name = COALESCE(?, customer_name),
+             notes = COALESCE(NULLIF(?, ''), notes),
              receipt_number = (
                  strftime('%Y%m%d', 'now', 'localtime') || '-' ||
                  printf('%04d', (
@@ -639,7 +662,7 @@ pub async fn checkout_order(
                  ))
              )
          WHERE id = ? AND restaurant_id = ?",
-         params![final_total, final_khr, exch_rate, customer_name.filter(|s| !s.is_empty()), restaurant_id.clone(), order_id.clone(), restaurant_id.clone()]
+         params![final_total, final_khr, exch_rate, customer_name.filter(|s| !s.is_empty()), notes.unwrap_or_default(), restaurant_id.clone(), order_id.clone(), restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     let mut item_rows = pool.query(
@@ -663,7 +686,7 @@ pub async fn checkout_order(
         let _: u64 = pool.execute(
             "INSERT INTO payments (id, order_id, method, currency, amount, bakong_transaction_hash)
              VALUES (?, ?, ?, ?, ?, ?)",
-            params![pid, order_id.clone(), p.method.clone(), p.currency.clone(), p.amount, p.bakong_transaction_hash.clone().unwrap_or_default()]
+            params![pid, order_id.clone(), p.method.clone(), p.currency.clone(), p.amount, p.bakong_transaction_hash.clone().filter(|s| !s.is_empty())]
         ).await.map_err(|e| format!("Payment insert error: {}", e))?;
     }
 
@@ -674,7 +697,7 @@ pub async fn checkout_order(
     let mut order_rows = pool.query(
         "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
                 bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
-                receipt_number
+                receipt_number, takeout_counter
          FROM orders WHERE id=? AND restaurant_id = ?",
          params![order_id, restaurant_id]
     ).await.map_err(|e| format!("Database error: {}", e))?;
@@ -705,6 +728,7 @@ pub async fn checkout_order(
         void_reason: None,
         voided_by_name: None,
         exchange_rate_used: None,
+        takeout_counter: row.get::<i64>(18).ok(),
     })
 }
 
@@ -1297,5 +1321,101 @@ pub async fn delete_order_history(
     }
 
     Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct HeldOrderSummary {
+    pub id: String,
+    pub customer_name: Option<String>,
+    pub table_id: Option<String>,
+    pub total_usd: i64,
+    pub item_count: i64,
+    pub held_at: String,
+    pub receipt_number: Option<String>,
+    pub takeout_counter: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn get_held_orders(
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Vec<HeldOrderSummary>, String> {
+    let mut rows = pool.query(
+        "SELECT o.id, o.customer_name, o.table_id, o.total_usd,
+                (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id AND oi.is_deleted = 0) AS item_count,
+                o.created_at, o.receipt_number, o.takeout_counter
+         FROM orders o
+         WHERE o.restaurant_id = ? AND o.status = 'hold' AND o.is_deleted = 0
+         ORDER BY o.created_at ASC",
+        params![restaurant_id],
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let mut results = Vec::new();
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        results.push(HeldOrderSummary {
+            id: row.get::<String>(0).unwrap_or_default(),
+            customer_name: row.get::<String>(1).ok(),
+            table_id: row.get::<String>(2).ok(),
+            total_usd: row.get::<i64>(3).unwrap_or(0),
+            item_count: row.get::<i64>(4).unwrap_or(0),
+            held_at: row.get::<String>(5).unwrap_or_default(),
+            receipt_number: row.get::<String>(6).ok(),
+            takeout_counter: row.get::<i64>(7).ok(),
+        });
+    }
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn resume_order(
+    order_id: String,
+    restaurant_id: String,
+    pool: State<'_, Arc<Connection>>,
+) -> Result<Order, String> {
+    let mut chk = pool.query(
+        "SELECT status FROM orders WHERE id = ? AND restaurant_id = ? AND is_deleted = 0",
+        params![order_id.clone(), restaurant_id.clone()],
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+    let row = chk.next().await.map_err(|e| e.to_string())?.ok_or("Order not found")?;
+    let status = row.get::<String>(0).unwrap_or_default();
+    if status != "hold" {
+        return Err(format!("Cannot resume: order status is '{}', expected 'hold'", status));
+    }
+
+    let mut ord_rows = pool.query(
+        "SELECT id, user_id, table_id, session_id, round_number, status, total_usd, total_khr, tax_vat, tax_plt,
+                bakong_bill_number, notes, customer_name, customer_phone, created_at, updated_at, completed_at,
+                receipt_number, takeout_counter
+         FROM orders WHERE id = ? AND restaurant_id = ?",
+        params![order_id.clone(), restaurant_id.clone()],
+    ).await.map_err(|e| format!("Database error: {}", e))?;
+
+    let row = ord_rows.next().await.map_err(|e| e.to_string())?.ok_or("Order missing after check")?;
+    Ok(Order {
+        id: row.get::<String>(0).unwrap_or_default(),
+        user_id: row.get::<String>(1).ok(),
+        table_id: row.get::<String>(2).ok(),
+        session_id: row.get::<String>(3).ok(),
+        round_number: row.get::<i64>(4).unwrap_or(1),
+        status: row.get::<String>(5).unwrap_or_default(),
+        total_usd: row.get::<i64>(6).unwrap_or(0),
+        total_khr: row.get::<i64>(7).unwrap_or(0),
+        tax_vat: row.get::<i64>(8).unwrap_or(0),
+        tax_plt: row.get::<i64>(9).unwrap_or(0),
+        bakong_bill_number: row.get::<String>(10).ok(),
+        notes: row.get::<String>(11).ok(),
+        customer_name: row.get::<String>(12).ok(),
+        customer_phone: row.get::<String>(13).ok(),
+        created_at: row.get::<String>(14).unwrap_or_default(),
+        updated_at: row.get::<String>(15).ok(),
+        completed_at: row.get::<String>(16).ok(),
+        receipt_number: row.get::<String>(17).ok(),
+        voided_by: None,
+        voided_at: None,
+        void_reason: None,
+        voided_by_name: None,
+        exchange_rate_used: None,
+        takeout_counter: row.get::<i64>(18).ok(),
+    })
 }
 

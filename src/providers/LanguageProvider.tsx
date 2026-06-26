@@ -19,6 +19,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const stored = localStorage.getItem('khpos_lang') as Lang | null;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (stored === 'km' || stored === 'en') setLangState(stored);
     }, []);
 

@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import { getDbStatus } from '@/lib/tauri-commands';
+import { getSyncConflictCount } from '@/lib/api/restaurant';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { Cloud, CloudOff, CloudUpload, Check } from 'lucide-react';
+import { Cloud, CloudOff, CloudUpload, Check, AlertTriangle } from 'lucide-react';
 
 type SyncState = 'offline' | 'syncing' | 'synced' | 'local' | 'error';
 
@@ -32,6 +33,7 @@ export function SyncStatus() {
     const [state, setState] = useState<SyncState>('synced');
     const [rawError, setRawError] = useState('');
     const [friendlyKey, setFriendlyKey] = useState('syncErrGeneral');
+    const [conflictCount, setConflictCount] = useState(0);
     const syncingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const { t } = useLanguage();
@@ -49,6 +51,8 @@ export function SyncStatus() {
             setState('offline');
             return;
         }
+
+        getSyncConflictCount().then(n => setConflictCount(n)).catch(() => {});
 
         try {
             const status = await getDbStatus();
@@ -80,6 +84,7 @@ export function SyncStatus() {
     }
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         checkStatus();
         pollRef.current = setInterval(checkStatus, 10_000);
 
@@ -149,6 +154,19 @@ export function SyncStatus() {
                 <p className="text-[9px] text-[var(--text-secondary)] px-2.5 leading-relaxed opacity-70 truncate" title={t(friendlyKey)}>
                     {t(friendlyKey)}
                 </p>
+            )}
+
+            {conflictCount > 0 && (
+                <div
+                    className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-xl border"
+                    style={{ background: '#f59e0b10', borderColor: '#f59e0b30' }}
+                    title={t('syncConflictWarning')}
+                >
+                    <AlertTriangle size={10} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-[9px] text-amber-400 leading-relaxed">
+                        {t('syncConflictWarning')}
+                    </p>
+                </div>
             )}
         </div>
     );

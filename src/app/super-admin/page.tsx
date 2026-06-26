@@ -1178,8 +1178,8 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                 newPassword: password || undefined,
             });
             onUpdated();
-        } catch (err: any) {
-            setError(err.toString());
+        } catch (err: unknown) {
+            setError(String(err));
         } finally {
             setLoading(false);
         }
@@ -1376,8 +1376,8 @@ function EditProfileModal({ onClose }: { onClose: () => void }) {
                 setUser({ ...user!, username, full_name: fullName });
                 onClose();
             }
-        } catch (err: any) {
-            setError(err.toString());
+        } catch (err: unknown) {
+            setError(String(err));
         } finally {
             setLoading(false);
         }
@@ -1615,8 +1615,8 @@ function MoveUserModal({ user, restaurants, onClose, onMoved }: {
             await superadminMoveUser({ userId: user.id, newRestaurantId: selectedId });
             onMoved();
             // Optional: alert success
-        } catch (err: any) {
-            setError(err.toString());
+        } catch (err: unknown) {
+            setError(String(err));
         } finally {
             setLoading(false);
         }

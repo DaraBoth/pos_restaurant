@@ -184,6 +184,9 @@ pub struct Order {
     // USD→KHR rate captured at checkout time, for a stable audit trail on reprints.
     #[serde(default)]
     pub exchange_rate_used: Option<f64>,
+    // Sequential daily counter for takeout/counter orders (NULL for table orders).
+    #[serde(default)]
+    pub takeout_counter: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -225,6 +228,7 @@ pub struct KitchenOrderItem {
 pub struct KitchenOrder {
     pub order_id: String,
     pub table_id: Option<String>,
+    pub notes: Option<String>,
     pub created_at: String,
     pub items: Vec<KitchenOrderItem>,
 }
@@ -275,6 +279,7 @@ pub struct InventoryItem {
     pub stock_qty: f64,
     pub stock_pct: f64,
     pub min_stock_qty: f64,
+    pub max_stock_qty: Option<f64>,
     pub cost_per_unit: f64,
     pub created_at: String,
 }

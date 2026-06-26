@@ -16,6 +16,8 @@ type UpdateState =
     | 'installed'        // binary swapped on disk, user choosing restart-now vs later
     | 'pending-restart'; // user chose "Later"; sidebar shows reminder pill
 
+const DOWNLOAD_STALL_MS = 30_000;
+
 export function UpdateStatus() {
     const { t } = useLanguage();
     const [state, setState] = useState<UpdateState>('idle');
@@ -26,6 +28,7 @@ export function UpdateStatus() {
     const [dismissed, setDismissed] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [sizeHint, setSizeHint] = useState('');
+    const [versionMismatch, setVersionMismatch] = useState('');
 
     // Snapshot of state for use inside the polling callback — avoids stale-closure
     // bugs when the interval fires while we're already mid-install.
@@ -35,6 +38,8 @@ export function UpdateStatus() {
     // Version that's been installed on disk and is waiting for the user to restart.
     // Used so a follow-up poll doesn't re-prompt for the same version.
     const installedVersionRef = useRef<string>('');
+    const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastProgressRef = useRef<number>(0);
 
     // Interval handle — stored in a ref so install() can stop polling after success.
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -102,6 +107,23 @@ export function UpdateStatus() {
         };
     }, [dismissed]);
 
+    function clearStallTimer() {
+        if (stallTimerRef.current !== null) {
+            clearTimeout(stallTimerRef.current);
+            stallTimerRef.current = null;
+        }
+    }
+
+    function armStallTimer() {
+        clearStallTimer();
+        lastProgressRef.current = Date.now();
+        stallTimerRef.current = setTimeout(() => {
+            console.warn('[Updater] Download stalled for 30s — aborting');
+            setState('available');
+            setErrorMsg(t('updateTimeout'));
+        }, DOWNLOAD_STALL_MS);
+    }
+
     async function install() {
         if (!pendingUpdate) return;
         setState('downloading');
@@ -109,15 +131,21 @@ export function UpdateStatus() {
         setContentLength(0);
         setErrorMsg('');
         setSizeHint('');
+        armStallTimer();
         try {
             await pendingUpdate.downloadAndInstall((event: DownloadEvent) => {
                 if (event.event === 'Started') {
                     const bytes = event.data?.contentLength;
                     setContentLength(bytes || 0);
                     if (bytes) setSizeHint(Math.round(bytes / 1024 / 1024) + ' MB');
+                    armStallTimer();
                 }
-                if (event.event === 'Progress') setDownloaded(p => p + (event.data?.chunkLength || 0));
+                if (event.event === 'Progress') {
+                    setDownloaded(p => p + (event.data?.chunkLength || 0));
+                    armStallTimer();
+                }
             });
+            clearStallTimer();
             console.info(`[Updater] v${latestVersion} installed on disk; prompting for restart`);
             installedVersionRef.current = latestVersion;
             setState('installed');
@@ -126,20 +154,39 @@ export function UpdateStatus() {
                 timerRef.current = null;
             }
         } catch (err) {
+            clearStallTimer();
             console.error('[Updater] install failed:', err);
             setState('available');
-            setErrorMsg('Download failed. Tap to retry.');
+            setErrorMsg(t('updateFailed'));
         }
     }
 
     async function restartNow() {
         try {
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem('dineos_expected_version', latestVersion || installedVersionRef.current);
+            }
             const { relaunch } = await import('@tauri-apps/plugin-process');
             await relaunch();
         } catch (err) {
             console.error('[Updater] relaunch failed:', err);
         }
     }
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const expected = window.localStorage.getItem('dineos_expected_version');
+        if (!expected) return;
+        window.localStorage.removeItem('dineos_expected_version');
+
+        import('@tauri-apps/api/app').then(({ getVersion }) =>
+            getVersion().then(current => {
+                if (current !== expected) {
+                    setVersionMismatch(current);
+                }
+            }).catch(() => {})
+        ).catch(() => {});
+    }, []);
 
     function restartLater() {
         // Binary is already on disk — next normal app launch will pick it up.
@@ -242,7 +289,7 @@ export function UpdateStatus() {
                                     {t('updateReady')}
                                 </h2>
                                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                    v{latestVersion} downloaded and installed
+                                    v{latestVersion} {t('updateReadySubtitle')}
                                 </p>
                             </div>
                         </div>
@@ -273,6 +320,18 @@ export function UpdateStatus() {
 
     return (
         <>
+            {versionMismatch && (
+                <div
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl border cursor-pointer"
+                    style={{ background: '#f9731610', borderColor: '#f9731630' }}
+                    onClick={() => setVersionMismatch('')}
+                    title="Click to dismiss"
+                >
+                    <p className="text-[9px] font-black text-orange-400 leading-relaxed">
+                        {t('updateMayNotHaveApplied')}{versionMismatch}
+                    </p>
+                </div>
+            )}
             {pill}
             {modal}
         </>

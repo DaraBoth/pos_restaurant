@@ -555,6 +555,10 @@ export function printDailyClosingReport(
         </tr>`)
         .join('');
 
+    const pb = detail.payment_breakdown;
+    const totalUsdCollected = pb ? (pb.cash_usd_cents + pb.khqr_usd_cents + pb.card_usd_cents) : 0;
+    const varianceUsdCents = pb ? (totalUsdCollected - report.total_sales_usd) : 0;
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -586,6 +590,7 @@ export function printDailyClosingReport(
   <table class="grid">
     <tr><td>Date</td><td class="right mono">${escapeHtml(report.report_date)}</td></tr>
     <tr><td>Cashier</td><td class="right">${escapeHtml(report.cashier_name || '-')}</td></tr>
+    ${report.exchange_rate_snapshot ? `<tr><td>Exchange Rate at Close</td><td class="right mono">$1 = ${Math.round(report.exchange_rate_snapshot).toLocaleString()} &#x17DB;</td></tr>` : ''}
   </table>
 
   <div class="line"></div>
@@ -597,6 +602,19 @@ export function printDailyClosingReport(
     <tr><td>Total USD / សរុប USD</td><td class="right mono">${formatUsd(report.total_sales_usd)}</td></tr>
     ${report.total_sales_khr > 0 ? `<tr><td>Total KHR / សរុប KHR</td><td class="right mono">${formatKhr(report.total_sales_khr)}</td></tr>` : ''}
     ${(report.total_sales_khr > 0 && report.total_sales_usd > 0) ? `<tr style="opacity:0.6;font-size:9px;"><td>Exchange Rate / អត្រា</td><td class="right mono">${Math.round(report.total_sales_khr * 100 / report.total_sales_usd).toLocaleString()}&#x17DB;/$</td></tr>` : ''}
+  </table>
+
+  <div class="line"></div>
+  <div class="section">Payment Breakdown / ការបែងចែកការទូទាត់</div>
+  <table class="grid">
+    ${pb && pb.cash_usd_cents > 0 ? `<tr><td>Cash USD / សាច់ប្រាក់ USD</td><td class="right mono">${formatUsd(pb.cash_usd_cents)}</td></tr>` : ''}
+    ${pb && pb.cash_khr_riels > 0 ? `<tr><td>Cash KHR / សាច់ប្រាក់ KHR</td><td class="right mono">${formatKhr(pb.cash_khr_riels)}</td></tr>` : ''}
+    ${pb && pb.khqr_usd_cents > 0 ? `<tr><td>KHQR (USD)</td><td class="right mono">${formatUsd(pb.khqr_usd_cents)}</td></tr>` : ''}
+    ${pb && pb.khqr_khr_riels > 0 ? `<tr><td>KHQR (KHR)</td><td class="right mono">${formatKhr(pb.khqr_khr_riels)}</td></tr>` : ''}
+    ${pb && pb.card_usd_cents > 0 ? `<tr><td>Card / កាតធនាគារ</td><td class="right mono">${formatUsd(pb.card_usd_cents)}</td></tr>` : ''}
+    ${pb && pb.card_khr_riels > 0 ? `<tr><td>Card KHR</td><td class="right mono">${formatKhr(pb.card_khr_riels)}</td></tr>` : ''}
+    ${pb ? `<tr><td><b>Total Collected (USD)</b></td><td class="right mono"><b>${formatUsd(totalUsdCollected)}</b></td></tr>` : ''}
+    ${pb ? `<tr style="font-size:9px;${varianceUsdCents !== 0 ? 'color:red;font-weight:900;' : 'opacity:0.65;'}"><td>Variance / ភាពខុសគ្នា</td><td class="right mono">${varianceUsdCents >= 0 ? '+' : ''}${formatUsd(varianceUsdCents)}</td></tr>` : ''}
   </table>
 
   <div class="line"></div>
@@ -616,12 +634,12 @@ export function printDailyClosingReport(
   <div class="line"></div>
   <div class="section">Profit Summary / សង្ខេបប្រាក់ចំណេញ</div>
   <table class="grid">
-    <tr><td>Total USD / សរុប USD</td><td class="right mono">${formatUsd(report.total_sales_usd)}</td></tr>
-    ${report.total_sales_khr > 0 ? `<tr><td>Total KHR / សរុប KHR</td><td class="right mono">${formatKhr(report.total_sales_khr)}</td></tr>` : ''}
-    <tr><td>Total Expenses</td><td class="right mono">-${formatUsd(report.total_expenses_usd)}</td></tr>
-    <tr><td><b>Operational Profit</b></td><td class="right mono"><b>${formatUsd(report.net_profit_usd)}</b></td></tr>
-    <tr><td>Inventory Usage Cost</td><td class="right mono">-${formatUsd(detail.inventory_total_cost_usd || 0)}</td></tr>
-    <tr><td><b>Est. Profit After Inventory</b></td><td class="right mono"><b>${formatUsd(estimatedProfitAfterInventory)}</b></td></tr>
+    <tr><td>Gross Sales / ការលក់សរុប</td><td class="right mono">${formatUsd(report.total_sales_usd)}</td></tr>
+    ${report.total_sales_khr > 0 ? `<tr><td>Gross Sales KHR</td><td class="right mono">${formatKhr(report.total_sales_khr)}</td></tr>` : ''}
+    <tr><td>Minus Expenses / ដកចំណាយ</td><td class="right mono">-${formatUsd(report.total_expenses_usd)}</td></tr>
+    ${(detail.inventory_total_cost_usd || 0) > 0 ? `<tr><td>Minus Inventory Cost / ដកថ្លៃស្ដុក</td><td class="right mono">-${formatUsd(detail.inventory_total_cost_usd || 0)}</td></tr>` : ''}
+    <tr style="border-top:1px dashed #000;"><td><b>Net Profit / ប្រាក់ចំណេញ</b></td><td class="right mono"><b>${formatUsd(report.net_profit_usd)}</b></td></tr>
+    ${(detail.inventory_total_cost_usd || 0) > 0 ? `<tr style="font-size:9px;opacity:0.65;"><td colspan="2">* Inventory cost based on today stock usage</td></tr>` : ''}
   </table>
 
   <div class="line"></div>

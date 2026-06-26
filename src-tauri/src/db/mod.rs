@@ -118,9 +118,10 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("orders",      "session_id",      "session_id TEXT");
     add_col!("orders",      "round_number",    "round_number INTEGER NOT NULL DEFAULT 1");
     add_col!("orders",      "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
-    add_col!("orders",      "customer_name",   "customer_name TEXT");
-    add_col!("orders",      "customer_phone",  "customer_phone TEXT");
-    add_col!("orders",      "receipt_number",  "receipt_number TEXT");
+    add_col!("orders",      "customer_name",     "customer_name TEXT");
+    add_col!("orders",      "customer_phone",    "customer_phone TEXT");
+    add_col!("orders",      "receipt_number",    "receipt_number TEXT");
+    add_col!("orders",      "takeout_counter",   "takeout_counter INTEGER");
     add_col!("floor_tables","seat_count",      "seat_count INTEGER NOT NULL DEFAULT 4");
     add_col!("floor_tables","restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("floor_tables","zone",            "zone TEXT NOT NULL DEFAULT 'Main'");
@@ -138,6 +139,7 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("inventory_logs", "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("inventory_logs", "reason",          "reason TEXT");
     add_col!("inventory_items", "is_deleted",     "is_deleted INTEGER NOT NULL DEFAULT 0");
+    add_col!("inventory_items", "max_stock_qty",  "max_stock_qty REAL DEFAULT NULL");
     add_col!("payments", "is_deleted",            "is_deleted INTEGER NOT NULL DEFAULT 0");
 
     add_col!("restaurants", "license_expires_at", "license_expires_at TEXT");
@@ -160,6 +162,9 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("orders",      "exchange_rate_used",   "exchange_rate_used REAL");
     add_col!("users",       "failed_login_attempts", "failed_login_attempts INTEGER NOT NULL DEFAULT 0");
     add_col!("users",       "locked_until",          "locked_until TEXT");
+    add_col!("daily_reports", "reopened_by",             "reopened_by TEXT");
+    add_col!("daily_reports", "reopened_at",             "reopened_at TEXT");
+    add_col!("daily_reports", "exchange_rate_snapshot",  "exchange_rate_snapshot REAL");
 
     // Ensure emergency tables exist
     if let Err(e) = conn.execute(
@@ -190,6 +195,34 @@ async fn ensure_critical_columns(conn: &Connection) {
         )", (),
     ).await {
         println!("[DB] Note: _sync_state table creation returned: {} (may already exist)", e);
+    }
+
+    if let Err(e) = conn.execute(
+        "CREATE TABLE IF NOT EXISTS _sync_conflicts (
+            id TEXT PRIMARY KEY,
+            table_name TEXT NOT NULL,
+            row_id TEXT NOT NULL,
+            local_updated_at TEXT NOT NULL,
+            remote_updated_at TEXT NOT NULL,
+            winner TEXT NOT NULL DEFAULT 'remote',
+            resolved_at TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )", (),
+    ).await {
+        println!("[DB] Note: _sync_conflicts table creation returned: {} (may already exist)", e);
+    }
+
+    if let Err(e) = conn.execute(
+        "CREATE TABLE IF NOT EXISTS _sync_table_state (
+            table_name TEXT NOT NULL,
+            restaurant_id TEXT NOT NULL,
+            last_push_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00',
+            last_pull_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (table_name, restaurant_id)
+        )", (),
+    ).await {
+        println!("[DB] Note: _sync_table_state table creation returned: {} (may already exist)", e);
     }
 
     if let Err(e) = conn.execute(
@@ -243,6 +276,18 @@ async fn ensure_critical_columns(conn: &Connection) {
     // Snapshot columns: store product name/khmer at order time so deleted products still show in history
     add_col!("order_items", "product_name", "product_name TEXT");
     add_col!("order_items", "product_khmer", "product_khmer TEXT");
+
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS inventory_movements (
+            id TEXT PRIMARY KEY,
+            inventory_item_id TEXT NOT NULL,
+            movement_type TEXT NOT NULL,
+            quantity REAL NOT NULL,
+            note TEXT,
+            user_id TEXT,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            restaurant_id TEXT NOT NULL
+        )", params![]).await;
 
     // ── Migration: remove the restrictive CHECK constraint from orders.status ──
     // SQLite doesn't support DROP CONSTRAINT, so we use rename → recreate → copy → drop.

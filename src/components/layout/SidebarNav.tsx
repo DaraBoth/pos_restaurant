@@ -68,7 +68,7 @@ export default function SidebarNav() {
     const { t, lang, setLang } = useLanguage();
     const { user, setUser } = useAuth();
     const { theme, toggleTheme } = useTheme();
-    const { clearOrder, exchangeRate } = useOrder();
+    const { clearOrder, exchangeRate, items, localCart } = useOrder();
     const [lowStockCount, setLowStockCount] = useState(0);
     const router = useRouter();
     const pathname = usePathname();
@@ -77,11 +77,13 @@ export default function SidebarNav() {
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
     const [collapsed, setCollapsed] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isLogoutOpen, setIsLogoutOpen] = useState(false);
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const [isSwitchOpen, setIsSwitchOpen] = useState(false);
     const [switchPin, setSwitchPin] = useState('');
     const [switchError, setSwitchError] = useState('');
     const [switchLoading, setSwitchLoading] = useState(false);
+    const cartHasItems = items.length > 0 || localCart.length > 0;
 
     useEffect(() => {
         if (user) {
@@ -134,8 +136,13 @@ export default function SidebarNav() {
     }, [restaurant, pathname, searchParams, router]);
 
     function handleLogout() {
+        setIsLogoutOpen(true);
+    }
+
+    function confirmLogout() {
         stopSync().catch(() => {});
         setUser(null);
+        setIsLogoutOpen(false);
         router.replace('/login');
     }
 
@@ -241,6 +248,16 @@ export default function SidebarNav() {
                     {!collapsed && <span className="text-[11px] font-bold">{t('switchUser')}</span>}
                 </button>
 
+                {/* Logout button */}
+                <button
+                    onClick={handleLogout}
+                    className={`flex items-center gap-2 px-3 py-1.5 w-full rounded-xl text-red-500 hover:text-red-400 border border-transparent hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
+                    title={t('logout')}
+                >
+                    <LogOut size={13} />
+                    {!collapsed && <span className="text-[11px] font-bold">{t('logout')}</span>}
+                </button>
+
                 {/* Unified profile settings button */}
                 <button
                     onClick={() => setIsSettingsOpen(true)}
@@ -318,6 +335,39 @@ export default function SidebarNav() {
                                 {switchLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t('login')}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Logout Confirmation Modal */}
+            {isLogoutOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-80 p-6 mx-4">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cartHasItems ? 'bg-red-500/10' : 'bg-[var(--bg-elevated)]'}`}>
+                                <LogOut size={16} className={cartHasItems ? 'text-red-400' : 'text-[var(--text-secondary)]'} />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black text-[var(--foreground)]">{t('logoutConfirmTitle')}</h3>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                                    {cartHasItems ? t('logoutActiveOrderWarning') : t('logoutConfirmDesc')}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setIsLogoutOpen(false)}
+                                className="flex-1 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-colors"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmLogout}
+                                className={`flex-1 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-95 ${cartHasItems ? 'bg-red-500 hover:bg-red-600' : 'bg-[var(--accent)] hover:brightness-110'}`}
+                            >
+                                {t('logout')}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

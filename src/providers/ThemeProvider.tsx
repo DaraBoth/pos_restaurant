@@ -21,6 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const stored = localStorage.getItem('dineos_theme') as Theme | null;
         const resolved = stored === 'light' || stored === 'dark' ? stored : 'dark';
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setThemeState(resolved);
         document.documentElement.setAttribute('data-theme', resolved);
     }, []);

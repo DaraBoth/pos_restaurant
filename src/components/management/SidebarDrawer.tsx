@@ -18,9 +18,11 @@ export default function SidebarDrawer({ isOpen, onClose, title, subtitle, childr
 
   useOverlayBehavior(shouldRender, onClose);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOpen) setShouldRender(true);
   }, [isOpen]);
 

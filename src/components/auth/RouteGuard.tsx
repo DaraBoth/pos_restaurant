@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
+import { useOrder } from '@/providers/OrderProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { getSetupStatus, triggerSync } from '@/lib/tauri-commands';
 import { verifyRestaurantLicense } from '@/lib/api/restaurant';
 import { isRestaurantSynced } from '@/lib/api/system';
@@ -14,8 +16,12 @@ const PUBLIC_PATHS = ['/login'];
 const SUPER_ADMIN_PATH = '/super-admin';
 const SETUP_PATH = '/setup';
 
+const LICENSE_GRACE_MS = 5 * 60 * 1000; // 5 minutes before showing even the banner
+
 export default function RouteGuard({ children }: { children: React.ReactNode }) {
-    const { user, isAuthenticated, loading: authLoading } = useAuth();
+    const { user, isAuthenticated, loading: authLoading, setLicenseExpiredPending } = useAuth();
+    const { items, localCart } = useOrder();
+    const { t } = useLanguage();
     const pathnameRaw = usePathname();
     const router = useRouter();
 
@@ -27,12 +33,15 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     const [checking, setChecking] = useState(true);
     const [initialSyncPending, setInitialSyncPending] = useState(false);
     const [licenseStatus, setLicenseStatus] = useState<RestaurantLicenseStatus | null>(null);
+    const [warningDismissed, setWarningDismissed] = useState(false);
     const initialCheckDone = useRef(false);
     const syncTriggered = useRef(false);
     // Track the PREVIOUS auth state so we only reset the check on real login/logout
     // transitions, NOT on every path change. Resetting on every path change caused a
     // full-screen spinner (checking=true) to appear on every tab/route click.
     const wasAuthenticatedRef = useRef(false);
+    // Timestamp when license expiry was first detected — used for the 5-min grace period
+    const firstExpiredAtRef = useRef<number | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -141,6 +150,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
         // Only show the spinner if we haven't completed the first check yet.
         if (!initialCheckDone.current) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setChecking(true);
         }
         checkAccess();
@@ -152,6 +162,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
     useEffect(() => {
         if (!isAuthenticated || user?.role === 'super_admin' || !user?.restaurant_id) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLicenseStatus(null);
             return;
         }
@@ -169,6 +180,19 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
             try {
                 const status = await verifyRestaurantLicense(restaurantId);
                 if (!cancelled) {
+                    if (status.checked_online && status.license_expires_at) {
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem('dineos_license_expires_at', status.license_expires_at);
+                        }
+                    }
+                    if (status.status === 'expired') {
+                        if (firstExpiredAtRef.current === null) {
+                            firstExpiredAtRef.current = Date.now();
+                        }
+                    } else {
+                        firstExpiredAtRef.current = null;
+                        setLicenseExpiredPending(false);
+                    }
                     setLicenseStatus(status);
                 }
             } catch {
@@ -194,6 +218,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
     useEffect(() => {
         if (!isAuthenticated || user?.role === 'super_admin' || !user?.restaurant_id) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setInitialSyncPending(false);
             return;
         }
@@ -254,11 +279,69 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         return <InitialSyncScreen />;
     }
 
-    if (licenseStatus?.status === 'expired') {
+    const isLicenseExpired = licenseStatus?.status === 'expired';
+    const gracePassed = firstExpiredAtRef.current !== null && Date.now() - firstExpiredAtRef.current >= LICENSE_GRACE_MS;
+    const cartHasItems = items.length > 0 || localCart.length > 0;
+    const showLicenseBanner = isLicenseExpired && gracePassed;
+
+    const cachedExpiresAt = typeof window !== 'undefined' ? window.localStorage.getItem('dineos_license_expires_at') : null;
+    const expiresAtStr = licenseStatus?.checked_online ? licenseStatus.license_expires_at : (licenseStatus?.license_expires_at ?? cachedExpiresAt);
+    const daysRemaining = (() => {
+        if (!expiresAtStr || isLicenseExpired) return null;
+        if (!licenseStatus?.checked_online) return null;
+        const exp = new Date(expiresAtStr);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        exp.setHours(0, 0, 0, 0);
+        return Math.round((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    })();
+    const showAmberWarning = daysRemaining !== null && daysRemaining <= 30 && daysRemaining > 7 && !warningDismissed;
+    const showRedWarning = daysRemaining !== null && daysRemaining <= 7 && daysRemaining > 0;
+
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => {
+        if (showLicenseBanner) {
+            setLicenseExpiredPending(true);
+        } else {
+            setLicenseExpiredPending(false);
+        }
+    }, [showLicenseBanner, setLicenseExpiredPending]);
+
+    // Once grace period has passed AND no active cart: show the full block screen
+    if (showLicenseBanner && !cartHasItems) {
         return <LicenseExpiredScreen status={licenseStatus} />;
     }
 
-    return <>{children}</>;
+    return (
+        <>
+            {showLicenseBanner && (
+                <div className="fixed top-0 left-0 right-0 z-[300] flex items-center gap-3 px-4 py-2.5 bg-amber-500/95 backdrop-blur-sm">
+                    <AlertTriangle size={15} className="text-amber-900 flex-shrink-0" />
+                    <p className="text-xs font-black text-amber-900 flex-1">
+                        {t('licenseExpiredBanner')}
+                    </p>
+                </div>
+            )}
+            {!showLicenseBanner && showRedWarning && (
+                <div className="fixed top-0 left-0 right-0 z-[299] flex items-center gap-3 px-4 py-2 bg-red-600/95 backdrop-blur-sm">
+                    <AlertTriangle size={14} className="text-white flex-shrink-0" />
+                    <p className="text-xs font-black text-white flex-1">
+                        {t('licenseExpiresInDays').replace('{days}', String(daysRemaining))}
+                    </p>
+                </div>
+            )}
+            {!showLicenseBanner && !showRedWarning && showAmberWarning && (
+                <div className="fixed top-0 left-0 right-0 z-[299] flex items-center gap-3 px-4 py-2 bg-amber-400/90 backdrop-blur-sm">
+                    <AlertTriangle size={14} className="text-amber-900 flex-shrink-0" />
+                    <p className="text-xs font-black text-amber-900 flex-1">
+                        {t('licenseExpirySoon').replace('{days}', String(daysRemaining))}
+                    </p>
+                    <button onClick={() => setWarningDismissed(true)} className="text-amber-900/60 hover:text-amber-900 text-xs font-black uppercase tracking-widest ml-2">✕</button>
+                </div>
+            )}
+            {children}
+        </>
+    );
 }
 
 function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {

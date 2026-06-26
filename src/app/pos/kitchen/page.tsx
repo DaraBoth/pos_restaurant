@@ -4,6 +4,7 @@ import { getKitchenOrders, updateKitchenItemStatus } from '@/lib/api/kitchen';
 import type { KitchenOrder, KitchenOrderItem } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
+import type { TranslationKey } from '@/lib/i18n';
 import { ChefHat, UtensilsCrossed, CheckCircle2, Clock, RefreshCw, Flame, LayoutList, Layers, Volume2, VolumeX } from 'lucide-react';
 
 const POLL_INTERVAL = 8;
@@ -415,6 +416,7 @@ function KitchenOrderCard({
 }) {
     const { t } = useLanguage();
     const elapsed = (() => {
+        // eslint-disable-next-line react-hooks/purity
         const sec = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1000);
         if (sec < 60) return `${sec}s`;
         const min = Math.floor(sec / 60);
@@ -435,6 +437,9 @@ function KitchenOrderCard({
                         <p className="text-sm font-black text-[var(--foreground)] leading-none">
                             {order.table_id ?? t('takeout')}
                         </p>
+                        {!order.table_id && order.takeout_counter != null && (
+                            <p className="text-lg font-black text-[var(--accent)] leading-none mt-0.5">#{order.takeout_counter}</p>
+                        )}
                         <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">{elapsed}</p>
                     </div>
                 </div>
@@ -444,6 +449,11 @@ function KitchenOrderCard({
                     </span>
                 )}
             </div>
+            {order.notes && (
+                <div className="px-3 py-1.5 bg-[var(--accent-blue)]/10 border-b border-[var(--accent-blue)]/20">
+                    <p className="text-[10px] font-bold text-[var(--accent-blue)] italic">{order.notes}</p>
+                </div>
+            )}
 
             <div className="flex-1 p-2 space-y-1.5">
                 {order.items.map(item => {
@@ -470,7 +480,7 @@ function KitchenOrderCard({
                                     <div className="flex items-center gap-1.5 mt-1">
                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${cfg.badgeCls}`}>
                                             <StatusIcon size={8} strokeWidth={2.5} />
-                                            {t(cfg.labelKey as any)}
+                                            {t(cfg.labelKey as TranslationKey)}
                                         </span>
                                     </div>
                                 </div>

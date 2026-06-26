@@ -26,6 +26,8 @@ interface AuthContextValue {
     // OrderProvider reports whether the cart currently has items so the
     // idle-logout warning can be made stronger when an order is in progress.
     reportActiveOrder: (hasItems: boolean) => void;
+    licenseExpiredPending: boolean;
+    setLicenseExpiredPending: (v: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -34,6 +36,8 @@ const AuthContext = createContext<AuthContextValue>({
     isAuthenticated: false,
     loading: true,
     reportActiveOrder: () => { },
+    licenseExpiredPending: false,
+    setLicenseExpiredPending: () => { },
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -44,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [showIdleWarning, setShowIdleWarning] = useState(false);
     const [idleCountdown, setIdleCountdown] = useState(IDLE_WARNING_SECONDS);
     const [idleActiveOrder, setIdleActiveOrder] = useState(false);
+    const [licenseExpiredPending, setLicenseExpiredPending] = useState(false);
 
     const lastActivityRef = useRef<number>(0);
     const activeOrderRef = useRef<boolean>(false);
@@ -144,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, setUser, isAuthenticated: !!user, loading, reportActiveOrder }}>
+        <AuthContext.Provider value={{ user, setUser, isAuthenticated: !!user, loading, reportActiveOrder, licenseExpiredPending, setLicenseExpiredPending }}>
             {children}
             {showIdleWarning && user && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">

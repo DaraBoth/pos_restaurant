@@ -17,6 +17,7 @@ export default function CategoriesManagement() {
     const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
         loadData();
     }, []);
 

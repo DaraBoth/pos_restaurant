@@ -4,6 +4,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { Package, Users, RefreshCw, ClipboardList, Building2, ArrowRight, TrendingUp, Layers, BoxesIcon } from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const QUICK_LINKS: { labelKey: TranslationKey; descKey: TranslationKey; icon: any; color: string }[] = [
     { labelKey: 'analytics',    descKey: 'analyticsDesc',    icon: TrendingUp,    color: '#22c55e' },
     { labelKey: 'products',     descKey: 'productsDesc',     icon: Package,       color: '#0ea5e9' },

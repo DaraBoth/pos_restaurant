@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { OrderItem, Order, Product } from '@/types';
 import { getActiveOrderForTable, getSessionRounds, getOrderItems, createOrder as apiCreateOrder, addOrderItem as apiAddOrderItem } from '@/lib/api/orders';
 import { getExchangeRate } from '@/lib/api/system';
+import { getRestaurant } from '@/lib/api/restaurant';
 import { useAuth } from '@/providers/AuthProvider';
 import { calculateTotals, OrderTotals } from '@/lib/currency';
 
@@ -13,6 +14,7 @@ export interface LocalCartItem {
     priceCents: number;
     qty: number;
     imagePath?: string;
+    note?: string;
 }
 
 interface OrderContextValue {
@@ -28,6 +30,7 @@ interface OrderContextValue {
     isTakeout: boolean;
     isDirect: boolean;
     localCart: LocalCartItem[];
+    orderNote: string;
     setOrderId: (id: string | null) => void;
     setItems: (items: OrderItem[]) => void;
     setTableId: (t: string) => void;
@@ -36,11 +39,13 @@ interface OrderContextValue {
     switchRound: (orderId: string) => Promise<void>;
     setTakeout: (v: boolean) => void;
     setDirect: (v: boolean) => void;
+    setOrderNote: (note: string) => void;
     refreshRate: () => void;
     clearOrder: () => void;
     loadTableSession: (tId: string) => Promise<void>;
     addToLocalCart: (product: Product) => Promise<void> | void;
     updateLocalCartQty: (productId: string, qty: number) => void;
+    setLocalCartItemNote: (productId: string, note: string) => void;
     commitLocalCart: (userId: string) => Promise<void>;
 }
 
@@ -51,12 +56,12 @@ const EMPTY_TOTALS: OrderTotals = {
 const OrderContext = createContext<OrderContextValue>({
     orderId: null, items: [], totals: EMPTY_TOTALS,
     exchangeRate: 4100, rateEffectiveFrom: null, rateIsDefault: false, tableId: '', sessionId: null, rounds: [], isTakeout: false, isDirect: false,
-    localCart: [],
+    localCart: [], orderNote: '',
     setOrderId: () => { }, setItems: () => { }, setTableId: () => { },
     setSessionId: () => { }, setRounds: () => { }, switchRound: async () => {},
-    setTakeout: () => { }, setDirect: () => { }, refreshRate: () => { }, clearOrder: () => { },
+    setTakeout: () => { }, setDirect: () => { }, setOrderNote: () => { }, refreshRate: () => { }, clearOrder: () => { },
     loadTableSession: async () => {},
-    addToLocalCart: async () => { }, updateLocalCartQty: () => { }, commitLocalCart: async () => {},
+    addToLocalCart: async () => { }, updateLocalCartQty: () => { }, setLocalCartItemNote: () => { }, commitLocalCart: async () => {},
 });
 
 export function OrderProvider({ children }: { children: React.ReactNode }) {
@@ -71,6 +76,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const [isTakeout, setTakeout] = useState(false);
     const [isDirect, setDirect] = useState(false);
     const [localCart, setLocalCart] = useState<LocalCartItem[]>([]);
+    const [orderNote, setOrderNote] = useState('');
+    const [vatEnabled, setVatEnabled] = useState(false);
     const { user, reportActiveOrder } = useAuth();
     const restaurantId = user?.restaurant_id;
 
@@ -79,10 +86,16 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         reportActiveOrder(items.length > 0 || localCart.length > 0);
     }, [items.length, localCart.length, reportActiveOrder]);
 
+    useEffect(() => {
+        if (!restaurantId) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        getRestaurant(restaurantId).then(r => setVatEnabled((r.vat_enabled ?? 0) === 1)).catch(() => {});
+    }, [restaurantId]);
+
     const subtotalCents = items.reduce(
         (sum, item) => sum + item.price_at_order * item.quantity, 0
     );
-    const totals = calculateTotals(subtotalCents, exchangeRate);
+    const totals = calculateTotals(subtotalCents, exchangeRate, vatEnabled);
 
     const setItems = useCallback((newItems: OrderItem[]) => {
         setItemsState(newItems);
@@ -108,6 +121,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         setTakeout(false);
         setDirect(false);
         setLocalCart([]);
+        setOrderNote('');
     }, []);
 
     const loadTableSession = useCallback(async (tId: string) => {
@@ -182,11 +196,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    const setLocalCartItemNote = useCallback((productId: string, note: string) => {
+        setLocalCart(prev => prev.map(i => i.productId === productId ? { ...i, note: note || undefined } : i));
+    }, []);
+
     const commitLocalCart = useCallback(async (userId: string) => {
         if (localCart.length === 0) return;
-        const newOrderId = await apiCreateOrder(userId, tableId || undefined, restaurantId || '');
+        const newOrderId = await apiCreateOrder(userId, tableId || undefined, restaurantId || '', orderNote || undefined);
         for (const item of localCart) {
-            await apiAddOrderItem(newOrderId, item.productId, item.qty, restaurantId || '');
+            await apiAddOrderItem(newOrderId, item.productId, item.qty, restaurantId || '', item.note);
         }
         if (tableId) {
             await loadTableSession(tableId);
@@ -196,19 +214,20 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             setItemsState(updatedItems);
         }
         setLocalCart([]);
-    }, [localCart, tableId, loadTableSession, restaurantId]);
+    }, [localCart, tableId, loadTableSession, restaurantId, orderNote]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         refreshRate();
     }, [refreshRate]);
 
     return (
         <OrderContext.Provider value={{
             orderId, items, totals, exchangeRate, rateEffectiveFrom, rateIsDefault, tableId, sessionId, rounds, isTakeout, isDirect,
-            localCart,
-            setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout, setDirect,
+            localCart, orderNote,
+            setOrderId, setItems, setTableId, setSessionId, setRounds, setTakeout, setDirect, setOrderNote,
             refreshRate, clearOrder, loadTableSession, switchRound,
-            addToLocalCart, updateLocalCartQty, commitLocalCart,
+            addToLocalCart, updateLocalCartQty, setLocalCartItemNote, commitLocalCart,
         }}>
             {children}
         </OrderContext.Provider>

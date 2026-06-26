@@ -173,6 +173,7 @@ export interface Order {
     void_reason?: string;
     voided_by_name?: string;
     exchange_rate_used?: number;
+    takeout_counter?: number;
 }
 
 export interface OrderItem {
@@ -202,6 +203,7 @@ export interface KitchenOrderItem {
 export interface KitchenOrder {
     order_id: string;
     table_id?: string;
+    notes?: string;
     created_at: string;
     items: KitchenOrderItem[];
 }
@@ -264,10 +266,21 @@ export interface InventoryItem {
     stock_qty: number;
     stock_pct: number;
     min_stock_qty: number;
+    max_stock_qty?: number | null;
     cost_per_unit: number;
     created_at: string;
 }
 
+
+export interface StockMovement {
+    id: string;
+    inventory_item_id: string;
+    movement_type: string;
+    quantity: number;
+    note?: string;
+    user_id?: string;
+    created_at: string;
+}
 
 // --------------- Analytics ---------------
 export interface TopProduct {
@@ -323,6 +336,9 @@ export interface DailyReport {
     closed_at: string;
     created_at: string;
     updated_at: string;
+    reopened_by?: string;
+    reopened_at?: string;
+    exchange_rate_snapshot?: number;
 }
 
 export interface DailyReportPreview {
@@ -352,10 +368,20 @@ export interface InventoryUsageRow {
     total_cost_usd: number;
 }
 
+export interface PaymentBreakdown {
+    cash_usd_cents: number;
+    cash_khr_riels: number;
+    khqr_usd_cents: number;
+    khqr_khr_riels: number;
+    card_usd_cents: number;
+    card_khr_riels: number;
+}
+
 export interface DailyReportDetail {
     report: DailyReport;
     expenses: DailyReportExpense[];
     inventory_total_usage_qty: number;
     inventory_total_cost_usd: number;
     inventory_usage: InventoryUsageRow[];
+    payment_breakdown: PaymentBreakdown;
 }

@@ -190,8 +190,8 @@ export default function AnalyticsPage() {
 
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-80">
-                    {autoRefresh ? 'Auto refresh every 60s' : 'Normal refresh mode'}
-                    {lastUpdatedAt ? ` • Updated at ${lastUpdatedAt}` : ''}
+                    {autoRefresh ? t('autoRefreshEvery60s') : t('normalRefreshMode')}
+                    {lastUpdatedAt ? ` • ${t('updatedAt')} ${lastUpdatedAt}` : ''}
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -201,14 +201,14 @@ export default function AnalyticsPage() {
                             : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)]'
                             }`}
                     >
-                        {autoRefresh ? 'Auto On' : 'Auto Off'}
+                        {autoRefresh ? t('autoOn') : t('autoOff')}
                     </button>
                     <button
                         onClick={triggerRefresh}
                         className="px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent-blue)]/40 hover:bg-[var(--accent-blue)]/10 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
                     >
                         <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                        Refresh
+                        {t('refresh')}
                     </button>
                 </div>
             </div>
@@ -348,7 +348,7 @@ export default function AnalyticsPage() {
                                             <div className="w-7 h-7 rounded-lg bg-[var(--bg-dark)] border border-white/5 text-orange-400 font-mono font-black text-[10px] flex items-center justify-center shadow-inner">
                                                 {i + 1}
                                             </div>
-                                            <div className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wide">{p.name}</div>
+                                            <div className="font-black text-[11px] text-[var(--foreground)] tracking-wide">{p.name}</div>
                                         </div>
                                         <div className="text-right">
                                             <div className="font-mono font-black text-sm text-[var(--accent-green)] leading-none mb-1">{formatUsd(p.total_revenue)}</div>

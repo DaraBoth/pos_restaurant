@@ -18,6 +18,7 @@ export default function UsersManagement() {
     const restaurantId = user?.restaurant_id;
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
         loadUsers();
     }, []);
 

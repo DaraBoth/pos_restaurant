@@ -23,6 +23,7 @@ export default function InventoryManagement() {
     const restaurantId = user?.restaurant_id;
     const [activeTab, setActiveTab] = useState<'materials' | 'audit'>('materials');
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [modalError, setModalError] = useState('');
     const [exporting, setExporting] = useState(false);
     const [exportToast, setExportToast] = useState<{ msg: string; ok: boolean } | null>(null);
     const exportToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,7 +34,7 @@ export default function InventoryManagement() {
     const [showMaterialModal, setShowMaterialModal] = useState(false);
     const [editingMaterial, setEditingMaterial] = useState<InventoryItem | null>(null);
     const [formData, setFormData] = useState({
-        name: '', unit_label: 'piece', stock_qty: 0, stock_pct: 0, min_stock_qty: 1, cost_per_unit: 0
+        name: '', unit_label: 'piece', stock_qty: 0, stock_pct: 0, min_stock_qty: 1, max_stock_qty: null as number | null, cost_per_unit: 0
     });
 
     // Audit Log State
@@ -79,6 +80,7 @@ export default function InventoryManagement() {
 
     const handleSaveMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
+        setModalError('');
         try {
             if (editingMaterial) {
                 await updateInventoryItem({ id: editingMaterial.id, khmer_name: '', ...formData, restaurant_id: restaurantId || '' });
@@ -90,13 +92,13 @@ export default function InventoryManagement() {
             loadMaterials();
         } catch (err) {
             console.error(err);
-            alert("Failed to save material.");
+            setModalError(err instanceof Error ? err.message : t('failedToSaveMaterial'));
         }
     };
 
     const handleDeleteMaterial = (id: string) => {
         if (!canDelete(user?.role) || !user?.id) {
-            alert('Permission denied: delete is only available to Admin roles.');
+            setModalError(t('permissionDeniedDelete'));
             return;
         }
         setDeleteConfirmId(id);
@@ -111,7 +113,7 @@ export default function InventoryManagement() {
             loadMaterials();
         } catch (err) {
             console.error(err);
-            alert(t('error'));
+            showExportToast(t('error'), false);
         }
     };
 
@@ -165,7 +167,7 @@ export default function InventoryManagement() {
             XLSX.writeFile(wb, `reorder-list-${new Date().toISOString().slice(0, 10)}.xlsx`);
         } catch (err) {
             console.error(err);
-            alert(t('error'));
+            showExportToast(t('error'), false);
         } finally {
             setExporting(false);
         }
@@ -245,7 +247,8 @@ export default function InventoryManagement() {
                             <button
                                 onClick={() => {
                                     setEditingMaterial(null);
-                                    setFormData({ name: '', unit_label: 'piece', stock_qty: 0, stock_pct: 0, min_stock_qty: 1, cost_per_unit: 0 });
+                                    setFormData({ name: '', unit_label: 'piece', stock_qty: 0, stock_pct: 0, min_stock_qty: 1, max_stock_qty: null, cost_per_unit: 0 });
+                                    setModalError('');
                                     setShowMaterialModal(true);
                                 }}
                                 className="h-12 px-6 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]"
@@ -316,8 +319,10 @@ export default function InventoryManagement() {
                                                                 stock_qty: mat.stock_qty,
                                                                 stock_pct: mat.stock_pct,
                                                                 min_stock_qty: mat.min_stock_qty,
+                                                                max_stock_qty: mat.max_stock_qty ?? null,
                                                                 cost_per_unit: mat.cost_per_unit
                                                             });
+                                                            setModalError('');
                                                             setShowMaterialModal(true);
                                                         }}
                                                         className="w-10 h-10 rounded-xl bg-[var(--bg-elevated)] flex items-center justify-center text-blue-400 hover:bg-blue-500/10 transition-colors"
@@ -451,6 +456,7 @@ export default function InventoryManagement() {
                                         <option value="set">{t('unitSet')}</option>
                                         <option value="roll">{t('unitRoll')}</option>
                                         <option value="pump">{t('unitPump')}</option>
+                                        <option value="">{t('unitOther')}</option>
                                     </datalist>
                                 </div>
                                 <div>
@@ -480,16 +486,32 @@ export default function InventoryManagement() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2">{t('lowStockAlert')}</label>
-                                    <input 
+                                    <input
                                         type="number" required
                                         value={formData.min_stock_qty} onChange={e => setFormData({...formData, min_stock_qty: parseInt(e.target.value)})}
                                         className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-2xl px-6 py-4 text-[var(--foreground)] focus:border-emerald-500 outline-none font-mono"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2">{t('maxStock') || 'Max Stock (optional)'}</label>
+                                    <input
+                                        type="number" min="0"
+                                        value={formData.max_stock_qty ?? ''}
+                                        onChange={e => setFormData({...formData, max_stock_qty: e.target.value === '' ? null : parseFloat(e.target.value)})}
+                                        placeholder="Optional"
+                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-2xl px-6 py-4 text-[var(--foreground)] focus:border-emerald-500 outline-none font-mono placeholder:text-[var(--text-secondary)]"
+                                    />
+                                </div>
                             </div>
 
+                            {modalError && (
+                                <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 font-bold">
+                                    {modalError}
+                                </div>
+                            )}
+
                             <div className="flex gap-4 pt-4 mt-8 border-t border-[var(--border)]">
-                                <button type="button" onClick={() => setShowMaterialModal(false)} className="flex-1 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-[var(--foreground)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-dark)] transition-colors">
+                                <button type="button" onClick={() => { setShowMaterialModal(false); setModalError(''); }} className="flex-1 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-[var(--foreground)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-dark)] transition-colors">
                                     {t('cancel')}
                                 </button>
                                 <button type="submit" className="flex-1 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white bg-emerald-500 hover:bg-emerald-400 transition-colors shadow-[0_0_20px_rgba(16,185,129,0.2)]">

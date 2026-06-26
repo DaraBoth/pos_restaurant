@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { getInventoryItems, deleteInventoryItem } from '@/lib/api/inventory';
+import { getInventoryItems, deleteInventoryItem, receiveStock } from '@/lib/api/inventory';
 import { useAuth } from '@/providers/AuthProvider';
 import { 
     BoxesIcon, Search, AlertTriangle, 
@@ -19,6 +19,11 @@ export default function InventoryView() {
     const [showLowOnly, setShowLowOnly] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [stockInItemId, setStockInItemId] = useState<string | null>(null);
+    const [stockInQty, setStockInQty] = useState('');
+    const [stockInNote, setStockInNote] = useState('');
+    const [stockInLoading, setStockInLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     
     const { user } = useAuth();
@@ -42,16 +47,37 @@ export default function InventoryView() {
     }
 
     async function handleDelete(id: string) {
-        if (!canDelete(user?.role) || !user?.id) {
-            window.alert('Permission denied: delete is only available to Admin roles.');
-            return;
-        }
-        if (!window.confirm('Are you sure you want to delete this ingredient? Products linked to it will no longer deduct stock.')) return;
+        if (!canDelete(user?.role) || !user?.id) return;
+        setDeleteConfirmId(id);
+    }
+
+    async function confirmDelete() {
+        if (!deleteConfirmId || !user?.id) return;
+        const id = deleteConfirmId;
+        setDeleteConfirmId(null);
         try {
             await deleteInventoryItem(id, restaurantId || '', user.id);
             loadData();
         } catch (e) {
             console.error(e);
+        }
+    }
+
+    async function handleStockIn() {
+        if (!stockInItemId || !user?.id || !restaurantId) return;
+        const qty = parseFloat(stockInQty);
+        if (isNaN(qty) || qty <= 0) return;
+        setStockInLoading(true);
+        try {
+            const updated = await receiveStock(stockInItemId, qty, stockInNote.trim() || undefined, user.id, restaurantId);
+            setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+            setStockInItemId(null);
+            setStockInQty('');
+            setStockInNote('');
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setStockInLoading(false);
         }
     }
 
@@ -77,10 +103,10 @@ export default function InventoryView() {
                     </div>
                     <div>
                         <h1 className="text-base font-black text-[var(--foreground)] leading-none uppercase tracking-tight">
-                            Ingredient Inventory
+                            {t('stockInventoryTitle')}
                         </h1>
                         <p className="text-[10px] text-[var(--text-secondary)] mt-1 font-bold">
-                            Manage raw materials and stock levels for recipe deduction
+                            {t('stockInventoryDesc')}
                         </p>
                     </div>
                 </div>
@@ -90,7 +116,7 @@ export default function InventoryView() {
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
                         <input
                             type="text"
-                            placeholder="Search ingredients..."
+                            placeholder={t('searchStockItems') ?? 'Search stock items...'}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--foreground)] focus:border-emerald-500 outline-none transition-all w-48 font-semibold"
@@ -101,7 +127,7 @@ export default function InventoryView() {
                         className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 font-bold text-xs"
                     >
                         <Plus size={16} strokeWidth={3} />
-                        Add New
+                        {t('addNew')}
                     </button>
                 </div>
             </div>
@@ -109,7 +135,7 @@ export default function InventoryView() {
             {/* Stats row */}
             <div className="grid grid-cols-4 gap-3">
                 <div className="pos-card p-4 bg-[var(--bg-card)]">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Total Items</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">{t('totalItems')}</p>
                     <p className="text-2xl font-black text-[var(--foreground)] font-mono">{items.length}</p>
                 </div>
                 <button 
@@ -118,16 +144,16 @@ export default function InventoryView() {
                 >
                     <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5">
                         <AlertTriangle size={12} />
-                        Low Stock
+                        {t('lowStock')}
                     </p>
                     <p className="text-2xl font-black text-amber-600 font-mono">{lowStockCount}</p>
                 </button>
                 <div className="pos-card p-4 bg-[var(--bg-card)] border-red-500/10">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Out of Stock</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">{t('outOfStockLabel')}</p>
                     <p className="text-2xl font-black text-red-500 font-mono">{outOfStockCount}</p>
                 </div>
                 <div className="pos-card p-4 bg-[var(--bg-card)] border-emerald-500/10">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Stock Health</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">{t('stockHealth')}</p>
                     <p className="text-2xl font-black text-emerald-600 font-mono">
                         {items.length ? Math.round(((items.length - lowStockCount) / items.length) * 100) : 100}%
                     </p>
@@ -141,19 +167,19 @@ export default function InventoryView() {
                         <thead>
                             <tr className="bg-[var(--bg-elevated)]">
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">
-                                    Ingredient & Unit
+                                    {t('stockAndUnit')}
                                 </th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-center">
-                                    Current Stock
+                                    {t('currentStock')}
                                 </th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-center">
-                                    Visual Level
+                                    {t('visualLevel')}
                                 </th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-center">
-                                    Avg Cost
+                                    {t('avgCost')}
                                 </th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">
-                                    Management
+                                    {t('management')}
                                 </th>
                             </tr>
                         </thead>
@@ -238,7 +264,7 @@ export default function InventoryView() {
                                     <td colSpan={5} className="px-6 py-20 text-center">
                                         <div className="max-w-[200px] mx-auto opacity-20">
                                             <Package size={48} className="mx-auto mb-4" />
-                                            <p className="text-sm font-black uppercase tracking-widest">No Ingredients Found</p>
+                                            <p className="text-sm font-black uppercase tracking-widest">{t('noStockItemsFound')}</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -248,12 +274,35 @@ export default function InventoryView() {
                 </div>
             </div>
 
-            <InventoryItemModal 
+            <InventoryItemModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSave={loadData}
                 item={selectedItem}
             />
+
+            {deleteConfirmId && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-80 p-6 mx-4 space-y-4">
+                        <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">{t('deleteMaterial')}</h3>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{t('deleteStockItemConfirm')}</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 transition-all"
+                            >
+                                {t('delete')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -17,7 +17,7 @@ export default function CheckoutModal({
     onClose: () => void;
     onComplete: (payload: ReceiptPrintPayload) => void;
 }) {
-    const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds, refreshRate } = useOrder();
+    const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds, refreshRate, orderNote } = useOrder();
     const { user } = useAuth();
     const { t } = useLanguage();
 
@@ -29,6 +29,7 @@ export default function CheckoutModal({
     const [discountPct, setDiscountPct] = useState<number>(0);
     const [discountUsdInput, setDiscountUsdInput] = useState<string>('');
     const [discountMode, setDiscountMode] = useState<'pct' | 'fixed'>('pct');
+    const [bakongReference, setBakongReference] = useState<string>('');
 
     const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
     const [combinedTotals, setCombinedTotals] = useState(totals);
@@ -132,7 +133,7 @@ export default function CheckoutModal({
                             method: 'khqr',
                             currency: 'KHR',
                             amount: remainingKhr,
-                            bakong_transaction_hash: 'PENDING-APP-VERIFY'
+                            bakong_transaction_hash: bakongReference.trim() || undefined
                         });
                     } else {
                         payments.push({
@@ -145,16 +146,18 @@ export default function CheckoutModal({
             }
 
             let customerName, customerPhone, receiptNumber: string | undefined;
+            let takeoutCounter: number | undefined;
             if (sessionId) {
                 await checkoutSession(sessionId, payments, user?.restaurant_id || '', discountCents);
                 const currentOrder = rounds.find(r => r.id === orderId);
                 customerName = currentOrder?.customer_name;
                 customerPhone = currentOrder?.customer_phone;
             } else {
-                const completedOrder = await checkoutOrder(orderId, payments, user?.restaurant_id || '', discountCents, customerNameInput || undefined);
+                const completedOrder = await checkoutOrder(orderId, payments, user?.restaurant_id || '', discountCents, customerNameInput || undefined, orderNote || undefined);
                 customerName = completedOrder.customer_name;
                 customerPhone = completedOrder.customer_phone;
                 receiptNumber = completedOrder.receipt_number ?? undefined;
+                takeoutCounter = completedOrder.takeout_counter ?? undefined;
             }
 
             const restaurant = await getRestaurant(user?.restaurant_id || '');
@@ -173,6 +176,7 @@ export default function CheckoutModal({
                 changeKhr: changeUsdCents > 0 ? changeKhr : (khrChangeRiels > 0 ? khrChangeRiels : undefined),
                 discountPct: discountMode === 'pct' && discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
+                takeoutCounter,
                 items: combinedItems,
                 payments,
                 totals: discountedTotals,
@@ -207,7 +211,8 @@ export default function CheckoutModal({
                 payments.push({
                     method: 'khqr',
                     currency: 'KHR',
-                    amount: remainingKhr
+                    amount: remainingKhr,
+                    bakong_transaction_hash: bakongReference.trim() || undefined
                 });
             } else {
                 payments.push({
@@ -253,7 +258,7 @@ export default function CheckoutModal({
                     </div>
                     <div className="flex gap-3 w-full">
                         <button
-                            onClick={() => { printReceipt(completedPayload); }}
+                            onClick={() => { printReceipt(completedPayload); onComplete(completedPayload); }}
                             className="flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 uppercase tracking-wider border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--foreground)] hover:bg-[var(--bg-dark)] transition-all"
                         >
                             <Printer size={16} /> {t('printReceipt')}
@@ -408,7 +413,7 @@ export default function CheckoutModal({
                             <div className="grid grid-cols-3 gap-2">
                                 {[
                                     { id: 'cash', label: t('cash'), icon: Banknote },
-                                    { id: 'khqr', label: t('khqr'), icon: QrCode },
+                                    { id: 'khqr', label: 'KHQR (Manual)', icon: QrCode },
                                     { id: 'card', label: t('card'), icon: CreditCard },
                                 ].map(m => (
                                     <button
@@ -424,6 +429,20 @@ export default function CheckoutModal({
                                     </button>
                                 ))}
                             </div>
+                            {method === 'khqr' && (
+                                <div className="rounded-xl border border-[var(--accent-blue)]/30 bg-[var(--accent-blue)]/5 px-3 py-2.5 space-y-2 mt-1">
+                                    <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">
+                                        Ask the customer to scan your KHQR code. Once payment is confirmed on your phone, tap Confirm Payment. / សូមអោយអតិថិជនស្កេន KHQR របស់អ្នក។ នៅពេលការទូទាត់ត្រូវបានបញ្ជាក់ ចុច &ldquo;បញ្ជាក់ការទូទាត់&rdquo;។
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={bakongReference}
+                                        onChange={e => setBakongReference(e.target.value)}
+                                        placeholder="Bakong Reference (optional)"
+                                        className="w-full bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--foreground)] placeholder:opacity-40 focus:outline-none focus:border-[var(--accent-blue)]/50"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 

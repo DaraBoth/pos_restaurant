@@ -75,6 +75,8 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     // Auto-logout / session timeout (admin-configurable; all roles inherit it)
     const [sessionTimeoutMs, setSessionTimeoutMs] = useState<number>(() => getSessionTimeoutMs());
 
+    const isAdmin = user?.role === 'admin';
+
     useEffect(() => {
         if (isOpen) {
             setFullName(user?.full_name || '');
@@ -127,8 +129,6 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
             .then(v => setAppVersion(v))
             .catch(() => setAppVersion(''));
     }, []);
-
-    const isAdmin = user?.role === 'admin';
 
     if (!isOpen) return null;
 

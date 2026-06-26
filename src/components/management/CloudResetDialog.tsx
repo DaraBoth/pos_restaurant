@@ -74,7 +74,7 @@ export function CloudResetDialog({ restaurantId }: CloudResetDialogProps) {
                                 onClick={() => setStatus('idle')}
                                 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest hover:text-[var(--foreground)]"
                             >
-                                Cancel
+                                {t('cancel')}
                             </button>
                         </div>
                     )}

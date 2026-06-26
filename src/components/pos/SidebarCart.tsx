@@ -3,6 +3,8 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { updateOrderItemQuantity, updateOrderItemNote, voidOrder, getOrderItems, addRound, getSessionRounds, getRestaurant, getSessionOrderItems } from '@/lib/tauri-commands';
+import { getOrders, getHeldOrders, resumeOrder } from '@/lib/api/orders';
+import type { HeldOrderSummary } from '@/lib/api/orders';
 import { getRevenueSummary } from '@/lib/api/analytics';
 import type { OrderItem, RevenueSummary } from '@/types';
 import { formatUsd, formatKhr, calculateTotals, roundKhr } from '@/lib/currency';
@@ -24,7 +26,8 @@ const VOID_REASONS = [
 
 export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheckout: () => void; onHold: () => void; isTakeout?: boolean }) {
     const { items, totals, orderId, tableId, clearOrder, setItems, rounds, switchRound, sessionId, setRounds,
-        localCart, addToLocalCart, updateLocalCartQty, commitLocalCart, exchangeRate, rateIsDefault } = useOrder();
+        localCart, addToLocalCart, updateLocalCartQty, setLocalCartItemNote, commitLocalCart, exchangeRate, rateIsDefault,
+        orderNote, setOrderNote, setOrderId } = useOrder();
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -33,9 +36,15 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteInput, setNoteInput] = useState('');
+    const [localNoteProductId, setLocalNoteProductId] = useState<string | null>(null);
+    const [localNoteInput, setLocalNoteInput] = useState('');
     const [committing, setCommitting] = useState(false);
     const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
     const [todaySummary, setTodaySummary] = useState<RevenueSummary | null>(null);
+    const [takeoutCounter, setTakeoutCounter] = useState<number | null>(null);
+    const [heldOrders, setHeldOrders] = useState<HeldOrderSummary[]>([]);
+    const [showHeldDrawer, setShowHeldDrawer] = useState(false);
+    const [resumingId, setResumingId] = useState<string | null>(null);
     const roundsScrollRef = useRef<HTMLDivElement>(null);
 
     const scrollRounds = (dir: 'left' | 'right') => {
@@ -68,6 +77,45 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
             .then(setTodaySummary)
             .catch(console.error);
     }, [isAdmin, user?.restaurant_id, orderId]);
+
+    useEffect(() => {
+        if (!orderId || tableId || !user?.restaurant_id) { setTakeoutCounter(null); return; }
+        getOrders('open', undefined, undefined, user.restaurant_id)
+            .then(orders => {
+                const match = orders.find(o => o.id === orderId);
+                setTakeoutCounter(match?.takeout_counter ?? null);
+            })
+            .catch(() => {});
+    }, [orderId, tableId, user?.restaurant_id]);
+
+    const refreshHeldOrders = () => {
+        if (!user?.restaurant_id) return;
+        getHeldOrders(user.restaurant_id).then(setHeldOrders).catch(() => {});
+    };
+
+    useEffect(() => {
+        refreshHeldOrders();
+    }, [orderId, user?.restaurant_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    async function handleResumeOrder(held: HeldOrderSummary) {
+        if ((items.length > 0 || localCart.length > 0) && orderId !== held.id) {
+            const ok = window.confirm(t('heldOrders') + ': ' + (t('noHeldOrders') ? '' : ''));
+            if (!ok) return;
+        }
+        setResumingId(held.id);
+        try {
+            const order = await resumeOrder(held.id, user?.restaurant_id || '');
+            const orderItems = await getOrderItems(held.id, user?.restaurant_id || '');
+            setOrderId(order.id);
+            setItems(orderItems);
+            setShowHeldDrawer(false);
+            refreshHeldOrders();
+        } catch (e) {
+            console.error('Resume order failed:', e);
+        } finally {
+            setResumingId(null);
+        }
+    }
 
 
     async function handleNoteSave(id: string) {
@@ -193,7 +241,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 receiptItems = Array.from(groupedMap.values());
 
                 const subtotal = receiptItems.reduce((sum, item) => sum + (item.price_at_order * item.quantity), 0);
-                receiptTotals = calculateTotals(subtotal, exchangeRate);
+                receiptTotals = calculateTotals(subtotal, exchangeRate, (restaurant.vat_enabled ?? 0) === 1);
             } else if (!orderId && localCart.length > 0) {
                 // Map local cart to OrderItem for preview
                 receiptItems = localCart.map(i => ({
@@ -226,7 +274,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                 tableId: tableId || undefined,
                 items: receiptItems,
                 payments: [], // Preview has no payments yet
-                totals: receiptTotals
+                totals: receiptTotals,
+                orderNotes: orderNote || undefined,
             };
 
             printReceipt(payload);
@@ -273,6 +322,11 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 {tableId}
                             </span>
                         )}
+                        {!tableId && orderId && takeoutCounter != null && (
+                            <span className="text-base font-black px-3 py-1 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] tracking-wider">
+                                {t('takeoutCounter')}{takeoutCounter}
+                            </span>
+                        )}
                         {tableId && (
                             <button
                                 onClick={() => setIsHistoryOpen(true)}
@@ -282,6 +336,18 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 <History size={13} />
                             </button>
                         )}
+                        <button
+                            onClick={() => { refreshHeldOrders(); setShowHeldDrawer(true); }}
+                            className="relative w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-amber-500/20 text-[var(--text-secondary)] hover:text-amber-400"
+                            title={t('heldOrders')}
+                        >
+                            <PauseCircle size={13} />
+                            {heldOrders.length > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-amber-500 text-[8px] font-black text-black px-0.5">
+                                    {heldOrders.length}
+                                </span>
+                            )}
+                        </button>
                         <button
                             onClick={handlePrintReceipt}
                             disabled={orderId ? isEmpty : localCart.length === 0}
@@ -441,6 +507,40 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                             <Plus size={16} />
                                         </button>
                                     </div>
+                                    {localNoteProductId === item.productId ? (
+                                        <div className="mt-1.5 flex items-center gap-1">
+                                            <StickyNote size={10} className="text-[var(--accent-blue)] flex-shrink-0" />
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                value={localNoteInput}
+                                                onChange={e => setLocalNoteInput(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' || e.key === 'Escape') {
+                                                        setLocalCartItemNote(item.productId, localNoteInput.trim());
+                                                        setLocalNoteProductId(null);
+                                                    }
+                                                }}
+                                                onBlur={() => {
+                                                    setLocalCartItemNote(item.productId, localNoteInput.trim());
+                                                    setLocalNoteProductId(null);
+                                                }}
+                                                placeholder={t('itemNote') + '...'}
+                                                className="flex-1 text-[10px] bg-[var(--bg-dark)] border border-[var(--accent-blue)]/40 rounded-md px-1.5 py-0.5 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setLocalNoteProductId(item.productId); setLocalNoteInput(item.note ?? ''); }}
+                                            className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
+                                        >
+                                            <Pencil size={9} />
+                                            {item.note
+                                                ? <span className="italic text-[var(--accent-blue)] truncate max-w-[120px]">{item.note}</span>
+                                                : <span>{t('addNote')}</span>
+                                            }
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -568,6 +668,17 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
 
                 {/* Footer */}
                 <div className="flex-shrink-0 px-3 py-3 bg-[var(--bg-elevated)] border-t border-[var(--border)] space-y-2.5">
+                    {/* Order note */}
+                    <div className="flex items-center gap-1.5">
+                        <StickyNote size={11} className="text-[var(--text-secondary)] flex-shrink-0 opacity-60" />
+                        <input
+                            type="text"
+                            value={orderNote}
+                            onChange={e => setOrderNote(e.target.value)}
+                            placeholder={t('orderNote') + '...'}
+                            className="flex-1 text-[10px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-md px-2 py-1 text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent-blue)]/70 transition-colors"
+                        />
+                    </div>
                     <div className="space-y-1 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
                         <div className="flex justify-between">
                             <span>{t('subtotal')}</span>
@@ -736,6 +847,53 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                             >
                                 {t('voidOrder')}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Held Orders Drawer */}
+            {showHeldDrawer && (
+                <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowHeldDrawer(false)}>
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-sm max-h-[70vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                            <div className="flex items-center gap-2">
+                                <PauseCircle size={15} className="text-amber-400" />
+                                <h3 className="text-xs font-black uppercase tracking-widest text-[var(--foreground)]">{t('heldOrders')}</h3>
+                                {heldOrders.length > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[9px] font-black">{heldOrders.length}</span>
+                                )}
+                            </div>
+                            <button onClick={() => setShowHeldDrawer(false)} className="w-6 h-6 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)]">
+                                <X size={13} />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                            {heldOrders.length === 0 ? (
+                                <p className="text-center text-xs text-[var(--text-secondary)] py-8 opacity-50">{t('noHeldOrders')}</p>
+                            ) : heldOrders.map(held => {
+                                const heldDate = new Date(held.held_at + 'Z');
+                                const minsAgo = Math.round((Date.now() - heldDate.getTime()) / 60000);
+                                return (
+                                    <div key={held.id} className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] hover:border-amber-500/40 transition-colors">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-black text-[var(--foreground)] truncate">
+                                                {held.customer_name || held.table_id || (held.takeout_counter != null ? `#${held.takeout_counter}` : held.id.slice(0, 6).toUpperCase())}
+                                            </p>
+                                            <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
+                                                {held.item_count} {t('items') || 'items'} · ${(held.total_usd / 100).toFixed(2)} · {minsAgo}m {t('ago') || 'ago'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleResumeOrder(held)}
+                                            disabled={resumingId === held.id}
+                                            className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-black transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            {resumingId === held.id ? <Loader2 size={12} className="animate-spin" /> : t('resumeOrder')}
+                                        </button>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

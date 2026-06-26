@@ -28,3 +28,6 @@ export const saveLogo = (filename: string, content: Uint8Array) =>
 
 export const triggerSyncReset = (restaurantId: string) =>
     call<void>('trigger_sync_reset', { restaurantId });
+
+export const getSyncConflictCount = () =>
+    call<number>('get_sync_conflict_count', {});

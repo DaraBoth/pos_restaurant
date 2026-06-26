@@ -33,6 +33,7 @@ function needsTables(restaurant: Restaurant | null): boolean {
     return true;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ALL_TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
     { id: 'analytics',  labelKey: 'analytics',     icon: TrendingUp },
     { id: 'categories', labelKey: 'categories',     icon: Layers },
@@ -86,6 +87,7 @@ function ManagementContent() {
     // Handle ?tab= query param
     useEffect(() => {
         const tab = searchParams.get('tab') as Tab | null;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (tab && tab in TAB_COMPONENTS) setActiveTab(tab);
     }, [searchParams]);
 
@@ -93,6 +95,7 @@ function ManagementContent() {
     const showTables = needsTables(restaurant);
     useEffect(() => {
         if (!showTables && activeTab === 'tables') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setActiveTab('analytics');
         }
     }, [showTables, activeTab]);
