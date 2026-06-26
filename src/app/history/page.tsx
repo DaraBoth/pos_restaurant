@@ -88,7 +88,7 @@ function combineOrderItems(items: OrderItem[]): OrderItem[] {
     return Array.from(map.values());
 }
 
-const STATUS_TABS: { id: StatusFilter; labelKey: string }[] = [
+const STATUS_TABS: { id: StatusFilter; labelKey: TranslationKey }[] = [
     { id: 'all', labelKey: 'allFilter' },
     { id: 'open', labelKey: 'open' },
     { id: 'completed', labelKey: 'completed' },
