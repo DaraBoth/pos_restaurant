@@ -109,6 +109,7 @@ This repo is wired to a [DailyGoalMap ORBIT](https://dailygoalmap.vercel.app) ta
 | **code-reviewer** | Read-only diff gate. Approves (`wf:approved`) or files a change-request back to coder. |
 | **qa-agent** | Exercises the running desktop app, files `wf:bug` tasks with repro steps. |
 | **advisor** | Prioritizes backlog, creates well-specced `wf:coder-task` tasks for coder. |
+| **ux-agent** | Audits UI/UX page-by-page as a product owner: finds broken layouts, missing states, bilingual gaps, and visual issues; files `wf:ux-bug` / `wf:coder-task` tasks directly to `assign:coder`. Can use Playwright for visual screenshots. READ-ONLY on source. |
 
 ### Slash commands
 ```
@@ -116,6 +117,7 @@ This repo is wired to a [DailyGoalMap ORBIT](https://dailygoalmap.vercel.app) ta
 /review-before-pr [task-id] — code-reviewer gates before human deploys
 /qa-task [task-id]          — qa-agent exercises the app and files bugs
 /sync-agent-task [agent]    — show current ORBIT queue for all/one agent
+/ux-audit [task-id]         — ux-agent audits pages and files UI fix tasks for coder
 ```
 
 ### Docs

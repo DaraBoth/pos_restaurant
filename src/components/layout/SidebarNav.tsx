@@ -4,10 +4,10 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon, Pencil, Hash, RefreshCw, X, AlertTriangle } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon, Pencil, Hash, ArrowLeftRight, X, AlertTriangle } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
-import { loginWithPin } from '@/lib/api/auth';
+import { loginWithPin, resetWindowTitle } from '@/lib/api/auth';
 import { getInventoryItems } from '@/lib/api/inventory';
 import { SyncStatus } from '@/components/ui/SyncStatus';
 import { UpdateStatus } from '@/components/ui/UpdateStatus';
@@ -40,7 +40,7 @@ const NavItem = ({
         <Link
             href={path}
             onClick={onClick}
-            className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl transition-all group active:scale-95 text-sm ${isExact
+            className={`flex items-center gap-2.5 w-full px-2.5 py-2 min-h-[44px] rounded-xl transition-all group active:scale-95 text-sm ${isExact
                 ? 'bg-[var(--accent-blue)]/15 text-[var(--foreground)] border border-[var(--accent-blue)]/40 font-semibold'
                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] font-medium'
             } ${collapsed ? 'justify-center px-0' : ''}`}
@@ -153,6 +153,7 @@ export default function SidebarNav() {
 
     function confirmLogout() {
         stopSync().catch(() => {});
+        resetWindowTitle().catch(() => {});
         setUser(null);
         setIsLogoutOpen(false);
         router.replace('/login');
@@ -184,13 +185,15 @@ export default function SidebarNav() {
             className={`relative flex-shrink-0 flex flex-col py-3 h-screen sticky top-0 bg-[var(--sidebar-bg)] z-40 border-r border-[var(--border)] transition-all duration-200 ${collapsed ? 'w-14' : 'w-48'}`}
             style={{ boxShadow: '1px 0 20px rgba(2,6,23,0.12)' }}
         >
-            {/* Floating Border Toggle Button */}
+            {/* Floating Border Toggle Button — min 44px effective tap area via padding */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="absolute -right-3 top-16 w-6 h-6 rounded-full bg-[var(--accent-blue)] text-white shadow-md border border-[var(--border)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 cursor-pointer"
+                className="absolute -right-5 top-14 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 cursor-pointer"
                 title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-                {collapsed ? <ArrowRightToLine size={12} /> : <ArrowLeftToLine size={12} />}
+                <span className="w-6 h-6 rounded-full bg-[var(--accent-blue)] text-white shadow-md border border-[var(--border)] flex items-center justify-center">
+                    {collapsed ? <ArrowRightToLine size={12} /> : <ArrowLeftToLine size={12} />}
+                </span>
             </button>
 
             {/* Logo + toggle */}
@@ -210,7 +213,7 @@ export default function SidebarNav() {
                     <NavItem label={t('pos')} icon={LayoutGrid} path="/pos?mode=table" pathname={pathname} searchParams={searchStr} collapsed={collapsed} onClick={clearOrder} />
                 )}
                 <NavItem label={t('buyProduct')} icon={Store} path="/pos?mode=direct" pathname={pathname} searchParams={searchStr} collapsed={collapsed} onClick={clearOrder} />
-                {false && user?.role === 'admin' && (
+                {canAccessAdminConsole(user?.role) && (
                     <NavItem label={t('kitchen')} icon={UtensilsCrossed} path="/pos/kitchen" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
                 )}
                 <NavItem label={t('history')} icon={History} path="/history" pathname={pathname} searchParams={searchStr} collapsed={collapsed} />
@@ -224,17 +227,17 @@ export default function SidebarNav() {
 
             {/* Footer */}
             <div className={`mt-2 space-y-1.5 ${collapsed ? 'px-1' : 'px-2'}`}>
-                {/* Sync status */}
-                {!collapsed && <SyncStatus />}
+                {/* Sync status — compact dot in collapsed state */}
+                <SyncStatus collapsed={collapsed} />
 
-                {/* Update status — only appears when update is available */}
-                {!collapsed && <UpdateStatus />}
+                {/* Update status — compact dot in collapsed state when update available */}
+                <UpdateStatus collapsed={collapsed} />
 
                 {/* Exchange rate shortcut */}
                 {exchangeRate > 0 && (
                     <Link
                         href="/management/exchange-rate"
-                        className={`flex items-center gap-2 px-3 py-1.5 w-full rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all group ${collapsed ? 'justify-center' : ''}`}
+                        className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] w-full rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all group ${collapsed ? 'justify-center' : ''}`}
                         title={`1 USD = ${Math.round(exchangeRate).toLocaleString()} ៛`}
                     >
                         {!collapsed ? (
@@ -245,7 +248,7 @@ export default function SidebarNav() {
                                 <Pencil size={10} className="text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 flex-shrink-0" />
                             </>
                         ) : (
-                            <span className="text-[9px] font-mono font-black text-[var(--text-secondary)]">₭</span>
+                            <span className="text-[9px] font-mono font-black text-[var(--text-secondary)]">៛</span>
                         )}
                     </Link>
                 )}
@@ -253,17 +256,19 @@ export default function SidebarNav() {
                 {/* Switch User button */}
                 <button
                     onClick={() => { setIsSwitchOpen(true); setSwitchPin(''); setSwitchError(''); }}
-                    className={`flex items-center gap-2 px-3 py-1.5 w-full rounded-xl text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-transparent hover:bg-[var(--bg-elevated)] transition-all ${collapsed ? 'justify-center' : ''}`}
+                    className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-transparent hover:bg-[var(--bg-elevated)] transition-all ${collapsed ? 'justify-center' : ''}`}
                     title={t('switchUser')}
                 >
-                    <RefreshCw size={13} />
+                    <ArrowLeftRight size={13} />
                     {!collapsed && <span className="text-[11px] font-bold">{t('switchUser')}</span>}
                 </button>
+
+                <div className="border-t border-[var(--border)] my-0.5 mx-1 opacity-50" />
 
                 {/* Logout button */}
                 <button
                     onClick={handleLogout}
-                    className={`flex items-center gap-2 px-3 py-1.5 w-full rounded-xl text-red-500 hover:text-red-400 border border-transparent hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
+                    className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-red-500 hover:text-red-400 border border-transparent hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
                     title={t('logout')}
                 >
                     <LogOut size={13} />
@@ -273,7 +278,7 @@ export default function SidebarNav() {
                 {/* Unified profile settings button */}
                 <button
                     onClick={() => setIsSettingsOpen(true)}
-                    className={`flex items-center gap-2.5 px-3 py-2 w-full rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all cursor-pointer ${collapsed ? 'justify-center' : ''}`}
+                    className={`group flex items-center gap-2.5 px-3 py-2 min-h-[44px] w-full rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all cursor-pointer ${collapsed ? 'justify-center' : ''}`}
                     title="My Settings"
                 >
                     <div className="w-7 h-7 rounded-xl border border-[var(--border)] flex items-center justify-center font-black text-xs flex-shrink-0 relative overflow-hidden">
@@ -286,14 +291,17 @@ export default function SidebarNav() {
                         )}
                     </div>
                     {!collapsed && (
-                        <div className="text-left min-w-0 flex-1">
-                            <p className="text-[11px] font-black text-[var(--foreground)] truncate leading-none">
-                                {user?.full_name || user?.username}
-                            </p>
-                            <p className="text-[9px] font-black text-[var(--text-secondary)] opacity-60 uppercase tracking-widest leading-none mt-1.5">
-                                {t(roleI18nKey(user?.role))}
-                            </p>
-                        </div>
+                        <>
+                            <div className="text-left min-w-0 flex-1">
+                                <p className="text-[11px] font-black text-[var(--foreground)] truncate leading-none">
+                                    {user?.full_name || user?.username}
+                                </p>
+                                <p className="text-[9px] font-black text-[var(--text-secondary)] opacity-60 uppercase tracking-widest leading-none mt-1.5">
+                                    {t(roleI18nKey(user?.role))}
+                                </p>
+                            </div>
+                            <Settings size={12} className="text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 flex-shrink-0 transition-opacity" />
+                        </>
                     )}
                 </button>
             </div>

@@ -123,6 +123,9 @@ export const setUserPin = (restaurantId: string, userId: string, pin: string) =>
 export const loginWithPin = (restaurantId: string, pin: string) =>
     call<UserSession>('login_with_pin', { restaurantId, pin });
 
+export const resetWindowTitle = () =>
+    call<null>('reset_window_title', {});
+
 export const createSuperadminAccount = (params: {
     username: string;
     password: string;

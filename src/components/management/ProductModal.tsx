@@ -59,6 +59,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
     const [categoryId, setCategoryId] = useState('');
     const [isAvailable, setIsAvailable] = useState(true);
     const [imagePath, setImagePath] = useState('');
+    const [stockQty, setStockQty] = useState('');
     const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +84,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setCostPriceUsd(product.cost_price_cents != null ? (product.cost_price_cents / 100).toFixed(2) : '');
             setCategoryId(product.category_id || '');
             setIsAvailable(product.is_available === 1);
+            setStockQty(product.stock_quantity != null ? String(product.stock_quantity) : '');
             setImagePath(product.image_path || '');
             setIngredients(product.ingredients.map(ing => ({
                 inventory_item_id: ing.inventory_item_id,
@@ -122,6 +124,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             setCostPriceUsd('');
             setCategoryId(categories[0]?.id || '');
             setIsAvailable(true);
+            setStockQty('');
             setImagePath('');
             setIngredients([]);
             setVariants([]);
@@ -173,6 +176,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
         const priceCents = Math.round(parseFloat(priceUsd || '0') * 100);
         const trimmedCost = costPriceUsd.trim();
         const costPriceCents = trimmedCost === '' ? undefined : Math.round(parseFloat(trimmedCost || '0') * 100);
+        const stockQuantity = stockQty.trim() === '' ? null : Math.round(parseFloat(stockQty));
         setLoading(true);
         try {
             let productId: string;
@@ -184,7 +188,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     restaurantId || '', sku || undefined,
                     !!product.sold_out_today,
                     description || undefined, khmerDescription || undefined,
-                    costPriceCents
+                    costPriceCents,
+                    stockQuantity
                 );
                 productId = product.id;
             } else {
@@ -193,7 +198,8 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     ingredients,
                     restaurantId || undefined, sku || undefined,
                     description || undefined, khmerDescription || undefined,
-                    costPriceCents
+                    costPriceCents,
+                    stockQuantity
                 );
             }
             await persistVariants(productId);
@@ -202,7 +208,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Failed to save product');
+            alert(t('saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -333,7 +339,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-colors"
                                     >
                                         <ImagePlus size={14} />
-                                        Change
+                                        {t('changeImage')}
                                     </button>
                                     <button
                                         type="button"
@@ -341,7 +347,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/70 hover:bg-red-500 text-white text-xs font-bold transition-colors"
                                     >
                                         <X size={14} />
-                                        Remove
+                                        {t('removeImage')}
                                     </button>
                                 </div>
                             </div>
@@ -397,7 +403,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     <input
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
-                        placeholder="បាយឆា"
+                        placeholder={t('phProductExample')}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold khmer placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
                     />
                 </div>
@@ -425,7 +431,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         value={khmerDescription}
                         onChange={e => setKhmerDescription(e.target.value)}
                         rows={2}
-                        placeholder="មានសណ្តែកដី។ ហឹរ។"
+                        placeholder={t('phAllergenExample')}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm khmer placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all resize-none"
                     />
                 </div>
@@ -493,6 +499,25 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     );
                 })()}
 
+                {/* Stock Quantity */}
+                <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
+                        {t('stockQuantity') ?? 'Stock Quantity'}
+                    </label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={stockQty}
+                        onChange={e => setStockQty(e.target.value)}
+                        placeholder="—"
+                        className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-mono placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all"
+                    />
+                    <p className="text-[11px] text-[var(--text-secondary)] opacity-70">
+                        {t('stockQuantityHint')}
+                    </p>
+                </div>
+
                 {/* Category */}
                 <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
@@ -513,7 +538,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                     <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                             <Box size={14} className="text-emerald-400" />
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Inventory Ingredients</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">{t('inventoryIngredients')}</h3>
                         </div>
                         <button
                             type="button"
@@ -521,14 +546,14 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                             className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 p-1.5 rounded-lg transition-colors flex items-center gap-1.5"
                         >
                             <Plus size={12} strokeWidth={3} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Add</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">{t('addIngredient')}</span>
                         </button>
                     </div>
                     
                     <div className="space-y-3">
                         {ingredients.length === 0 && (
                             <div className="text-center py-4 border-2 border-dashed border-[var(--border)] rounded-xl">
-                                <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-widest font-bold opacity-40">No ingredients linked</p>
+                                <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-widest font-bold opacity-40">{t('noIngredientsLinked')}</p>
                             </div>
                         )}
                         {ingredients.map((ing, idx) => (
@@ -542,7 +567,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                             setIngredients(newIngs);
                                         }}
                                         options={[
-                                            { label: '-- Select Material --', value: '' },
+                                            { label: t('selectMaterial'), value: '' },
                                             ...materials.map(m => ({ label: `${m.name} (${m.unit_label})`, value: m.id }))
                                         ]}
                                         className="flex-1"
@@ -615,6 +640,13 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                         <p className="text-[11px] text-[var(--text-secondary)] opacity-60 py-1">{t('noVariants')}</p>
                     ) : (
                         <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 px-2 pb-0.5">
+                                <span className="flex-1 min-w-[90px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{t('variantName')}</span>
+                                <span className="flex-1 min-w-[80px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{t('khmerName')}</span>
+                                <span className="w-[80px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{t('price')} (USD)</span>
+                                <span className="w-[64px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{t('stockCol')}</span>
+                                <span className="w-6" />
+                            </div>
                             {variants.map((v, idx) => (
                                 <div key={v.id ?? `new-${idx}`} className="flex flex-wrap items-center gap-1.5 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)]">
                                     <input
@@ -626,7 +658,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                     <input
                                         value={v.name_km}
                                         onChange={e => updateVariant(idx, { name_km: e.target.value })}
-                                        placeholder="ខ្មែរ"
+                                        placeholder={t('khmerName')}
                                         className="flex-1 min-w-[80px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--foreground)] khmer outline-none focus:border-[var(--accent)]"
                                     />
                                     <input
@@ -686,7 +718,7 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                         <input
                                             value={g.name_km}
                                             onChange={e => updateModGroup(gi, { name_km: e.target.value })}
-                                            placeholder="ខ្មែរ"
+                                            placeholder={t('khmerName')}
                                             className="flex-1 min-w-[70px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--foreground)] khmer outline-none focus:border-[var(--accent)]"
                                         />
                                         <button type="button" onClick={() => removeModGroup(gi)} className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-all">
@@ -704,6 +736,14 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                         </label>
                                     </div>
                                     <div className="space-y-1.5 pl-1">
+                                        {g.options.length > 0 && (
+                                            <div className="flex items-center gap-1.5 pb-0.5">
+                                                <span className="flex-1 min-w-[70px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{t('variantName')}</span>
+                                                <span className="flex-1 min-w-[60px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{t('khmerName')}</span>
+                                                <span className="w-[72px] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">+/- (USD)</span>
+                                                <span className="w-5" />
+                                            </div>
+                                        )}
                                         {g.options.map((o, oi) => (
                                             <div key={o.id ?? `no-${oi}`} className="flex items-center gap-1.5">
                                                 <input
@@ -715,16 +755,19 @@ export default function ProductModal({ isOpen, onClose, onSave, categories, prod
                                                 <input
                                                     value={o.name_km}
                                                     onChange={e => updateModOption(gi, oi, { name_km: e.target.value })}
-                                                    placeholder="ខ្មែរ"
+                                                    placeholder={t('khmerName')}
                                                     className="flex-1 min-w-[60px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--foreground)] khmer outline-none focus:border-[var(--accent)]"
                                                 />
-                                                <input
-                                                    type="number" step="0.01"
-                                                    value={o.priceDeltaUsd}
-                                                    onChange={e => updateModOption(gi, oi, { priceDeltaUsd: e.target.value })}
-                                                    title={t('priceDelta')}
-                                                    className="w-[64px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-mono text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                                                />
+                                                <div className="flex items-center w-[72px] bg-[var(--bg-dark)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-mono text-[var(--foreground)] focus-within:border-[var(--accent)]">
+                                                    <span className="text-[var(--text-secondary)] mr-0.5">$</span>
+                                                    <input
+                                                        type="number" step="0.01"
+                                                        value={o.priceDeltaUsd}
+                                                        onChange={e => updateModOption(gi, oi, { priceDeltaUsd: e.target.value })}
+                                                        title={t('priceDelta')}
+                                                        className="w-full bg-transparent outline-none"
+                                                    />
+                                                </div>
                                                 <button type="button" onClick={() => removeModOption(gi, oi)} className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-all">
                                                     <X size={13} />
                                                 </button>

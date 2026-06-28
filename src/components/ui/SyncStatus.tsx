@@ -29,7 +29,7 @@ function mapSyncErrorKey(msg: string): string {
     return 'syncErrGeneral';
 }
 
-export function SyncStatus() {
+export function SyncStatus({ collapsed = false }: { collapsed?: boolean }) {
     const [state, setState] = useState<SyncState>('synced');
     const [rawError, setRawError] = useState('');
     const [friendlyKey, setFriendlyKey] = useState('syncErrGeneral');
@@ -117,6 +117,22 @@ export function SyncStatus() {
     const Icon = cfg.icon;
     const label = stateLabels[state];
     const tooltipText = state === 'error' ? t(friendlyKey) : label;
+
+    if (collapsed) {
+        return (
+            <div
+                className="flex items-center justify-center w-full py-1 cursor-help"
+                title={tooltipText}
+            >
+                <span className="relative flex-shrink-0">
+                    <span className="block w-2.5 h-2.5 rounded-full" style={{ background: cfg.color }} />
+                    {cfg.pulse && (
+                        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: cfg.color, opacity: 0.5 }} />
+                    )}
+                </span>
+            </div>
+        );
+    }
 
     return (
         <div

@@ -163,12 +163,12 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">Khmer Name</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]">{t('khmerName')}</label>
                         <input
                             value={khmerName}
                             onChange={e => setKhmerName(e.target.value)}
                             className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all khmer"
-                            placeholder="ចន ដូ"
+                            placeholder={t('phFullNameExample')}
                         />
                     </div>
                 </div>

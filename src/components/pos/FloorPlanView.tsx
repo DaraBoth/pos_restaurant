@@ -5,9 +5,10 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { getTables } from '@/lib/api/tables';
 import { getActiveOrderForTable, getOrderItems } from '@/lib/api/orders';
 import type { FloorTable } from '@/types';
+import { formatUsd } from '@/lib/currency';
 import {
     LayoutGrid, Users2, CheckCircle2, UtensilsCrossed, Clock,
-    ShoppingBag, MapPin, Search, List, Grid3X3, X,
+    ShoppingBag, MapPin, Search, List, Grid3X3, X, AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProvider';
@@ -43,6 +44,7 @@ export default function FloorPlanView() {
 
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [search, setSearch] = useState('');
     const [activeZone, setActiveZone] = useState<string>('All');
@@ -52,9 +54,10 @@ export default function FloorPlanView() {
     }, [user?.restaurant_id]);
 
     async function load() {
+        setLoadError(false);
         setLoading(true);
         try { setTables(await getTables(user?.restaurant_id ?? undefined)); }
-        catch (e) { console.error(e); }
+        catch (e) { console.error(e); setLoadError(true); }
         finally { setLoading(false); }
     }
 
@@ -141,6 +144,12 @@ export default function FloorPlanView() {
                     <Users2 size={9} color={s.text} strokeWidth={2} />
                     <span className="text-[9px] font-bold" style={{ color: s.text }}>{table.seat_count}</span>
                 </div>
+                {table.status !== 'available' && table.order_total_usd_cents != null && (
+                    <p className="text-[9px] font-bold font-mono leading-none" style={{ color: s.text }}>
+                        {formatUsd(table.order_total_usd_cents)}
+                        {table.item_count != null && ` · ${table.item_count}`}
+                    </p>
+                )}
             </button>
         );
     }
@@ -180,16 +189,23 @@ export default function FloorPlanView() {
                     <span className="text-[10px] font-semibold" style={{ color: s.dot }}>{t(s.labelKey)}</span>
                 </div>
 
-                {/* Seat count */}
-                <div className="flex items-center gap-1 text-[var(--text-secondary)]">
-                    <Users2 size={11} strokeWidth={2} />
-                    <span className="text-[11px] font-bold">{table.seat_count}</span>
-                </div>
+                {/* Order summary — shown for busy/waiting tables */}
+                {table.status !== 'available' && table.order_total_usd_cents != null ? (
+                    <span className="text-[11px] font-bold font-mono" style={{ color: s.dot }}>
+                        {formatUsd(table.order_total_usd_cents)}
+                        {table.item_count != null && <span className="opacity-60 font-semibold"> · {table.item_count}</span>}
+                    </span>
+                ) : (
+                    <div className="flex items-center gap-1 text-[var(--text-secondary)]">
+                        <Users2 size={11} strokeWidth={2} />
+                        <span className="text-[11px] font-bold">{table.seat_count}</span>
+                    </div>
+                )}
 
                 {/* Current badge */}
                 {isCurrent && (
                     <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-[var(--accent-blue)]/20 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30">
-                        Active
+                        {t('activeTableLabel')}
                     </span>
                 )}
             </button>
@@ -317,7 +333,7 @@ export default function FloorPlanView() {
                                 }}
                             >
                                 {z !== 'All' && <MapPin size={8} />}
-                                {z}
+                                {z === 'All' ? t('allFilter') : z}
                                 <span className="font-black opacity-60">{count}</span>
                             </button>
                         );
@@ -335,7 +351,7 @@ export default function FloorPlanView() {
                                 background: viewMode === mode ? 'var(--accent-blue)' : 'transparent',
                                 color: viewMode === mode ? '#fff' : 'var(--text-secondary)',
                             }}
-                            title={mode === 'grid' ? 'Grid view' : 'List view'}
+                            title={mode === 'grid' ? t('gridViewLabel') : t('listViewLabel')}
                         >
                             <Icon size={13} />
                         </button>
@@ -350,6 +366,12 @@ export default function FloorPlanView() {
                         {Array.from({ length: 16 }).map((_, i) => (
                             <div key={i} className="rounded-2xl animate-pulse bg-[var(--bg-elevated)]" style={{ aspectRatio: '1/1.15' }} />
                         ))}
+                    </div>
+                ) : loadError ? (
+                    <div className="flex flex-col items-center justify-center h-64 gap-4">
+                        <AlertTriangle size={36} className="text-red-400 opacity-70" />
+                        <p className="text-sm font-semibold text-[var(--text-secondary)]">{t('genericError')}</p>
+                        <button onClick={load} className="text-xs font-bold text-[var(--accent)] underline underline-offset-2">{t('retry')}</button>
                     </div>
                 ) : tables.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -372,8 +394,8 @@ export default function FloorPlanView() {
                 ) : filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 gap-2 opacity-50">
                         <Search size={28} className="text-[var(--text-secondary)]" />
-                        <p className="text-sm font-semibold text-[var(--text-secondary)]">No tables match your search</p>
-                        <button onClick={() => { setSearch(''); setActiveZone('All'); }} className="text-xs text-[var(--accent-blue)] hover:underline">Clear filters</button>
+                        <p className="text-sm font-semibold text-[var(--text-secondary)]">{t('noTablesMatchSearch')}</p>
+                        <button onClick={() => { setSearch(''); setActiveZone('All'); }} className="text-xs text-[var(--accent-blue)] hover:underline">{t('clearFilters')}</button>
                     </div>
                 ) : (
                     <>

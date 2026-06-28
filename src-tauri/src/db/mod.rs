@@ -15,6 +15,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("001_baseline", include_str!("migrations/001_baseline.sql")),
     ("004_app_releases", include_str!("migrations/004_app_releases.sql")),
     ("005_daily_reports", include_str!("migrations/005_daily_reports.sql")),
+    ("006_products_stock_nullable", include_str!("migrations/006_products_stock_nullable.sql")),
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -128,7 +129,6 @@ async fn ensure_critical_columns(conn: &Connection) {
     add_col!("categories",   "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
     add_col!("categories",   "parent_id",       "parent_id TEXT");
     add_col!("products",     "restaurant_id",   "restaurant_id TEXT REFERENCES restaurants(id)");
-    add_col!("products",     "stock_quantity",  "stock_quantity INTEGER NOT NULL DEFAULT 0");
     add_col!("products",     "image_path",      "image_path TEXT");
     // Product variants: each order line can reference a chosen variant; the
     // variant name is snapshotted so history survives variant deletion.
@@ -596,6 +596,89 @@ async fn ensure_critical_columns(conn: &Connection) {
         }
         let _ = conn.execute(
             "INSERT OR IGNORE INTO _migrations (id) VALUES ('005_orders_drop_session_fk')",
+            ()
+        ).await;
+    }
+
+    // ── Migration 006: Rebuild products to make stock_quantity nullable ─────────
+    // Runs AFTER all add_col! calls so drifted columns (sku, sold_out_today,
+    // description, khmer_description, cost_price_cents, inventory_item_id,
+    // inventory_item_usage) are guaranteed to exist before the INSERT...SELECT copy.
+    let needs_stock_nullable = {
+        let mut r = conn.query(
+            "SELECT 1 FROM _migrations WHERE id = '006_products_stock_nullable_rebuild'",
+            ()
+        ).await;
+        match r {
+            Ok(ref mut rows) => rows.next().await.ok().flatten().is_none(),
+            Err(_) => false,
+        }
+    };
+    if needs_stock_nullable {
+        let has_not_null = {
+            let mut r = conn.query(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='products'",
+                ()
+            ).await;
+            match r {
+                Ok(ref mut rows) => {
+                    if let Ok(Some(row)) = rows.next().await {
+                        let sql = row.get::<String>(0).unwrap_or_default().to_uppercase();
+                        sql.contains("STOCK_QUANTITY INTEGER NOT NULL")
+                    } else { false }
+                }
+                Err(_) => false,
+            }
+        };
+        if has_not_null {
+            println!("[DB] Migration 006: rebuilding products to make stock_quantity nullable…");
+            let stmts = [
+                "PRAGMA foreign_keys=OFF",
+                "CREATE TABLE products_sq_new (
+                    id TEXT PRIMARY KEY,
+                    category_id TEXT REFERENCES categories(id),
+                    name TEXT NOT NULL,
+                    khmer_name TEXT,
+                    price_cents INTEGER NOT NULL,
+                    image_path TEXT,
+                    is_available INTEGER NOT NULL DEFAULT 1,
+                    is_deleted INTEGER NOT NULL DEFAULT 0,
+                    stock_quantity INTEGER DEFAULT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now')),
+                    restaurant_id TEXT REFERENCES restaurants(id),
+                    sku TEXT,
+                    sold_out_today INTEGER NOT NULL DEFAULT 0,
+                    description TEXT,
+                    khmer_description TEXT,
+                    cost_price_cents INTEGER,
+                    inventory_item_id TEXT,
+                    inventory_item_usage REAL NOT NULL DEFAULT 1.0
+                )",
+                "INSERT INTO products_sq_new (id, category_id, name, khmer_name, price_cents, image_path, is_available, is_deleted, stock_quantity, created_at, updated_at, restaurant_id, sku, sold_out_today, description, khmer_description, cost_price_cents, inventory_item_id, inventory_item_usage)
+                 SELECT id, category_id, name, khmer_name, price_cents, image_path, is_available, is_deleted, stock_quantity, created_at, updated_at, restaurant_id, sku, sold_out_today, description, khmer_description, cost_price_cents, inventory_item_id, inventory_item_usage FROM products",
+                "DROP TABLE products",
+                "ALTER TABLE products_sq_new RENAME TO products",
+                "PRAGMA foreign_keys=ON",
+            ];
+            let mut ok = true;
+            for stmt in stmts {
+                if let Err(e) = conn.execute(stmt, ()).await {
+                    eprintln!("[DB] Migration 006 error: {} — SQL: {}", e, &stmt[..stmt.len().min(120)]);
+                    ok = false;
+                    break;
+                }
+            }
+            if ok {
+                let _ = conn.execute(
+                    "CREATE TRIGGER IF NOT EXISTS trg_products_upd AFTER UPDATE ON products BEGIN UPDATE products SET updated_at = datetime('now') WHERE id = NEW.id; END",
+                    ()
+                ).await;
+                println!("[DB] Migration 006: products.stock_quantity is now nullable ✓");
+            }
+        }
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO _migrations (id) VALUES ('006_products_stock_nullable_rebuild')",
             ()
         ).await;
     }

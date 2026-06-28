@@ -543,7 +543,7 @@ export default function CheckoutModal({
                                 onClick={handlePreviewPrint}
                                 disabled={loading}
                                 className="w-14 h-14 rounded-xl flex items-center justify-center bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-all active:scale-[0.95]"
-                                title="Print Preview"
+                                title={t('printPreviewBtn')}
                             >
                                 <Printer size={20} />
                             </button>

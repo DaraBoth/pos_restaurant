@@ -203,7 +203,7 @@ pub async fn get_products(
             category_khmer: row.get::<String>(8).ok(),
             ingredients,
             created_at: row.get::<String>(9).unwrap_or_default(),
-            stock_quantity: row.get::<i64>(10).unwrap_or(0),
+            stock_quantity: row.get::<i64>(10).ok(),
             sku: row.get::<String>(11).ok().filter(|s| !s.is_empty()),
             sold_out_today: row.get::<i64>(12).unwrap_or(0),
             description: row.get::<String>(13).ok().filter(|s| !s.is_empty()),
@@ -270,12 +270,13 @@ pub async fn create_product(
     description: Option<String>,
     khmer_description: Option<String>,
     cost_price_cents: Option<i64>,
+    stock_quantity: Option<i64>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<String, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let _: u64 = pool.execute(
-        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, image_path, restaurant_id, sku, description, khmer_description, cost_price_cents, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        "INSERT INTO products (id, category_id, name, khmer_name, price_cents, image_path, restaurant_id, sku, description, khmer_description, cost_price_cents, stock_quantity, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         params![
             id.clone(),
             category_id,
@@ -287,7 +288,8 @@ pub async fn create_product(
             sku.unwrap_or_default(),
             description.unwrap_or_default(),
             khmer_description.unwrap_or_default(),
-            cost_price_cents
+            cost_price_cents,
+            stock_quantity
         ]
     )
     .await
@@ -321,10 +323,11 @@ pub async fn update_product(
     description: Option<String>,
     khmer_description: Option<String>,
     cost_price_cents: Option<i64>,
+    stock_quantity: Option<i64>,
     pool: State<'_, Arc<Connection>>,
 ) -> Result<(), String> {
     let _: u64 = pool.execute(
-        "UPDATE products SET name=?, khmer_name=?, price_cents=?, category_id=?, is_available=?, image_path=?, sku=?, sold_out_today=?, description=?, khmer_description=?, cost_price_cents=?, updated_at=datetime('now')
+        "UPDATE products SET name=?, khmer_name=?, price_cents=?, category_id=?, is_available=?, image_path=?, sku=?, sold_out_today=?, description=?, khmer_description=?, cost_price_cents=?, stock_quantity=?, updated_at=datetime('now')
          WHERE id=? AND restaurant_id=?",
          params![
              name,
@@ -338,6 +341,7 @@ pub async fn update_product(
              description.unwrap_or_default(),
              khmer_description.unwrap_or_default(),
              cost_price_cents,
+             stock_quantity,
              id.clone(),
              restaurant_id.clone()
          ]

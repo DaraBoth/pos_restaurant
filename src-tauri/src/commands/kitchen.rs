@@ -12,7 +12,7 @@ pub async fn get_kitchen_orders(
 ) -> Result<Vec<KitchenOrder>, String> {
     // Find open orders that have active (non-done) items
     let mut rows = pool.query(
-        "SELECT DISTINCT o.id, o.table_id, o.created_at, o.notes
+        "SELECT DISTINCT o.id, o.table_id, o.created_at, o.notes, o.takeout_counter
          FROM orders o
          JOIN order_items oi ON oi.order_id = o.id
          WHERE o.status = 'open' AND o.is_deleted = 0 AND o.restaurant_id = ?
@@ -30,12 +30,13 @@ pub async fn get_kitchen_orders(
             row.get::<String>(1).ok(),
             row.get::<String>(2).unwrap_or_default(),
             row.get::<String>(3).ok(),
+            row.get::<i64>(4).ok(),
         ));
     }
 
     let mut result = Vec::new();
 
-    for (order_id, table_id, created_at, notes) in order_rows {
+    for (order_id, table_id, created_at, notes, takeout_counter) in order_rows {
         let mut item_rows = pool.query(
             "SELECT oi.id,
                     COALESCE(p.name, 'Unknown') AS product_name,
@@ -76,6 +77,7 @@ pub async fn get_kitchen_orders(
             table_id,
             notes,
             created_at,
+            takeout_counter,
             items,
         });
     }

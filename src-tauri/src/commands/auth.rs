@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{State, Manager};
 use libsql::{Connection, params};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
@@ -133,6 +133,25 @@ fn is_superadmin_username(username: &str) -> bool {
 
 fn is_superadmin_role(role: &str) -> bool {
     role.trim().eq_ignore_ascii_case("super_admin")
+}
+
+async fn fetch_restaurant_name(pool: &Connection, restaurant_id: &str) -> Option<String> {
+    let mut rows = pool.query(
+        "SELECT name FROM restaurants WHERE id = ? LIMIT 1",
+        params![restaurant_id]
+    ).await.ok()?;
+    rows.next().await.ok()??.get::<String>(0).ok()
+}
+
+fn set_window_title(app: &tauri::AppHandle, title: &str) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_title(title);
+    }
+}
+
+#[tauri::command]
+pub fn reset_window_title(app: tauri::AppHandle) {
+    set_window_title(&app, "DineOS");
 }
 
 fn first_device_login_message() -> String {
@@ -400,6 +419,7 @@ pub async fn login(
     password: String,
     pool: State<'_, Arc<Connection>>,
     remote: State<'_, RemoteDb>,
+    app: tauri::AppHandle,
 ) -> Result<UserSession, String> {
     let superadmin_login = is_superadmin_username(&username);
 
@@ -421,6 +441,11 @@ pub async fn login(
                     // ✅ Known user, correct password — allow offline login
                     reset_login_attempts(&pool, &username).await;
                     println!("[Auth] Local login granted for '{}'", username);
+                    if let Some(rid) = &local_record.restaurant_id {
+                        if let Some(name) = fetch_restaurant_name(&pool, rid).await {
+                            set_window_title(&app, &format!("{} - DineOS", name));
+                        }
+                    }
                     return Ok(to_user_session(&local_record));
                 }
                 // Known user but password doesn't match local hash.
@@ -534,6 +559,12 @@ pub async fn login(
     if let Err(e) = seed_local_user_from_remote(&pool, &remote_record).await {
         eprintln!("[Auth] Warning: failed to cache user locally: {}", e);
         // Non-fatal — user is still authenticated this session
+    }
+
+    if let Some(rid) = &remote_record.restaurant_id {
+        if let Some(name) = fetch_restaurant_name(&pool, rid).await {
+            set_window_title(&app, &format!("{} - DineOS", name));
+        }
     }
 
     Ok(to_user_session(&remote_record))
@@ -1241,6 +1272,7 @@ pub async fn login_with_pin(
     restaurant_id: String,
     pin: String,
     pool: State<'_, Arc<Connection>>,
+    app: tauri::AppHandle,
 ) -> Result<UserSession, String> {
     if pin.len() < 4 || pin.len() > 6 || !pin.chars().all(|c| c.is_ascii_digit()) {
         return Err("Invalid PIN format.".to_string());
@@ -1268,6 +1300,9 @@ pub async fn login_with_pin(
         if Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok() {
             let username = row.get::<String>(2).unwrap_or_default();
             reset_login_attempts(&pool, &username).await;
+            if let Some(name) = fetch_restaurant_name(&pool, &restaurant_id).await {
+                set_window_title(&app, &format!("{} - DineOS", name));
+            }
             return Ok(UserSession {
                 id: row.get::<String>(0).unwrap_or_default(),
                 restaurant_id: row.get::<String>(1).ok(),

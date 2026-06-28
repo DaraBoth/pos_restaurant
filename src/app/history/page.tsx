@@ -13,7 +13,7 @@ import { printReceipt } from '@/lib/receipt';
 import {
     History, RefreshCw, TableProperties, ChevronDown,
     ChevronUp, Download, Clock, ReceiptText,
-    LayoutList, LayoutGrid, Printer, Trash2
+    LayoutList, LayoutGrid, Printer, Trash2, Loader2
 } from 'lucide-react';
 // Dynamic import for XLSX to avoid bundling issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,7 +21,7 @@ let XLSX_MODULE: any = null;
 import { useLanguage } from '@/providers/LanguageProvider';
 import type { TranslationKey } from '@/lib/i18n';
 import { call } from '@/lib/api/client';
-import { format } from 'date-fns';
+import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
 import { printDailyClosingReport, printSalesSummary } from '@/lib/reports';
 import { getTopProductsInRange } from '@/lib/api/analytics';
 import { getImageSrc } from '@/lib/image';
@@ -90,9 +90,7 @@ function combineOrderItems(items: OrderItem[]): OrderItem[] {
 
 const STATUS_TABS: { id: StatusFilter; labelKey: TranslationKey }[] = [
     { id: 'all', labelKey: 'allFilter' },
-    { id: 'open', labelKey: 'open' },
     { id: 'completed', labelKey: 'completed' },
-    { id: 'hold', labelKey: 'hold' },
     { id: 'void', labelKey: 'voidedFilter' },
 ];
 
@@ -139,6 +137,10 @@ export default function HistoryPage() {
     const [showCloseReportConfirm, setShowCloseReportConfirm] = useState(false);
     const [exportToast, setExportToast] = useState<{ msg: string; ok: boolean } | null>(null);
     const exportToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [activePreset, setActivePreset] = useState<string>('today');
+    const [orderSearch, setOrderSearch] = useState('');
+    const [reprintingId, setReprintingId] = useState<string | null>(null);
     const [actualCountedCashUsd, setActualCountedCashUsd] = useState('');
     const [exchangeRateForReport, setExchangeRateForReport] = useState(4100);
     const [adjustments, setAdjustments] = useState<CashAdjustmentRow[]>([
@@ -269,8 +271,10 @@ export default function HistoryPage() {
                     .filter((order) => order.status === 'completed' || order.status === 'void')
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             );
+            setLoadError(null);
         } catch (e) {
             console.error(e);
+            setLoadError(t('genericError'));
         } finally {
             setLoading(false);
         }
@@ -446,7 +450,15 @@ export default function HistoryPage() {
         ));
     }, [closedReports, reportSearch]);
 
-    const filtered = groupedOrders;
+    const filtered = useMemo(() => {
+        const q = orderSearch.trim().toLowerCase();
+        if (!q) return groupedOrders;
+        return groupedOrders.filter(g =>
+            g.id.toLowerCase().includes(q) ||
+            (g.table_id || '').toLowerCase().includes(q) ||
+            (g.orders.find(o => o.receipt_number)?.receipt_number || '').toLowerCase().includes(q)
+        );
+    }, [groupedOrders, orderSearch]);
 
     useEffect(() => {
         if (viewMode !== 'grid' || filtered.length === 0) return;
@@ -523,8 +535,8 @@ export default function HistoryPage() {
                 const d = new Date(g.created_at.replace(' ', 'T') + 'Z');
                 return {
                     'Order #': g.id.split('-')[0].toUpperCase(),
-                    'Date': d.toLocaleDateString(),
-                    'Time': d.toLocaleTimeString(),
+                    'Date': d.toLocaleDateString('en-GB'),
+                    'Time': d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
                     'Table': g.table_id || 'Takeout',
                     'Total USD': (g.total_usd / 100).toFixed(2),
                     'Total KHR': g.total_khr.toLocaleString(),
@@ -850,12 +862,30 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                    {/* Quick-filter presets */}
+                    <div className="flex items-center gap-1.5">
+                        {([
+                            { key: 'today', label: t('today'), start: () => format(new Date(), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
+                            { key: 'yesterday', label: t('yesterday'), start: () => format(subDays(new Date(), 1), 'yyyy-MM-dd'), end: () => format(subDays(new Date(), 1), 'yyyy-MM-dd') },
+                            { key: 'thisWeek', label: t('thisWeek'), start: () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
+                            { key: 'thisMonth', label: t('thisMonth'), start: () => format(startOfMonth(new Date()), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
+                        ] as const).map(preset => (
+                            <button
+                                key={preset.key}
+                                onClick={() => { setStartDate(preset.start()); setEndDate(preset.end()); setActivePreset(preset.key); }}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activePreset === preset.key ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                            >
+                                {preset.label}
+                            </button>
+                        ))}
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <div className="relative group">
                             <input
                                 type="date"
                                 value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                onChange={(e) => { setStartDate(e.target.value); setActivePreset(''); }}
                                 className="pos-input px-3 text-xs h-10 w-[160px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-black uppercase tracking-widest text-[var(--foreground)]"
                             />
                         </div>
@@ -864,7 +894,7 @@ export default function HistoryPage() {
                             <input
                                 type="date"
                                 value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
+                                onChange={(e) => { setEndDate(e.target.value); setActivePreset(''); }}
                                 className="pos-input px-3 text-xs h-10 w-[160px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-black uppercase tracking-widest text-[var(--foreground)]"
                             />
                         </div>
@@ -876,7 +906,7 @@ export default function HistoryPage() {
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
                     >
                         <Printer size={14} />
-                        PRINT
+                        {t('printBtn')}
                     </button>
 
                     <button
@@ -901,10 +931,8 @@ export default function HistoryPage() {
             <div className="flex flex-wrap gap-3">
                 {[
                     { label: t('revenue'), value: formatUsd(totalRevenueCents), accent: 'var(--accent)' },
-                    { label: t('open'), value: String(allGroupedOrders.filter(g => g.status === 'open').length), accent: '#f97316' },
                     { label: t('completed'), value: String(completed.length), accent: '#22c55e' },
-                    { label: 'HOLD', value: String(allGroupedOrders.filter(g => g.status === 'hold' || g.status === 'pending_payment').length), accent: '#eab308' },
-                    { label: 'VOID', value: String(allGroupedOrders.filter(g => g.status === 'void').length), accent: '#ef4444' },
+                    { label: t('voidedFilter'), value: String(allGroupedOrders.filter(g => g.status === 'void').length), accent: '#ef4444' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
@@ -1346,7 +1374,7 @@ export default function HistoryPage() {
                                     </p>
                                 </div>
                                 <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                    {report.status}
+                                    {report.status === 'closed' ? t('closedFilter') : report.status}
                                 </span>
                             </div>
 
@@ -1413,6 +1441,12 @@ export default function HistoryPage() {
             {activeTab === 'orders' && (
             /* ── Tabs & Content ── */
             <div className="space-y-3">
+                {loadError && (
+                    <div className="p-4 rounded-xl bg-red-600/10 border border-red-600/30 flex items-center justify-between gap-3">
+                        <span className="text-xs font-bold text-red-400 flex-1">{loadError}</span>
+                        <button onClick={loadOrders} className="text-xs font-black uppercase text-red-400 hover:text-red-200 whitespace-nowrap">{t('retry')}</button>
+                    </div>
+                )}
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex gap-2 overflow-x-auto pb-2 container-snap">
                         {STATUS_TABS.map(tab => (
@@ -1433,6 +1467,13 @@ export default function HistoryPage() {
                     </div>
                     {/* Cashier + payment-method filters and view mode toggle */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                        <input
+                            type="text"
+                            value={orderSearch}
+                            onChange={e => setOrderSearch(e.target.value)}
+                            placeholder={t('phSearchOrders')}
+                            className="pos-input px-3 text-xs h-9 w-44"
+                        />
                         <CustomSelect
                             value={cashierFilter}
                             onChange={setCashierFilter}
@@ -1448,14 +1489,14 @@ export default function HistoryPage() {
                     <div className="flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-1">
                         <button
                             onClick={() => setViewMode('table')}
-                            title="Table view"
+                            title={t('tableView')}
                             className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                         >
                             <LayoutList size={15} strokeWidth={2.5} />
                         </button>
                         <button
                             onClick={() => setViewMode('grid')}
-                            title="Receipt grid view"
+                            title={t('receiptGridView')}
                             className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                         >
                             <LayoutGrid size={15} strokeWidth={2.5} />
@@ -1463,6 +1504,12 @@ export default function HistoryPage() {
                     </div>
                     </div>
                 </div>
+
+                {filtered.length !== allGroupedOrders.length && (
+                    <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 px-1">
+                        {t('showingXofY').replace('{x}', String(filtered.length)).replace('{y}', String(allGroupedOrders.length))}
+                    </p>
+                )}
 
                 {viewMode === 'table' ? (
                     <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-2xl relative">
@@ -1512,11 +1559,11 @@ export default function HistoryPage() {
                                                         </td>
                                                         <td className="px-4 py-2.5 font-mono text-xs font-black tracking-widest" style={{ color: isExpanded ? 'var(--accent)' : 'inherit' }}>
                                                             {g.table_id
-                                                                ? `SESSION ${g.id.split('-')[0].toUpperCase()}`
+                                                                ? `${t('sessionLabel')} ${g.id.split('-')[0].toUpperCase()}`
                                                                 : `#${g.orders[0]?.receipt_number ?? '-'}`}
                                                         </td>
                                                         <td className="px-4 py-2.5">
-                                                            <div className="text-xs font-black mb-0.5">{new Date(g.created_at + 'Z').toLocaleDateString()}</div>
+                                                            <div className="text-xs font-black mb-0.5">{new Date(g.created_at + 'Z').toLocaleDateString('en-GB')}</div>
                                                             <div className="text-[10px] font-bold font-mono opacity-40 flex items-center gap-1">
                                                                 <Clock size={10} />
                                                                 {new Date(g.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1537,7 +1584,7 @@ export default function HistoryPage() {
                                                                 className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border"
                                                                 style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                             >
-                                                                {g.status === 'void' ? 'VOID / មោឃៈ' : ['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as TranslationKey)}
+                                                                {g.status === 'void' ? 'VOID / មោឃៈ' : ['hold', 'pending_payment'].includes(g.status) ? t('hold') : t(g.status as TranslationKey)}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-2.5 font-mono font-black text-sm" style={{ color: 'var(--accent)' }}>
@@ -1576,34 +1623,40 @@ export default function HistoryPage() {
                                                                             <button
                                                                                 onClick={async (e) => {
                                                                                     e.stopPropagation();
-                                                                                    if (restaurant) {
-                                                                                        const allItems = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
-                                                                                        const { payments, cashierName } = await loadReprintExtras(g);
-                                                                                        printReceipt({
-                                                                                            restaurant,
-                                                                                            orderId: g.id,
-                                                                                            tableId: g.table_id || undefined,
-                                                                                            customerName: undefined,
-                                                                                            customerPhone: undefined,
-                                                                                            cashierName,
-                                                                                            items: allItems,
-                                                                                            payments,
-                                                                                            totals: {
-                                                                                                subtotalCents: g.total_usd - g.total_vat - g.total_plt,
-                                                                                                vatCents: g.total_vat,
-                                                                                                pltCents: g.total_plt,
-                                                                                                totalUsdCents: g.total_usd,
-                                                                                                totalKhr: g.total_khr
-                                                                                            },
-                                                                                            exchangeRateUsed: g.orders.find(o => o.exchange_rate_used != null)?.exchange_rate_used,
-                                                                                            orderNotes: g.orders.find(o => o.notes)?.notes || undefined,
-                                                                                            isCopy: true,
-                                                                                        });
+                                                                                    if (restaurant && reprintingId !== g.id) {
+                                                                                        setReprintingId(g.id);
+                                                                                        try {
+                                                                                            const allItems = combineOrderItems(g.orders.flatMap(o => orderDetails[o.id] || []));
+                                                                                            const { payments, cashierName } = await loadReprintExtras(g);
+                                                                                            printReceipt({
+                                                                                                restaurant,
+                                                                                                orderId: g.id,
+                                                                                                tableId: g.table_id || undefined,
+                                                                                                customerName: undefined,
+                                                                                                customerPhone: undefined,
+                                                                                                cashierName,
+                                                                                                items: allItems,
+                                                                                                payments,
+                                                                                                totals: {
+                                                                                                    subtotalCents: g.total_usd - g.total_vat - g.total_plt,
+                                                                                                    vatCents: g.total_vat,
+                                                                                                    pltCents: g.total_plt,
+                                                                                                    totalUsdCents: g.total_usd,
+                                                                                                    totalKhr: g.total_khr
+                                                                                                },
+                                                                                                exchangeRateUsed: g.orders.find(o => o.exchange_rate_used != null)?.exchange_rate_used,
+                                                                                                orderNotes: g.orders.find(o => o.notes)?.notes || undefined,
+                                                                                                isCopy: true,
+                                                                                            });
+                                                                                        } finally {
+                                                                                            setReprintingId(null);
+                                                                                        }
                                                                                     }
                                                                                 }}
-                                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
+                                                                                disabled={reprintingId === g.id}
+                                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50"
                                                                             >
-                                                                                <ReceiptText size={12} />
+                                                                                {reprintingId === g.id ? <Loader2 size={12} className="animate-spin" /> : <ReceiptText size={12} />}
                                                                                 {t('printMasterReceipt')}
                                                                             </button>
                                                                             )}
@@ -1643,7 +1696,7 @@ export default function HistoryPage() {
                                                                                         {o.exchange_rate_used != null ? (
                                                                                             <span className="font-mono opacity-70">$1 = {Math.round(o.exchange_rate_used).toLocaleString()}&#x17DB;</span>
                                                                                         ) : (
-                                                                                            <span className="font-mono opacity-40">Rate: N/A</span>
+                                                                                            <span className="font-mono opacity-40">{t('rateNa')}</span>
                                                                                         )}
                                                                                         <span>{new Date(o.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                                                     </div>
@@ -1679,7 +1732,7 @@ export default function HistoryPage() {
                                                                                                             </span>
                                                                                                             <p className="text-xs font-black text-[var(--foreground)] leading-tight truncate">{lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}</p>
                                                                                                         </div>
-                                                                                                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-widest mt-0.5">{formatUsd(item.price_at_order)} / unit</p>
+                                                                                                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-70 uppercase tracking-widest mt-0.5">{formatUsd(item.price_at_order)} {t('perUnit')}</p>
                                                                                                     </div>
                                                                                                 </div>
                                                                                                 <div className="text-right flex-shrink-0">
@@ -1711,10 +1764,16 @@ export default function HistoryPage() {
                 ) : (
                     /* ── Receipt Grid View ── */
                     filtered.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-24 gap-3 opacity-30">
-                            <ReceiptText size={36} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('noMatchingTransactions')}</span>
-                        </div>
+                        loading ? (
+                            <div className="flex items-center justify-center py-24">
+                                <RefreshCw size={24} className="animate-spin opacity-20" />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-24 gap-3 opacity-30">
+                                <ReceiptText size={36} />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('noMatchingTransactions')}</span>
+                            </div>
+                        )
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
                             {filtered.map(g => {
@@ -1741,7 +1800,7 @@ export default function HistoryPage() {
                                                     className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border"
                                                     style={{ background: style.bg, color: style.text, borderColor: style.border }}
                                                 >
-                                                    {g.status === 'void' ? 'VOID / មោឃៈ' : ['hold', 'pending_payment'].includes(g.status) ? 'HOLD' : t(g.status as TranslationKey)}
+                                                    {g.status === 'void' ? 'VOID / មោឃៈ' : ['hold', 'pending_payment'].includes(g.status) ? t('hold') : t(g.status as TranslationKey)}
                                                 </span>
                                                 {g.table_id ? (
                                                     <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/25 text-[var(--accent)] uppercase tracking-widest">
@@ -1760,11 +1819,11 @@ export default function HistoryPage() {
                                             <div className="flex items-center gap-1.5 mt-1 text-[var(--text-secondary)] opacity-50">
                                                 <Clock size={10} />
                                                 <span className="text-[10px] font-mono font-bold">
-                                                    {dt.toLocaleDateString()} · {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    {dt.toLocaleDateString('en-GB')} · {dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </div>
                                             <div className="mt-2 text-[9px] font-black opacity-30 uppercase tracking-[0.1em]">
-                                                {g.orders.length} Rounds
+                                                {g.orders.length} {t('roundLabel')}
                                             </div>
                                         </div>
 
@@ -1786,7 +1845,7 @@ export default function HistoryPage() {
                                                                             {lang === 'km' && item.product_khmer ? item.product_khmer : item.product_name}
                                                                         </span>
                                                                         <span className="text-[9px] font-mono opacity-40 mt-0.5">
-                                                                            {formatUsd(item.price_at_order)} / unit
+                                                                            {formatUsd(item.price_at_order)} {t('perUnit')}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -1797,7 +1856,7 @@ export default function HistoryPage() {
                                                         </div>
                                                     )).concat(items.length > 10 ? [
                                                         <div key="more" className="text-center pt-2 text-[9px] font-black uppercase opacity-30">
-                                                            + {items.length - 10} more items
+                                                            + {items.length - 10} {t('moreItems')}
                                                         </div>
                                                     ] : [])
                                                 )
@@ -1891,33 +1950,38 @@ export default function HistoryPage() {
                                             )}
                                             <button
                                                 onClick={async () => {
-                                                    if (restaurant && isLoaded) {
-                                                        const { payments, cashierName } = await loadReprintExtras(g);
-                                                        printReceipt({
-                                                            restaurant,
-                                                            orderId: g.id,
-                                                            tableId: g.table_id || undefined,
-                                                            customerName: undefined,
-                                                            customerPhone: undefined,
-                                                            cashierName,
-                                                            items,
-                                                            payments,
-                                                            totals: {
-                                                                subtotalCents: g.total_usd,
-                                                                vatCents: 0,
-                                                                pltCents: 0,
-                                                                totalUsdCents: g.total_usd,
-                                                                totalKhr: g.total_khr
-                                                            },
-                                                            exchangeRateUsed: g.orders.find(o => o.exchange_rate_used != null)?.exchange_rate_used,
-                                                            isCopy: true,
-                                                        });
+                                                    if (restaurant && isLoaded && reprintingId !== g.id) {
+                                                        setReprintingId(g.id);
+                                                        try {
+                                                            const { payments, cashierName } = await loadReprintExtras(g);
+                                                            printReceipt({
+                                                                restaurant,
+                                                                orderId: g.id,
+                                                                tableId: g.table_id || undefined,
+                                                                customerName: undefined,
+                                                                customerPhone: undefined,
+                                                                cashierName,
+                                                                items,
+                                                                payments,
+                                                                totals: {
+                                                                    subtotalCents: g.total_usd - g.total_vat - g.total_plt,
+                                                                    vatCents: g.total_vat,
+                                                                    pltCents: g.total_plt,
+                                                                    totalUsdCents: g.total_usd,
+                                                                    totalKhr: g.total_khr
+                                                                },
+                                                                exchangeRateUsed: g.orders.find(o => o.exchange_rate_used != null)?.exchange_rate_used,
+                                                                isCopy: true,
+                                                            });
+                                                        } finally {
+                                                            setReprintingId(null);
+                                                        }
                                                     }
                                                 }}
-                                                disabled={!isLoaded || !restaurant || g.status === 'void'}
+                                                disabled={!isLoaded || !restaurant || g.status === 'void' || reprintingId === g.id}
                                                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed h-9"
                                             >
-                                                <Printer size={11} strokeWidth={2.5} />
+                                                {reprintingId === g.id ? <Loader2 size={11} className="animate-spin" /> : <Printer size={11} strokeWidth={2.5} />}
                                                 {t('printReceipt')}
                                             </button>
                                         </div>
@@ -1930,32 +1994,15 @@ export default function HistoryPage() {
             )}
 
             {/* Close Daily Report confirmation modal */}
-            {showCloseReportConfirm && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
-                    <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
-                        <h3 className="text-sm font-black text-[var(--accent)] uppercase tracking-widest">
-                            {t('closeReportConfirmTitle')}
-                        </h3>
-                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                            {t('closeReportConfirmMsg')}
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setShowCloseReportConfirm(false)}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
-                            >
-                                {t('cancel')}
-                            </button>
-                            <button
-                                onClick={confirmCloseReport}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-[var(--accent)] text-black hover:brightness-110 transition-all"
-                            >
-                                {t('confirm')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmDialog
+                open={showCloseReportConfirm}
+                title={t('closeReportConfirmTitle')}
+                message={t('closeReportConfirmMsg')}
+                confirmLabel={t('confirm')}
+                cancelLabel={t('cancel')}
+                onConfirm={confirmCloseReport}
+                onCancel={() => setShowCloseReportConfirm(false)}
+            />
 
             {exportToast && (
                 <div className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm font-bold pointer-events-none transition-all ${exportToast.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>

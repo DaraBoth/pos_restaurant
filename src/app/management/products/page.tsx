@@ -28,7 +28,9 @@ export default function ProductsManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
     const [exchangeRate, setExchangeRate] = useState(0);
-    const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'product' | 'category'; id: string; warning?: string } | null>(null);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'product' | 'category'; id: string; name: string; warning?: string } | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const [exportToast, setExportToast] = useState<{ msg: string; ok: boolean } | null>(null);
     const [exporting, setExporting] = useState(false);
     const exportToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,6 +44,8 @@ export default function ProductsManagement() {
 
     async function loadData() {
         if (!restaurantId) return;
+        setIsLoading(true);
+        setFetchError(null);
         try {
             const [cats, prods, rateData] = await Promise.all([
                 getCategories(restaurantId),
@@ -53,6 +57,9 @@ export default function ProductsManagement() {
             if (rateData?.rate) setExchangeRate(rateData.rate);
         } catch (e) {
             console.error(e);
+            setFetchError(t('error'));
+        } finally {
+            setIsLoading(false);
         }
     }
 
@@ -93,10 +100,12 @@ export default function ProductsManagement() {
 
     async function handleDeleteProduct(id: string) {
         if (!canDelete(user?.role) || !user?.id) {
-            alert('Permission denied: delete is only available to Admin roles.');
+            alert(t('permissionDeniedDelete'));
             return;
         }
-        setDeleteConfirm({ type: 'product', id });
+        const p = products.find(pr => pr.id === id);
+        const name = p ? (p.khmer_name ? `${p.name} (${p.khmer_name})` : p.name) : id;
+        setDeleteConfirm({ type: 'product', id, name });
     }
 
     async function confirmDeleteProduct(id: string) {
@@ -112,7 +121,7 @@ export default function ProductsManagement() {
 
     async function handleDeleteCategory(id: string) {
         if (!canDelete(user?.role) || !user?.id) {
-            alert('Permission denied: delete is only available to Admin roles.');
+            alert(t('permissionDeniedDelete'));
             return;
         }
         const getDescendantIds = (catId: string): string[] => {
@@ -130,7 +139,9 @@ export default function ProductsManagement() {
             alert(t('categoryHasChildren') ?? 'Cannot delete: this category still has sub-categories. Please delete or reassign them first.');
             return;
         }
-        setDeleteConfirm({ type: 'category', id });
+        const c = categories.find(cat => cat.id === id);
+        const name = c ? (c.khmer_name ? `${c.name} (${c.khmer_name})` : c.name) : id;
+        setDeleteConfirm({ type: 'category', id, name });
     }
 
     async function confirmDeleteCategory(id: string) {
@@ -250,15 +261,34 @@ export default function ProductsManagement() {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-[var(--bg-elevated)]">
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] w-12">Visual</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Product</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Category</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">Price / តម្លៃ</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">Actions</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] w-12">{t('visualCol')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('products')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('category')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('stockCol')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">{t('price')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">{t('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
-                                {filteredProducts.map(p => (
+                                {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td className="px-4 py-3"><div className="w-9 h-9 rounded-lg bg-white/[0.05]" /></td>
+                                        <td className="px-4 py-3"><div className="h-3 bg-white/[0.05] rounded w-28" /></td>
+                                        <td className="px-4 py-3"><div className="h-3 bg-white/[0.05] rounded w-20" /></td>
+                                        <td className="px-4 py-3"><div className="h-3 bg-white/[0.05] rounded w-10" /></td>
+                                        <td className="px-4 py-3"><div className="h-3 bg-white/[0.05] rounded w-14 ml-auto" /></td>
+                                        <td className="px-4 py-3"><div className="h-7 bg-white/[0.05] rounded w-16 ml-auto" /></td>
+                                    </tr>
+                                ))}
+                                {!isLoading && fetchError && (
+                                    <tr>
+                                        <td colSpan={7} className="px-4 py-10 text-center">
+                                            <p className="text-sm text-red-400 font-bold mb-2">{fetchError}</p>
+                                            <button onClick={loadData} className="text-xs text-[var(--accent-blue)] font-bold hover:underline">{t('retry')}</button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !fetchError && filteredProducts.map(p => (
                                     <tr key={p.id} className="hover:bg-white/[0.03] group transition-colors">
                                         {/* Image */}
                                         <td className="px-4 py-2.5">
@@ -294,6 +324,18 @@ export default function ProductsManagement() {
                                             </span>
                                         </td>
 
+                                        {/* Stock */}
+                                        <td className="px-4 py-2.5">
+                                            {p.stock_quantity == null ? (
+                                                <span className="text-xs text-[var(--text-secondary)] opacity-40">—</span>
+                                            ) : p.stock_quantity === 0 ? (
+                                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 uppercase tracking-wider">{t('outOfStock')}</span>
+                                            ) : p.stock_quantity <= 5 ? (
+                                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">{p.stock_quantity}</span>
+                                            ) : (
+                                                <span className="text-xs text-[var(--text-secondary)]">{p.stock_quantity}</span>
+                                            )}
+                                        </td>
                                         {/* Price */}
                                         <td className="px-4 py-2.5 text-right">
                                             <span className="font-mono font-bold text-sm text-[var(--accent)]">{formatUsd(p.price_cents)}</span>
@@ -318,17 +360,17 @@ export default function ProductsManagement() {
                                                     <Ban size={12} />
                                                     {p.sold_out_today ? t('unmarkSoldOut') : t('markSoldOut')}
                                                 </button>
-                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center gap-1.5">
                                                     <button
                                                         onClick={() => { setEditingProduct(p); setIsProductModalOpen(true); }}
-                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white text-white/50 transition-all"
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white text-white/50 transition-all"
                                                     >
                                                         <Edit3 size={13} />
                                                     </button>
                                                     {canDelete(user?.role) && (
                                                         <button
                                                             onClick={() => handleDeleteProduct(p.id)}
-                                                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
+                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
                                                         >
                                                             <Trash2 size={13} />
                                                         </button>
@@ -338,9 +380,9 @@ export default function ProductsManagement() {
                                         </td>
                                     </tr>
                                 ))}
-                                {filteredProducts.length === 0 && (
+                                {!isLoading && !fetchError && filteredProducts.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
+                                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
                                             {t('noProducts')}
                                         </td>
                                     </tr>
@@ -355,9 +397,9 @@ export default function ProductsManagement() {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-[var(--bg-elevated)]">
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Category Name</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">Products</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">Actions</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('categoryName')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('products')}</th>
+                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">{t('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
@@ -374,26 +416,26 @@ export default function ProductsManagement() {
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <span className="text-xs font-bold text-[var(--text-secondary)]">
-                                                {products.filter(p => p.category_id === c.id).length} items
+                                                {products.filter(p => p.category_id === c.id).length} {t('items')}
                                                 {categories.some(sub => sub.parent_id === c.id) && (
                                                     <span className="ml-2 text-[var(--accent)] opacity-70">
-                                                        · {categories.filter(sub => sub.parent_id === c.id).length} sub-cats
+                                                        · {categories.filter(sub => sub.parent_id === c.id).length} {t('subCatsCount')}
                                                     </span>
                                                 )}
                                             </span>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1.5">
                                                 <button
                                                     onClick={() => { setEditingCategory(c); setIsCategoryModalOpen(true); }}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white text-white/50 transition-all"
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white text-white/50 transition-all"
                                                 >
                                                     <Edit3 size={13} />
                                                 </button>
                                                 {canDelete(user?.role) && (
                                                     <button
                                                         onClick={() => handleDeleteCategory(c.id)}
-                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] border border-white/10 hover:bg-red-500 hover:border-red-500 hover:text-white text-white/50 transition-all"
                                                     >
                                                         <Trash2 size={13} />
                                                     </button>
@@ -405,7 +447,7 @@ export default function ProductsManagement() {
                                 {categories.length === 0 && (
                                     <tr>
                                         <td colSpan={3} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
-                                            {t('noProducts')}
+                                            {t('noCategories')}
                                         </td>
                                     </tr>
                                 )}
@@ -437,6 +479,9 @@ export default function ProductsManagement() {
                         <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">
                             {deleteConfirm.type === 'product' ? t('deleteProduct') : t('deleteCategory')}
                         </h3>
+                        <p className="text-sm font-bold text-[var(--foreground)] truncate" title={deleteConfirm.name}>
+                            &quot;{deleteConfirm.name}&quot;
+                        </p>
                         <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                             {t('deleteCannotUndo')}
                         </p>

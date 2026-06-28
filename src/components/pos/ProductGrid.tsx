@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getProducts, getCategories } from '@/lib/api/products';
 import { getOrderItems } from '@/lib/api/orders';
 import { useOrder } from '@/providers/OrderProvider';
@@ -32,29 +32,37 @@ export default function ProductGrid() {
     const [qtyModalProduct, setQtyModalProduct] = useState<Product | null>(null);
     const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
     const [modifierPickerProduct, setModifierPickerProduct] = useState<Product | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const soldOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { orderId, tableId, setOrderId, setItems, addToLocalCart, exchangeRate, rateIsDefault } = useOrder();
     const { user, licenseExpiredPending } = useAuth();
     const { t, lang } = useLanguage();
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const [cats, prods, tops] = await Promise.all([
-                    getCategories(user?.restaurant_id || undefined),
-                    getProducts(undefined, user?.restaurant_id || undefined),
-                    getTopProducts('month', user?.restaurant_id || undefined)
-                ]);
-                setCategories(cats);
-                setAllProducts(prods);
-                setTopProducts(tops);
-            } catch (e) {
-                console.error(e);
-            }
+    const load = useCallback(async () => {
+        setLoadError(false);
+        setIsLoading(true);
+        try {
+            const [cats, prods, tops] = await Promise.all([
+                getCategories(user?.restaurant_id || undefined),
+                getProducts(undefined, user?.restaurant_id || undefined),
+                getTopProducts('month', user?.restaurant_id || undefined)
+            ]);
+            setCategories(cats);
+            setAllProducts(prods);
+            setTopProducts(tops);
+        } catch (e) {
+            console.error(e);
+            setLoadError(true);
+        } finally {
+            setIsLoading(false);
         }
-        load();
     }, [user?.restaurant_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        load();
+    }, [load]);
 
     useEffect(() => {
         if (!orderId) return;
@@ -76,10 +84,10 @@ export default function ProductGrid() {
             showSoldOutToast(product.id);
             return false;
         }
-        // Stock-based sold-out gate is intentionally NOT applied here: the legacy
-        // products.stock_quantity column is NOT NULL DEFAULT 0, so every product
-        // reads as 0 and was wrongly blocked as "sold out". It is re-enabled once
-        // the nullable stock_quantity migration (task 3e9cf8ae) + stock UI land.
+        if (product.stock_quantity != null && product.stock_quantity <= 0) {
+            showSoldOutToast(product.id);
+            return false;
+        }
         return true;
     }
 
@@ -233,7 +241,7 @@ export default function ProductGrid() {
                         <div className="mt-1.5 space-y-1">
                             {/* Breadcrumb */}
                             <div className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)]">
-                                <button onClick={() => setSelectedCategory(null)} className="hover:text-[var(--foreground)] transition-colors">All</button>
+                                <button onClick={() => setSelectedCategory(null)} className="hover:text-[var(--foreground)] transition-colors">{t('allCategories')}</button>
                                 {path.map((cat, i) => (
                                     <span key={cat.id} className="flex items-center gap-1">
                                         <span className="opacity-40">/</span>
@@ -272,7 +280,24 @@ export default function ProductGrid() {
 
             {/* Product Grid */}
             <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
-                {filteredProducts.length === 0 ? (
+                {isLoading ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+                        {Array.from({ length: 12 }).map((_, i) => (
+                            <div key={i} className="aspect-square rounded-xl bg-[var(--bg-elevated)] animate-pulse" />
+                        ))}
+                    </div>
+                ) : loadError ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-3">
+                        <AlertTriangle size={32} className="text-red-400 opacity-70" />
+                        <p className="text-sm font-semibold text-[var(--text-secondary)]">{t('genericError')}</p>
+                        <button
+                            onClick={load}
+                            className="text-xs font-bold text-[var(--accent)] underline underline-offset-2"
+                        >
+                            {t('retry')}
+                        </button>
+                    </div>
+                ) : filteredProducts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 gap-3 opacity-30">
                         <ShoppingBag size={40} className="text-[var(--text-secondary)]" />
                         <p className="text-sm font-semibold text-[var(--text-secondary)]">
@@ -285,11 +310,9 @@ export default function ProductGrid() {
                             const isAdding = addingId === product.id;
                             const unavailable = product.is_available === 0;
                             const soldOutToday = !unavailable && !!product.sold_out_today;
-                            // Stock-based sold-out is disabled until the nullable stock_quantity
-                            // migration (task 3e9cf8ae) lands — the legacy NOT NULL DEFAULT 0
-                            // column made every product read as sold out (bug 10287e2e).
-                            const isSoldOut = false;
-                            const isBlocked = unavailable || soldOutToday;
+                            const stockSoldOut = !unavailable && !soldOutToday && product.stock_quantity != null && product.stock_quantity <= 0;
+                            const isSoldOut = soldOutToday || stockSoldOut;
+                            const isBlocked = unavailable || isSoldOut;
                             const showingToast = soldOutToastId === product.id;
                             const cardColor = CARD_COLORS[idx % CARD_COLORS.length];
                             const displayName = lang === 'km' ? (product.khmer_name || product.name) : product.name;
@@ -380,7 +403,7 @@ export default function ProductGrid() {
                                                 title={t('enterQuantity')}
                                                 onClick={(e) => { e.stopPropagation(); openQuantityModal(product); }}
                                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openQuantityModal(product); } }}
-                                                className="absolute bottom-1.5 left-1.5 w-7 h-7 rounded-full bg-black/55 hover:bg-[var(--accent)] text-white flex items-center justify-center shadow-lg z-10 transition-colors cursor-pointer"
+                                                className="absolute bottom-1.5 left-1.5 w-11 h-11 rounded-full bg-black/55 hover:bg-[var(--accent)] text-white flex items-center justify-center shadow-lg z-10 transition-colors cursor-pointer"
                                             >
                                                 <PlusCircle size={15} strokeWidth={2.5} />
                                             </span>
@@ -420,7 +443,7 @@ export default function ProductGrid() {
                                         </p>
                                         {exchangeRate > 0 && !rateIsDefault && (
                                             <p className="text-[10px] text-white/40 font-mono leading-tight">
-                                                ≈ {formatKhr(roundKhr(Math.round(product.price_cents / 100 * exchangeRate)))}
+                                                ≈ {formatKhr(roundKhr(product.price_cents, exchangeRate))}
                                             </p>
                                         )}
                                     </div>

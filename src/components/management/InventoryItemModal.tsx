@@ -115,12 +115,12 @@ export default function InventoryItemModal({ isOpen, onClose, onSave, item }: In
                 {/* Khmer Name */}
                 <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-widest">
-                        Khmer Name
+                        {t('khmerName')}
                     </label>
                     <input
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
-                        placeholder="អង្ករម្លិះ"
+                        placeholder={t('phKhmerStockItemExample')}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] font-semibold khmer placeholder:text-[var(--text-secondary)]/50 focus:border-emerald-500 outline-none transition-all"
                     />
                 </div>

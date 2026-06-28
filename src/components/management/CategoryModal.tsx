@@ -91,7 +91,7 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
                         value={khmerName}
                         onChange={e => setKhmerName(e.target.value)}
                         className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent)] outline-none transition-all khmer"
-                        placeholder="ភេសជ្ជៈ"
+                        placeholder={t('phCategoryExample')}
                     />
                 </div>
 

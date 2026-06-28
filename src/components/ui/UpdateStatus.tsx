@@ -18,7 +18,7 @@ type UpdateState =
 
 const DOWNLOAD_STALL_MS = 30_000;
 
-export function UpdateStatus() {
+export function UpdateStatus({ collapsed = false }: { collapsed?: boolean }) {
     const { t } = useLanguage();
     const [state, setState] = useState<UpdateState>('idle');
     const [latestVersion, setLatestVersion] = useState('');
@@ -194,6 +194,39 @@ export function UpdateStatus() {
         setState('pending-restart');
     }
 
+    // ─── Collapsed compact icons ──────────────────────────────────────────────
+
+    if (collapsed) {
+        if (state === 'available') {
+            return (
+                <button
+                    type="button"
+                    onClick={install}
+                    className="flex items-center justify-center w-full py-1 cursor-pointer"
+                    title={`Update to v${latestVersion}`}
+                >
+                    <span className="relative flex-shrink-0">
+                        <span className="block w-2.5 h-2.5 rounded-full bg-amber-400" />
+                        <span className="absolute inset-0 rounded-full bg-amber-400 opacity-50 animate-ping" />
+                    </span>
+                </button>
+            );
+        }
+        if (state === 'pending-restart') {
+            return (
+                <button
+                    type="button"
+                    onClick={restartNow}
+                    className="flex items-center justify-center w-full py-1 cursor-pointer"
+                    title={`Restart to apply v${latestVersion}`}
+                >
+                    <span className="block w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                </button>
+            );
+        }
+        return null;
+    }
+
     // ─── Sidebar pill (renders inline where UpdateStatus is mounted) ──────────
 
     let pill: React.ReactElement | null = null;
@@ -224,11 +257,11 @@ export function UpdateStatus() {
                     <button
                         type="button"
                         onClick={() => setDismissed(latestVersion)}
-                        className="ml-0.5 p-0.5 rounded text-amber-400/60 hover:text-amber-300 hover:bg-amber-400/10 transition-colors flex-shrink-0"
+                        className="ml-0.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded text-amber-400/60 hover:text-amber-300 hover:bg-amber-400/10 transition-colors flex-shrink-0"
                         title="Dismiss"
                         aria-label="Dismiss update"
                     >
-                        <X size={10} />
+                        <X size={12} />
                     </button>
                 </div>
                 {errorMsg && (

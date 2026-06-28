@@ -25,10 +25,20 @@ pub async fn get_tables(
                 ) THEN 'busy'
                 ELSE 'available'
             END AS status,
-            COALESCE(ft.zone, 'Main') AS zone
+            COALESCE(ft.zone, 'Main') AS zone,
+            ao.total_usd AS order_total_usd_cents,
+            (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = ao.id AND oi.quantity > 0) AS item_count,
+            ao.created_at AS opened_at
          FROM floor_tables ft
+         LEFT JOIN orders ao ON (
+             ao.table_id = ft.name
+             AND ao.restaurant_id = ft.restaurant_id
+             AND ao.status IN ('open', 'pending_payment')
+             AND ao.is_deleted = 0
+         )
          WHERE ft.is_deleted = 0
            AND (ft.restaurant_id = ?1 OR ?1 IS NULL)
+         GROUP BY ft.id
          ORDER BY ft.zone, ft.name";
 
     let mut rows = pool.query(sql, params![restaurant_id])
@@ -43,6 +53,9 @@ pub async fn get_tables(
             seat_count: row.get::<i64>(2).unwrap_or(4),
             status: row.get::<String>(3).unwrap_or_default(),
             zone: row.get::<String>(4).unwrap_or_else(|_| "Main".to_string()),
+            order_total_usd_cents: row.get::<i64>(5).ok(),
+            item_count: row.get::<i64>(6).ok(),
+            opened_at: row.get::<String>(7).ok(),
         });
     }
 
@@ -82,6 +95,9 @@ pub async fn create_table(
         status: "available".to_string(),
         seat_count: seats,
         zone: zone_val,
+        order_total_usd_cents: None,
+        item_count: None,
+        opened_at: None,
     })
 }
 

@@ -136,6 +136,7 @@ pub fn run() {
             commands::auth::change_password,
             commands::auth::set_user_pin,
             commands::auth::login_with_pin,
+            commands::auth::reset_window_title,
             commands::auth::unlock_user,
             commands::restaurant::get_restaurant,
             commands::restaurant::get_setup_status,

@@ -95,7 +95,7 @@ export default function ExchangeRateManagement() {
                         <div className="text-3xl font-black font-mono text-blue-400">
                             {rate ? formatKhr(rate.rate).replace('៛', '') : '---'}
                         </div>
-                        <span className="text-base font-black text-[var(--text-secondary)]">KHR</span>
+                        <span className="text-base font-black text-[var(--text-secondary)]">៛</span>
                     </div>
                     <p className="text-xs font-medium text-[var(--text-secondary)] relative z-10">
                         {t('perUsd')}
@@ -155,10 +155,10 @@ export default function ExchangeRateManagement() {
                             <div>
                                 <p className="font-black text-sm text-amber-300 mb-1">{t('rateChangeWarningTitle')}</p>
                                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                                    <span className="font-bold text-amber-300">{rateWarning.count}</span>{' '}
-                                    completed order{rateWarning.count !== 1 ? 's' : ''} today used{' '}
-                                    <span className="font-bold text-amber-300">{formatKhr(rateWarning.oldRate)}</span>{' '}
-                                    per USD. {t('rateChangeWarningBody')}
+                                    {t('rateChangeOrdersUsed')
+                                        .replace('{count}', String(rateWarning.count))
+                                        .replace('{rate}', formatKhr(rateWarning.oldRate))}{' '}
+                                    {t('rateChangeWarningBody')}
                                 </p>
                             </div>
                         </div>

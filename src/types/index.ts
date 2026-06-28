@@ -129,7 +129,7 @@ export interface Product {
     category_khmer?: string;
     ingredients: ProductIngredient[];
     created_at: string;
-    stock_quantity?: number;
+    stock_quantity?: number | null;
     sku?: string;
     sold_out_today?: boolean;
     description?: string;
@@ -148,6 +148,12 @@ export interface FloorTable {
     seat_count: number;
     /** Zone label e.g. 'Main', 'VIP', 'Garden' */
     zone: string;
+    /** USD cents total of the active open/waiting order — null when table is free */
+    order_total_usd_cents?: number | null;
+    /** Number of line items in the active order */
+    item_count?: number | null;
+    /** ISO timestamp when the active order was created */
+    opened_at?: string | null;
 }
 
 // --------------- Orders ---------------
@@ -253,6 +259,7 @@ export interface KitchenOrder {
     table_id?: string;
     notes?: string;
     created_at: string;
+    takeout_counter?: number | null;
     items: KitchenOrderItem[];
 }
 

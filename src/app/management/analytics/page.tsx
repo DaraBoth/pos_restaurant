@@ -5,7 +5,8 @@ import { getRevenueSummary, getRevenueByPeriod, getTopProducts, getRevenueByCate
 import { useAuth } from '@/providers/AuthProvider';
 import { RevenueSummary, RevenueByDay, TopProduct, CategoryRevenue, PeakHour } from '@/types';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { formatUsd } from '@/lib/currency';
+import { formatUsd, formatKhr, roundKhr } from '@/lib/currency';
+import { getExchangeRate } from '@/lib/api/system';
 import { TrendingUp, ShoppingBag, DollarSign, Clock, AlertTriangle, Flame, PieChart, RefreshCw } from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 
@@ -69,6 +70,7 @@ export default function AnalyticsPage() {
     const [slowMoversThreshold, setSlowMoversThreshold] = useState<number>(() => readSlowMoversConfig().threshold);
     const [slowMoversDays, setSlowMoversDays] = useState<number>(() => readSlowMoversConfig().days);
 
+    const [exchangeRate, setExchangeRate] = useState<number>(4100);
     const [period, setPeriod] = useState<Period>('month');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -102,18 +104,20 @@ export default function AnalyticsPage() {
             setLoading(true);
             setError('');
             try {
-                const [s, d, tp, cr, ph] = await Promise.all([
+                const [s, d, tp, cr, ph, er] = await Promise.all([
                     getRevenueSummary(restaurantId || undefined),
                     getRevenueByPeriod(period, restaurantId || undefined),
                     getTopProducts(period, restaurantId || undefined),
                     getRevenueByCategory(period, restaurantId || undefined),
                     getPeakHours(period, restaurantId || undefined),
+                    getExchangeRate(restaurantId || undefined).catch(() => null),
                 ]);
                 setSummary(s);
                 setChartData(d);
                 setTopProducts(tp);
                 setCategoryRevenue(cr);
                 setPeakHours(ph);
+                if (er) setExchangeRate(er.rate);
                 setLastUpdatedAt(new Date().toLocaleTimeString());
             } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
@@ -145,6 +149,7 @@ export default function AnalyticsPage() {
         {
             label: t('todayRevenue'),
             value: formatUsd(summary.today_usd),
+            khr: formatKhr(roundKhr(summary.today_usd, exchangeRate)),
             sub: `${summary.today_orders} ${t('orders')}`,
             icon: DollarSign,
             color: 'text-green-400',
@@ -153,6 +158,7 @@ export default function AnalyticsPage() {
         {
             label: t('monthRevenue'),
             value: formatUsd(summary.month_usd),
+            khr: formatKhr(roundKhr(summary.month_usd, exchangeRate)),
             sub: `${summary.month_orders} ${t('orders')}`,
             icon: TrendingUp,
             color: 'text-blue-400',
@@ -161,6 +167,7 @@ export default function AnalyticsPage() {
         {
             label: t('yearRevenue'),
             value: formatUsd(summary.year_usd),
+            khr: formatKhr(roundKhr(summary.year_usd, exchangeRate)),
             sub: `${summary.year_orders} ${t('orders')}`,
             icon: ShoppingBag,
             color: 'text-purple-400',
@@ -169,6 +176,7 @@ export default function AnalyticsPage() {
         {
             label: t('openOrders'),
             value: String(summary.open_orders),
+            khr: null,
             sub: t('activeNow'),
             icon: Clock,
             color: 'text-orange-400',
@@ -239,6 +247,7 @@ export default function AnalyticsPage() {
                                     </div>
                                 </div>
                                 <p className="text-2xl font-black font-mono text-[var(--foreground)] tracking-tight leading-none">{card.value}</p>
+                                {card.khr && <p className="text-xs font-mono text-[var(--text-secondary)] opacity-70 mt-0.5">{card.khr}</p>}
                                 <p className={`text-[9px] font-bold uppercase tracking-[0.2em] mt-2 opacity-60 ${card.color}`}>{card.sub}</p>
                             </div>
                         ))}
@@ -338,7 +347,7 @@ export default function AnalyticsPage() {
                                     <Flame size={16} className="text-orange-400" />
                                 </div>
                                 <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
-                                    Top Products
+                                    {t('topProducts')}
                                 </h3>
                             </div>
                             <div className="space-y-3">
@@ -352,11 +361,11 @@ export default function AnalyticsPage() {
                                         </div>
                                         <div className="text-right">
                                             <div className="font-mono font-black text-sm text-[var(--accent-green)] leading-none mb-1">{formatUsd(p.total_revenue)}</div>
-                                            <div className="text-[9px] text-[var(--text-secondary)] font-bold uppercase tracking-[0.2em] opacity-60">{p.order_count} Sold</div>
+                                            <div className="text-[9px] text-[var(--text-secondary)] font-bold uppercase tracking-[0.2em] opacity-60">{p.order_count} {t('soldSuffix')}</div>
                                         </div>
                                     </div>
                                 ))}
-                                {topProducts.length === 0 && <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center py-6 opacity-40">No data</div>}
+                                {topProducts.length === 0 && <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center py-6 opacity-40">{t('noData')}</div>}
                             </div>
                         </div>
 
@@ -367,7 +376,7 @@ export default function AnalyticsPage() {
                                     <PieChart size={16} className="text-blue-400" />
                                 </div>
                                 <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
-                                    Revenue By Category
+                                    {t('revenueByCategory')}
                                 </h3>
                             </div>
                             <div className="space-y-3">
@@ -377,7 +386,7 @@ export default function AnalyticsPage() {
                                         <div className="font-mono font-black text-sm text-[var(--accent-blue)]">{formatUsd(c.total_revenue)}</div>
                                     </div>
                                 ))}
-                                {categoryRevenue.length === 0 && <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center py-6 opacity-40">No data</div>}
+                                {categoryRevenue.length === 0 && <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center py-6 opacity-40">{t('noData')}</div>}
                             </div>
                         </div>
 
@@ -388,7 +397,7 @@ export default function AnalyticsPage() {
                                     <Clock size={16} className="text-purple-400" />
                                 </div>
                                 <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
-                                    Peak Ordering Hours
+                                    {t('peakOrderingHours')}
                                 </h3>
                             </div>
                              <div className="flex gap-1.5 h-36 mt-4">
@@ -410,7 +419,7 @@ export default function AnalyticsPage() {
                                              </div>
                                          )
                                      });
-                                 })() : <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center w-full py-6 opacity-40">No data</div>}
+                                 })() : <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] text-center w-full py-6 opacity-40">{t('noData')}</div>}
                              </div>
                         </div>
 
@@ -421,7 +430,7 @@ export default function AnalyticsPage() {
                                     <AlertTriangle size={16} className="text-rose-400" />
                                 </div>
                                 <h3 className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">
-                                    Slow Movers
+                                    {t('slowMovers')}
                                 </h3>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 mb-5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">
@@ -448,12 +457,12 @@ export default function AnalyticsPage() {
                                     <div key={sm.id} className="flex items-center justify-between p-3.5 bg-rose-500/10 rounded-xl border border-rose-500/20">
                                         <div className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wide">{sm.name}</div>
                                         <div className="text-right flex flex-col gap-0.5">
-                                            <div className="font-mono font-black text-sm text-rose-400 leading-none">{sm.order_count} Sold</div>
-                                            <div className="text-[9px] text-rose-400/60 font-bold uppercase tracking-[0.2em]">Action Needed</div>
+                                            <div className="font-mono font-black text-sm text-rose-400 leading-none">{sm.order_count} {t('soldSuffix')}</div>
+                                            <div className="text-[9px] text-rose-400/60 font-bold uppercase tracking-[0.2em]">{t('actionNeeded')}</div>
                                         </div>
                                     </div>
                                 ))}
-                                {slowMovers.length === 0 && <div className="text-[10px] text-[var(--accent-green)] font-black uppercase tracking-[0.2em] text-center p-6 bg-[var(--accent-green)]/10 rounded-xl border border-[var(--accent-green)]/20 shadow-inner">All products are selling well!</div>}
+                                {slowMovers.length === 0 && <div className="text-[10px] text-[var(--accent-green)] font-black uppercase tracking-[0.2em] text-center p-6 bg-[var(--accent-green)]/10 rounded-xl border border-[var(--accent-green)]/20 shadow-inner">{t('allSellingWell')}</div>}
                             </div>
                         </div>
 

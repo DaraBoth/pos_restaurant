@@ -76,7 +76,7 @@ pub struct Product {
     pub category_khmer: Option<String>,
     pub ingredients: Vec<ProductIngredient>,
     pub created_at: String,
-    pub stock_quantity: i64,
+    pub stock_quantity: Option<i64>,
     pub sku: Option<String>,
     pub sold_out_today: i64,
     pub description: Option<String>,
@@ -141,6 +141,9 @@ pub struct FloorTable {
     pub status: String,
     pub seat_count: i64,
     pub zone: String,
+    pub order_total_usd_cents: Option<i64>,
+    pub item_count: Option<i64>,
+    pub opened_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -290,6 +293,7 @@ pub struct KitchenOrder {
     pub table_id: Option<String>,
     pub notes: Option<String>,
     pub created_at: String,
+    pub takeout_counter: Option<i64>,
     pub items: Vec<KitchenOrderItem>,
 }
 

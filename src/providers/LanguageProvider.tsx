@@ -23,6 +23,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         if (stored === 'km' || stored === 'en') setLangState(stored);
     }, []);
 
+    useEffect(() => {
+        if (typeof document !== 'undefined') {
+            document.documentElement.lang = lang;
+        }
+    }, [lang]);
+
     const setLang = useCallback((l: Lang) => {
         setLangState(l);
         localStorage.setItem('khpos_lang', l);

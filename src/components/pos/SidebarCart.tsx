@@ -49,6 +49,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
     const [resumingId, setResumingId] = useState<string | null>(null);
     const [pendingResume, setPendingResume] = useState<HeldOrderSummary | null>(null);
     const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+    const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const roundsScrollRef = useRef<HTMLDivElement>(null);
 
     const scrollRounds = (dir: 'left' | 'right') => {
@@ -479,8 +481,8 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start gap-1 mb-1">
                                         <div className="min-w-0">
-                                            <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${item.khmerName ? 'khmer' : ''}`}>
-                                                {item.productName}
+                                            <p className={`text-sm font-bold text-[var(--foreground)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
+                                                {lang === 'km' ? (item.khmerName || item.productName) : item.productName}
                                             </p>
                                             {variantLabel && (
                                                 <p className={`text-[11px] font-semibold text-[var(--accent-blue)] truncate leading-tight ${lang === 'km' ? 'khmer' : ''}`}>
@@ -626,13 +628,41 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                                 <span className="text-sm font-bold font-mono text-[var(--accent-green)]">
                                                     {formatUsd(item.price_at_order * item.quantity)}
                                                 </span>
-                                                <button
-                                                    onClick={() => void handleCommittedQtySet(item.id, '0', item.quantity)}
-                                                    className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                    title={t('removeItem')}
-                                                >
-                                                    <X size={13} strokeWidth={2.5} />
-                                                </button>
+                                                {removingItemId === item.id ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+                                                                setRemovingItemId(null);
+                                                                void handleCommittedQtySet(item.id, '0', item.quantity);
+                                                            }}
+                                                            className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white hover:bg-red-600 transition-colors"
+                                                        >
+                                                            ✓
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+                                                                setRemovingItemId(null);
+                                                            }}
+                                                            className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setRemovingItemId(item.id);
+                                                            if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+                                                            removeTimerRef.current = setTimeout(() => setRemovingItemId(null), 2000);
+                                                        }}
+                                                        className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                        title={t('removeItem')}
+                                                    >
+                                                        <X size={13} strokeWidth={2.5} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                         {item.note && (
@@ -731,6 +761,12 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                 {orderId ? formatUsd(totals.subtotalCents) : formatUsd(localCartTotalCents)}
                             </span>
                         </div>
+                        {orderId && totals.vatCents > 0 && (
+                            <div className="flex justify-between">
+                                <span>{t('vat')}</span>
+                                <span className="font-mono text-sm text-[var(--foreground)]">{formatUsd(totals.vatCents)}</span>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -926,7 +962,7 @@ export default function SidebarCart({ onCheckout, onHold, isTakeout }: { onCheck
                                                 {held.customer_name || held.table_id || (held.takeout_counter != null ? `#${held.takeout_counter}` : held.id.slice(0, 6).toUpperCase())}
                                             </p>
                                             <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
-                                                {held.item_count} {t('items') || 'items'} · ${(held.total_usd / 100).toFixed(2)} · {minsAgo}m {t('ago') || 'ago'}
+                                                {held.item_count} {t('items')} · {formatUsd(held.total_usd)} · {minsAgo}m {t('ago')}
                                             </p>
                                         </div>
                                         <button

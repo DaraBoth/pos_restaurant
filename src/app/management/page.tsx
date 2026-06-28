@@ -5,7 +5,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import {
     TrendingUp, Package, LayoutGrid,
-    Users, ClipboardList, Layers, BoxesIcon
+    Users, ClipboardList, Layers, BoxesIcon, LayoutDashboard
 } from 'lucide-react';
 import type { TranslationKey } from '@/lib/i18n';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
@@ -18,8 +18,9 @@ import UsersView from './views/UsersView';
 import OrdersView from './views/OrdersView';
 import CategoriesView from './views/CategoriesView';
 import InventoryView from './views/InventoryView';
+import DashboardView from './views/DashboardView';
 
-type Tab = 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'orders' | 'inventory';
+type Tab = 'dashboard' | 'analytics' | 'products' | 'categories' | 'tables' | 'users' | 'orders' | 'inventory';
 
 // Business types that NEVER use tables (no seating/floor plan needed)
 const NO_TABLE_TYPES = ['Mart/Accessories Shop/Pharmacy/Bakery'];
@@ -35,6 +36,7 @@ function needsTables(restaurant: Restaurant | null): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ALL_TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
+    { id: 'dashboard',  labelKey: 'dashboard',      icon: LayoutDashboard },
     { id: 'analytics',  labelKey: 'analytics',     icon: TrendingUp },
     { id: 'categories', labelKey: 'categories',     icon: Layers },
     { id: 'products',   labelKey: 'products',        icon: Package },
@@ -45,6 +47,7 @@ const ALL_TABS: { id: Tab; labelKey: TranslationKey; icon: any }[] = [
 ];
 
 const TAB_COMPONENTS: Record<Tab, React.FC> = {
+    dashboard:  DashboardView,
     analytics:  AnalyticsView,
     products:   ProductsView,
     categories: CategoriesView,
@@ -63,7 +66,7 @@ export default function ManagementPage() {
 }
 
 function ManagementContent() {
-    const [activeTab, setActiveTab] = useState<Tab>('analytics');
+    const [activeTab, setActiveTab] = useState<Tab>('dashboard');
     const { t } = useLanguage();
     const { user } = useAuth();
     const searchParams = useSearchParams();

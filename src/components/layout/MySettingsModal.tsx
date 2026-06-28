@@ -1,21 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-    X, User, Monitor, Globe, LogOut, Building2, Check, Edit2,
-    ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff, Download,
+import {
+    X, User, Monitor, Globe, Building2, Check, Edit2,
+    ArrowRightLeft, MapPin, Image, StickyNote, Info, CloudOff, Download, ExternalLink,
     Eye, EyeOff, Lock
 } from 'lucide-react';
 import { useAuth, getSessionTimeoutMs, SESSION_TIMEOUT_KEY } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useOrder } from '@/providers/OrderProvider';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
+import { roleI18nKey } from '@/lib/permissions';
+import type { TranslationKey } from '@/lib/i18n';
+import Toast from '@/components/ui/Toast';
 import { updateUser, changePassword } from '@/lib/api/auth';
-import { stopSync, getExchangeRate } from '@/lib/api/system';
+import { getExchangeRate } from '@/lib/api/system';
 import { formatKhr } from '@/lib/currency';
 import type { ExchangeRate } from '@/types';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import RestaurantSettingsForm from '../management/RestaurantSettingsForm';
 import ExchangeRateManagement from '@/app/management/exchange-rate/page';
 import { CloudResetDialog } from '../management/CloudResetDialog';
@@ -41,8 +43,6 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     const { user, setUser } = useAuth();
     const { t, lang, setLang } = useLanguage();
     const { theme, setTheme } = useTheme();
-    const { items, localCart } = useOrder();
-    const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<TabType>('account');
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -70,12 +70,12 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     const [savingPwd, setSavingPwd] = useState(false);
     const [showPwd, setShowPwd] = useState(false);
 
-    // Logout confirmation
-    const [isLogoutOpen, setIsLogoutOpen] = useState(false);
-    const cartHasItems = items.length > 0 || localCart.length > 0;
 
     // Auto-logout / session timeout (admin-configurable; all roles inherit it)
     const [sessionTimeoutMs, setSessionTimeoutMs] = useState<number>(() => getSessionTimeoutMs());
+
+    // Error toast for save failures
+    const [errorToast, setErrorToast] = useState<string | null>(null);
 
     const isAdmin = user?.role === 'admin';
 
@@ -137,8 +137,8 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
     async function handleChangePassword() {
         if (!user) return;
         setPwdError('');
-        if (newPwd.length < 6) { setPwdError(t('passwordMinLength') ?? 'New password must be at least 6 characters'); return; }
-        if (newPwd !== confirmPwd) { setPwdError(t('passwordMismatch') ?? 'Passwords do not match'); return; }
+        if (newPwd.length < 6) { setPwdError(t('passwordMinLength')); return; }
+        if (newPwd !== confirmPwd) { setPwdError(t('passwordMismatch')); return; }
         setSavingPwd(true);
         try {
             await changePassword(user.id, currentPwd, newPwd);
@@ -150,26 +150,13 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
             if (msg.includes('incorrect')) {
-                setPwdError(t('currentPasswordIncorrect') ?? 'Current password is incorrect');
+                setPwdError(t('currentPasswordIncorrect'));
             } else {
                 setPwdError(msg);
             }
         } finally {
             setSavingPwd(false);
         }
-    }
-
-    function confirmLogout() {
-        stopSync().catch(() => {});
-        setUser(null);
-        setIsLogoutOpen(false);
-        onClose();
-        router.replace('/login');
-    }
-
-    function handleOpenDownloads() {
-        onClose();
-        router.push('/downloads');
     }
 
     async function handleSaveAccount() {
@@ -198,7 +185,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
             setTimeout(() => setSaveSuccess(false), 2000);
         } catch (e) {
             console.error(e);
-            alert('Failed to update account details');
+            setErrorToast(t('failedUpdateAccount'));
         } finally {
             setSavingAccount(false);
         }
@@ -228,37 +215,36 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
             setTimeout(() => setSaveSuccess(false), 2000);
         } catch (e) {
             console.error(e);
-            alert('Failed to update mobile number');
+            setErrorToast(t('failedUpdateMobile'));
         } finally {
             setSavingAccount(false);
         }
     }
 
     // Role Job Title translation mapping
-    const getJobTitle = (role: string) => {
+    const getJobTitleKey = (role: string): TranslationKey => {
         switch (role) {
-            case 'super_admin': return 'Super Administrator';
-            case 'admin': return 'System Administrator';
+            case 'super_admin': return 'jobSuperAdmin';
+            case 'admin': return 'jobSysAdmin';
             case 'business_admin':
-            case 'manager': return 'Business Administrator';
-            case 'cashier': return 'Head Cashier';
-            default: return 'Associate';
+            case 'manager': return 'jobBizAdmin';
+            case 'cashier': return 'jobHeadCashier';
+            default: return 'jobAssociate';
         }
     };
 
-    // Role Department mapping
-    const getDepartment = (role: string) => {
+    const getDepartmentKey = (role: string): TranslationKey => {
         switch (role) {
             case 'super_admin':
             case 'admin':
-                return 'System Administration';
+                return 'deptSystemAdmin';
             case 'business_admin':
             case 'manager':
-                return 'Operations / Management';
+                return 'deptOperations';
             case 'cashier':
-                return 'POS Operations';
+                return 'deptPosOps';
             default:
-                return 'General Service';
+                return 'deptGeneralService';
         }
     };
 
@@ -306,7 +292,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                         window.dispatchEvent(new Event('user-avatar-updated'));
                                     } catch (err) {
                                         console.error('Failed to save profile picture:', err);
-                                        alert('Failed to save profile picture.');
+                                        setErrorToast(t('failedSaveProfilePicture'));
                                     }
                                 }} />
                             </label>
@@ -322,14 +308,14 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                 }}
                                 className="text-[9px] font-black text-red-500 uppercase tracking-widest mt-2 hover:text-red-400 transition-colors"
                             >
-                                Remove Avatar
+                                {t('removeAvatar')}
                             </button>
                         )}
                         <h2 className="text-xs font-black text-[var(--foreground)] mt-3 tracking-tight truncate w-full px-2">
                             {fullName || user?.username}
                         </h2>
                         <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 mt-0.5">
-                            {user?.role}
+                            {t(roleI18nKey(user?.role) as TranslationKey)}
                         </span>
                     </div>
 
@@ -341,23 +327,26 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                 ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
                                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                         >
-                            <User size={14} /> Account
+                            <User size={14} /> {t('settingsAccount')}
                         </button>
                         <button
                             onClick={() => setActiveTab('displayLanguage')}
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${activeTab === 'displayLanguage' 
-                                ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${activeTab === 'displayLanguage'
+                                ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
                                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                         >
-                            <Monitor size={14} /> Display & Language
+                            <Monitor size={14} /> {t('settingsDisplayLanguage')}
                         </button>
-                        <button
-                            onClick={handleOpenDownloads}
+                        <Link
+                            href="/downloads"
+                            onClick={onClose}
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]"
                         >
-                            <Download size={14} /> Downloads
-                        </button>
-                        
+                            <Download size={14} />
+                            <span className="flex-1">{t('downloads')}</span>
+                            <ExternalLink size={10} className="opacity-40" />
+                        </Link>
+
                         {/* Exchange Rate — editable for admin, read-only for all other roles */}
                         <button
                             onClick={() => setActiveTab('exchange')}
@@ -365,38 +354,38 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                 ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
                                 : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                         >
-                            <ArrowRightLeft size={14} /> Exchange Rate
+                            <ArrowRightLeft size={14} /> {t('settingsExchangeRate')}
                         </button>
-                        
+
                         {/* Business Settings Category (Admin only) */}
                         {isAdmin && (
                             <div className="mt-4 space-y-1">
                                 <div className="px-3 py-1 text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-55">
-                                    Business Config
+                                    {t('settingsBusinessConfig')}
                                 </div>
                                 <button
                                     onClick={() => setActiveTab('biz_identity')}
-                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_identity' 
-                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
+                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_identity'
+                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
                                         : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                                 >
-                                    <Building2 size={14} /> Identity & Type
+                                    <Building2 size={14} /> {t('settingsIdentityType')}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('biz_address')}
-                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_address' 
-                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
+                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_address'
+                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
                                         : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                                 >
-                                    <MapPin size={14} /> Address Details
+                                    <MapPin size={14} /> {t('settingsAddressDetails')}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('biz_branding')}
-                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_branding' 
-                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
+                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_branding'
+                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
                                         : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                                 >
-                                    <Image size={14} /> Logo & Branding
+                                    <Image size={14} /> {t('settingsLogoBranding')}
                                 </button>
 
                                 {/* Operational Settings (available for all business types) */}
@@ -407,29 +396,22 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                             ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
                                             : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                                     >
-                                        <Info size={14} /> Operational Settings
+                                        <Info size={14} /> {t('settingsOperational')}
                                     </button>
                                 )}
 
                                 <button
                                     onClick={() => setActiveTab('biz_sync')}
-                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_sync' 
-                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black' 
+                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${activeTab === 'biz_sync'
+                                        ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/35 font-black'
                                         : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)]'}`}
                                 >
-                                    <CloudOff size={14} /> Cloud Sync & Repair
+                                    <CloudOff size={14} /> {t('settingsCloudSync')}
                                 </button>
                             </div>
                         )}
                     </nav>
 
-                    {/* Unified Logout at the bottom */}
-                    <button
-                        onClick={() => setIsLogoutOpen(true)}
-                        className="mt-auto flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 border border-transparent active:scale-95 transition-all text-left"
-                    >
-                        <LogOut size={14} /> {t('logout')}
-                    </button>
                 </div>
 
                 {/* ── Content View ── */}
@@ -437,15 +419,15 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
                         <h1 className="text-sm font-black text-[var(--foreground)] uppercase tracking-widest flex items-center gap-2">
-                            {activeTab === 'account' && 'Account Settings'}
-                            {activeTab === 'displayLanguage' && 'Display & Language'}
-                            {activeTab === 'exchange' && 'Exchange Rate Settings'}
-                            {activeTab === 'biz_identity' && 'Business Identity'}
-                            {activeTab === 'biz_address' && 'Business Address'}
-                            {activeTab === 'biz_branding' && 'Business branding'}
-                            {activeTab === 'biz_receipt' && 'Business Receipt footer'}
-                            {activeTab === 'biz_operational' && 'Business Operations'}
-                            {activeTab === 'biz_sync' && 'Cloud Sync & Repair'}
+                            {activeTab === 'account' && t('settingsAccountHeader')}
+                            {activeTab === 'displayLanguage' && t('settingsDisplayHeader')}
+                            {activeTab === 'exchange' && t('settingsExchangeHeader')}
+                            {activeTab === 'biz_identity' && t('settingsBizIdentityHeader')}
+                            {activeTab === 'biz_address' && t('settingsBizAddressHeader')}
+                            {activeTab === 'biz_branding' && t('settingsBizBrandingHeader')}
+                            {activeTab === 'biz_receipt' && t('settingsBizReceiptHeader')}
+                            {activeTab === 'biz_operational' && t('settingsBizOperationsHeader')}
+                            {activeTab === 'biz_sync' && t('settingsBizSyncHeader')}
                         </h1>
                         <button
                             onClick={onClose}
@@ -463,7 +445,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                             <div className="space-y-6">
                                 {/* Current version */}
                                 <div className="border-b border-[var(--border)] pb-4 space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Current Version</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('currentVersion')}</label>
                                     <p className="text-xs font-bold text-[var(--foreground)]">
                                         DineOS Professional {appVersion ? `v${appVersion}` : ''}
                                     </p>
@@ -471,28 +453,28 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
 
                                 {/* ID / Username */}
                                 <div className="border-b border-[var(--border)] pb-4 space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">ID / Username</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('idUsername')}</label>
                                     <p className="text-xs font-black text-[var(--foreground)]">{user?.username}</p>
                                 </div>
 
                                 {/* Name (Editable) */}
                                 <div className="border-b border-[var(--border)] pb-4 flex items-center justify-between gap-4">
                                     <div className="space-y-1 flex-1">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Display Name</label>
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('displayName')}</label>
                                         {isEditingName ? (
                                             <div className="flex gap-2 max-w-md mt-1">
                                                 <input 
                                                     type="text" 
                                                     value={fullName} 
                                                     onChange={e => setFullName(e.target.value)}
-                                                    placeholder="English Name"
+                                                    placeholder={t('phEnglishName')}
                                                     className="flex-1 px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)]"
                                                 />
-                                                <input 
-                                                    type="text" 
-                                                    value={khmerName} 
+                                                <input
+                                                    type="text"
+                                                    value={khmerName}
                                                     onChange={e => setKhmerName(e.target.value)}
-                                                    placeholder="Khmer Name"
+                                                    placeholder={t('phKhmerName')}
                                                     className="flex-1 px-3 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent-blue)] khmer"
                                                 />
                                                 <button 
@@ -505,7 +487,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                             </div>
                                         ) : (
                                             <p className="text-xs font-black text-[var(--foreground)]">
-                                                {fullName || 'No Name Set'} {khmerName ? `(${khmerName})` : ''}
+                                                {fullName || t('noNameSet')} {khmerName ? `(${khmerName})` : ''}
                                             </p>
                                         )}
                                     </div>
@@ -521,26 +503,26 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
 
                                 {/* Company Name */}
                                 <div className="border-b border-[var(--border)] pb-4 space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Company / Business Name</label>
-                                    <p className="text-xs font-bold text-[var(--foreground)]">{restaurant?.name || 'Loading Business...'}</p>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('companyBusinessName')}</label>
+                                    <p className="text-xs font-bold text-[var(--foreground)]">{restaurant?.name || t('loadingBusiness')}</p>
                                 </div>
 
                                 {/* Department */}
                                 <div className="border-b border-[var(--border)] pb-4 space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Department</label>
-                                    <p className="text-xs font-bold text-[var(--foreground)]">{getDepartment(user?.role || '')}</p>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('department')}</label>
+                                    <p className="text-xs font-bold text-[var(--foreground)]">{t(getDepartmentKey(user?.role || ''))}</p>
                                 </div>
 
                                 {/* Job Title */}
                                 <div className="border-b border-[var(--border)] pb-4 space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Job Title</label>
-                                    <p className="text-xs font-bold text-[var(--foreground)]">{getJobTitle(user?.role || '')}</p>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('jobTitle')}</label>
+                                    <p className="text-xs font-bold text-[var(--foreground)]">{t(getJobTitleKey(user?.role || ''))}</p>
                                 </div>
 
                                 {/* Mobile */}
                                 <div className="border-b border-[var(--border)] pb-4 flex items-center justify-between gap-4">
                                     <div className="space-y-1 flex-1">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">Mobile Number</label>
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] opacity-60">{t('mobileNumber')}</label>
                                         {isEditingMobile ? (
                                             <div className="flex gap-2 max-w-sm mt-1">
                                                 <input 
@@ -557,7 +539,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                                 </button>
                                             </div>
                                         ) : (
-                                            <p className="text-xs font-bold text-[var(--foreground)]">{mobile || 'No Mobile Set'}</p>
+                                            <p className="text-xs font-bold text-[var(--foreground)]">{mobile || t('noMobileSet')}</p>
                                         )}
                                     </div>
                                     {!isEditingMobile && (
@@ -572,7 +554,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
 
                                 {saveSuccess && (
                                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2 animate-fade-in">
-                                        <Check size={14} /> Profile details updated successfully!
+                                        <Check size={14} /> {t('profileUpdatedSuccess')}
                                     </div>
                                 )}
 
@@ -594,9 +576,9 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                     </div>
 
                                     {[
-                                        { label: t('currentPassword') ?? 'Current Password', value: currentPwd, set: setCurrentPwd, auto: 'current-password' },
-                                        { label: t('newPassword') ?? 'New Password', value: newPwd, set: setNewPwd, auto: 'new-password' },
-                                        { label: t('confirmNewPassword') ?? 'Confirm New Password', value: confirmPwd, set: setConfirmPwd, auto: 'new-password' },
+                                        { label: t('currentPassword'), value: currentPwd, set: setCurrentPwd, auto: 'current-password' },
+                                        { label: t('newPassword'), value: newPwd, set: setNewPwd, auto: 'new-password' },
+                                        { label: t('confirmNewPassword'), value: confirmPwd, set: setConfirmPwd, auto: 'new-password' },
                                     ].map((f, i) => (
                                         <div key={i} className="space-y-1">
                                             <label className="block text-[10px] font-bold text-[var(--text-secondary)] opacity-70">{f.label}</label>
@@ -624,7 +606,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                         disabled={savingPwd || !currentPwd || !newPwd || !confirmPwd}
                                         className="w-full px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
-                                        {savingPwd ? '...' : (t('savePassword') ?? 'Save Password')}
+                                        {savingPwd ? t('saving') : t('savePassword')}
                                     </button>
                                 </div>
                             </div>
@@ -634,23 +616,23 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                         {activeTab === 'displayLanguage' && (
                             <div className="space-y-6">
                                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                                    Customize your local workspace display and language preferences. These settings apply only to your active terminal session.
+                                    {t('displayLanguageDesc')}
                                 </p>
-                                
+
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Theme Mode</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">{t('themeMode')}</label>
                                     <CustomSelect
                                         value={theme}
                                         onChange={(val) => setTheme(val as 'light' | 'dark')}
                                         options={[
-                                            { label: 'Dark Mode (Default Premium)', value: 'dark' },
-                                            { label: 'Light Mode (Clean Workplace)', value: 'light' }
+                                            { label: t('darkModeLabel'), value: 'dark' },
+                                            { label: t('lightModeLabel'), value: 'light' }
                                         ]}
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Interface Language</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">{t('interfaceLanguage')}</label>
                                     <CustomSelect
                                         value={lang}
                                         onChange={(val) => setLang(val as 'en' | 'km')}
@@ -675,10 +657,10 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                             }}
                                             options={[
                                                 { label: t('never'), value: '0' },
-                                                { label: '30 minutes', value: String(30 * 60 * 1000) },
-                                                { label: '1 hour', value: String(60 * 60 * 1000) },
-                                                { label: '4 hours', value: String(4 * 60 * 60 * 1000) },
-                                                { label: '8 hours', value: String(8 * 60 * 60 * 1000) },
+                                                { label: t('timeout30min'), value: String(30 * 60 * 1000) },
+                                                { label: t('timeout1h'), value: String(60 * 60 * 1000) },
+                                                { label: t('timeout4h'), value: String(4 * 60 * 60 * 1000) },
+                                                { label: t('timeout8h'), value: String(8 * 60 * 60 * 1000) },
                                             ]}
                                         />
                                     </div>
@@ -708,7 +690,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                                             </p>
                                         </div>
                                         <p className="text-[10px] text-[var(--text-secondary)] opacity-60">
-                                            {t('lastUpdated') ?? 'Last updated'}: {new Date(readonlyRate.effective_from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            {t('lastUpdated')}: {new Date(readonlyRate.effective_from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </p>
                                     </>
                                 ) : (
@@ -752,37 +734,13 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                 </div>
             </div>
 
-            {/* Logout confirmation dialog */}
-            {isLogoutOpen && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-2xl">
-                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl w-80 p-6 mx-4">
-                        <div className="flex items-start gap-3 mb-4">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cartHasItems ? 'bg-red-500/10' : 'bg-[var(--bg-elevated)]'}`}>
-                                <LogOut size={16} className={cartHasItems ? 'text-red-400' : 'text-[var(--text-secondary)]'} />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-black text-[var(--foreground)]">{t('logoutConfirmTitle')}</h3>
-                                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-                                    {cartHasItems ? t('logoutActiveOrderWarning') : t('logoutConfirmDesc')}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setIsLogoutOpen(false)}
-                                className="flex-1 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-colors"
-                            >
-                                {t('cancel')}
-                            </button>
-                            <button
-                                onClick={confirmLogout}
-                                className={`flex-1 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-95 ${cartHasItems ? 'bg-red-500 hover:bg-red-600' : 'bg-[var(--accent)] hover:brightness-110'}`}
-                            >
-                                {t('logout')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+
+            {errorToast && (
+                <Toast
+                    message={errorToast}
+                    variant="error"
+                    onClose={() => setErrorToast(null)}
+                />
             )}
         </div>
     );

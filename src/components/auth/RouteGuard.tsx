@@ -34,6 +34,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     const [initialSyncPending, setInitialSyncPending] = useState(false);
     const [licenseStatus, setLicenseStatus] = useState<RestaurantLicenseStatus | null>(null);
     const [warningDismissed, setWarningDismissed] = useState(false);
+    const [gracePassed, setGracePassed] = useState(false);
     const initialCheckDone = useRef(false);
     const syncTriggered = useRef(false);
     // Track the PREVIOUS auth state so we only reset the check on real login/logout
@@ -164,6 +165,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         if (!isAuthenticated || user?.role === 'super_admin' || !user?.restaurant_id) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setLicenseStatus(null);
+            setGracePassed(false);
             return;
         }
 
@@ -189,8 +191,10 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                         if (firstExpiredAtRef.current === null) {
                             firstExpiredAtRef.current = Date.now();
                         }
+                        setGracePassed(Date.now() - firstExpiredAtRef.current >= LICENSE_GRACE_MS);
                     } else {
                         firstExpiredAtRef.current = null;
+                        setGracePassed(false);
                         setLicenseExpiredPending(false);
                     }
                     setLicenseStatus(status);
@@ -261,6 +265,13 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         };
     }, [isAuthenticated, user?.restaurant_id, user?.role]);
 
+    const cartHasItems = items.length > 0 || localCart.length > 0;
+    const showLicenseBanner = licenseStatus?.status === 'expired' && gracePassed;
+
+    useEffect(() => {
+        setLicenseExpiredPending(showLicenseBanner);
+    }, [showLicenseBanner, setLicenseExpiredPending]);
+
     if (checking || authLoading) {
         return (
             <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-dark)' }}>
@@ -269,7 +280,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
                         className="w-16 h-16 border-4 rounded-full animate-spin mx-auto mb-4"
                         style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent)' }}
                     />
-                    <p style={{ color: 'var(--text-secondary)' }}>Preparing workspace...</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>{t('preparingWorkspace')}</p>
                 </div>
             </div>
         );
@@ -279,15 +290,10 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         return <InitialSyncScreen />;
     }
 
-    const isLicenseExpired = licenseStatus?.status === 'expired';
-    const gracePassed = firstExpiredAtRef.current !== null && Date.now() - firstExpiredAtRef.current >= LICENSE_GRACE_MS;
-    const cartHasItems = items.length > 0 || localCart.length > 0;
-    const showLicenseBanner = isLicenseExpired && gracePassed;
-
     const cachedExpiresAt = typeof window !== 'undefined' ? window.localStorage.getItem('dineos_license_expires_at') : null;
     const expiresAtStr = licenseStatus?.checked_online ? licenseStatus.license_expires_at : (licenseStatus?.license_expires_at ?? cachedExpiresAt);
     const daysRemaining = (() => {
-        if (!expiresAtStr || isLicenseExpired) return null;
+        if (!expiresAtStr || licenseStatus?.status === 'expired') return null;
         if (!licenseStatus?.checked_online) return null;
         const exp = new Date(expiresAtStr);
         const now = new Date();
@@ -297,15 +303,6 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
     })();
     const showAmberWarning = daysRemaining !== null && daysRemaining <= 30 && daysRemaining > 7 && !warningDismissed;
     const showRedWarning = daysRemaining !== null && daysRemaining <= 7 && daysRemaining > 0;
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => {
-        if (showLicenseBanner) {
-            setLicenseExpiredPending(true);
-        } else {
-            setLicenseExpiredPending(false);
-        }
-    }, [showLicenseBanner, setLicenseExpiredPending]);
 
     // Once grace period has passed AND no active cart: show the full block screen
     if (showLicenseBanner && !cartHasItems) {
@@ -347,6 +344,11 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
     const router = useRouter();
     const { setUser } = useAuth();
+    const { t } = useLanguage();
+
+    const expiryDate = status.license_expires_at
+        ? new Date(status.license_expires_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+        : t('licenseNotSet');
 
     function handleBackToLogin() {
         setUser(null);
@@ -359,34 +361,32 @@ function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
                     <AlertTriangle size={28} />
                 </div>
                 <div className="space-y-2">
-                    <h1 className="text-2xl font-black text-white uppercase tracking-wider">License Expired</h1>
+                    <h1 className="text-2xl font-black text-white uppercase tracking-wider">{t('licenseExpiredTitle')}</h1>
                     <p className="text-sm text-[var(--text-secondary)]">
-                        {status.restaurant_name || 'This restaurant'} needs a renewed subscription before it can continue while online.
+                        {status.restaurant_name || t('licenseThisRestaurant')} {t('licenseExpiredBody')}
                     </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2 text-left">
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-300">
-                        <AlertTriangle size={14} /> Expiry Details
+                        <AlertTriangle size={14} /> {t('licenseExpiryDetails')}
                     </div>
                     <p className="text-sm text-white">
-                        Expiry date: <span className="font-bold">{status.license_expires_at || 'Not set'}</span>
+                        {t('licenseExpiredExpiry')} <span className="font-bold">{expiryDate}</span>
                     </p>
                     <p className="text-sm text-white">
-                        Contact service team: <span className="font-bold">{status.license_support_contact || 'Please contact our service team to renew your subscription.'}</span>
+                        {t('licenseExpiredContact')} <span className="font-bold">{status.license_support_contact || t('licenseContactDefault')}</span>
                     </p>
                 </div>
                 <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-left text-sm text-amber-200 flex gap-3">
                     <WifiOff size={18} className="mt-0.5 flex-shrink-0" />
-                    <p>
-                        Offline use is still tolerated when no internet is available. Once the app comes online and confirms the license is expired, access is locked until renewal.
-                    </p>
+                    <p>{t('licenseExpiredOfflineNote')}</p>
                 </div>
                 <button
                     onClick={handleBackToLogin}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] text-sm font-black text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-red-500/30 transition-all"
                 >
                     <LogIn size={15} />
-                    Back to Login
+                    {t('backToLogin')}
                 </button>
             </div>
         </div>
@@ -394,15 +394,16 @@ function LicenseExpiredScreen({ status }: { status: RestaurantLicenseStatus }) {
 }
 
 function InitialSyncScreen() {
+    const { t } = useLanguage();
     return (
         <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-dark)' }}>
             <div className="text-center max-w-md px-6">
                 <div className="mx-auto mb-4 w-16 h-16 rounded-2xl border border-blue-500/30 bg-blue-500/10 flex items-center justify-center text-blue-300">
                     <CloudUpload size={28} />
                 </div>
-                <h2 className="text-xl font-black text-white uppercase tracking-widest">Syncing Setup Data</h2>
+                <h2 className="text-xl font-black text-white uppercase tracking-widest">{t('syncingSetupData')}</h2>
                 <p className="text-sm text-[var(--text-secondary)] mt-3">
-                    Preparing restaurant data for this device. Please wait a moment before opening POS features.
+                    {t('syncingSetupDataBody')}
                 </p>
                 <div className="w-56 h-2 rounded-full bg-white/10 mx-auto mt-6 overflow-hidden">
                     <div className="h-full bg-blue-400/80 animate-[syncBar_1.6s_ease-in-out_infinite]" style={{ width: '40%' }} />

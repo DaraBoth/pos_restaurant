@@ -1,0 +1,16 @@
+-- Migration 006: Make products.stock_quantity nullable
+-- NULL = stock not tracked (default for new products)
+-- 0   = sold out
+-- >0  = units remaining
+--
+-- The actual table rebuild runs inside ensure_critical_columns() as code migration
+-- id '006_products_stock_nullable_rebuild'. It is placed there (not executed as SQL
+-- here) because it must run AFTER all add_col! calls so that drifted columns
+-- (sku, sold_out_today, description, khmer_description, cost_price_cents,
+-- inventory_item_id, inventory_item_usage) are guaranteed to exist in the old table
+-- before the SELECT copy — on fresh installs those columns do not exist until
+-- ensure_critical_columns adds them. This follows the same code-migration pattern
+-- used by 002_orders_remove_status_check and 003_fix_broken_order_fks.
+--
+-- This file is registered in MIGRATIONS solely to record the version number and
+-- is a no-op (only comments, no executable SQL).

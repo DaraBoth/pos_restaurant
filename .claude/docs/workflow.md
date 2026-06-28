@@ -67,6 +67,21 @@
   (enters main flow above)
 ```
 
+```
+  ux-agent audits pages (1 page per cycle)
+       │
+       │ files wf:ux-bug / wf:coder-task
+       ▼
+  assign:coder
+       │
+       ▼
+  [ coder fixes UI issue ]
+       │
+       ▼
+  assign:code-reviewer
+       │  (same review flow as above)
+```
+
 ## Escalation (any agent)
 
 ```
@@ -89,26 +104,32 @@
 | Tag | Set by | Cleared by | Meaning |
 |-----|--------|-----------|---------|
 | `project:dineos` | All agents | Never | Scope filter — required on every task |
-| `wf:coder-task` | advisor / human | (preserved on complete) | Ready for coder |
-| `assign:coder` | advisor / reviewer / human | coder (on complete) | Queued for coder |
+| `wf:coder-task` | advisor / human / ux-agent | (preserved on complete) | Ready for coder |
+| `assign:coder` | advisor / reviewer / ux-agent / human | coder (on complete) | Queued for coder |
 | `wf:done` | coder | reviewer | Implementation complete |
 | `assign:code-reviewer` | coder | reviewer (on complete) | Queued for reviewer |
 | `wf:approved` | code-reviewer | Never | Approved; human can deploy |
 | `wf:change-request` | code-reviewer | coder (on re-complete) | Needs fixes |
 | `wf:bug` | qa-agent | coder (on complete) | Bug report |
+| `wf:ux-bug` | ux-agent / pos-customer | coder (on complete) | UI/UX issue filed by audit agent |
+| `wf:ux-task` | human / advisor | ux-agent (on complete) | UX audit task queued for ux-agent |
+| `assign:ux-agent` | human / advisor | ux-agent (on complete) | Queued for ux-agent |
+| `wf:i18n` | ux-agent | coder (on complete) | Bilingual/translation gap |
+| `wf:money-critical` | ux-agent / pos-customer | coder (on complete) | Wrong money display — financial risk |
 | `wf:needs-human` | Any agent | Human | Human decision required |
 | `wf:blocked` | Any agent | Human | Blocks a parent task |
 
 ## Agent capabilities matrix
 
-| Capability | coder | code-reviewer | qa-agent | advisor |
-|-----------|-------|--------------|---------|---------|
-| Edit source files | YES | NO | NO | NO |
-| Create ORBIT tasks | YES (escalation only) | YES (change-request) | YES (bugs) | YES (specced tasks) |
-| Run `pnpm lint` | YES | NO | NO | NO |
-| Run `pnpm tauri:dev` | NO | NO | YES | NO |
-| Push / deploy | NO | NO | NO | NO |
-| Read source | YES | YES | YES | YES |
+| Capability | coder | code-reviewer | qa-agent | advisor | ux-agent |
+|-----------|-------|--------------|---------|---------|---------|
+| Edit source files | YES | NO | NO | NO | NO |
+| Create ORBIT tasks | YES (escalation only) | YES (change-request) | YES (bugs) | YES (specced tasks) | YES (ux fix tasks) |
+| Run `pnpm lint` | YES | NO | NO | NO | NO |
+| Run `pnpm tauri:dev` | NO | NO | YES | NO | NO |
+| Run Playwright screenshots | NO | NO | NO | NO | YES (read-only) |
+| Push / deploy | NO | NO | NO | NO | NO |
+| Read source | YES | YES | YES | YES | YES |
 
 ## Token discipline
 - Agents lean on `.claude/docs/project-context.md` rather than re-reading the entire repo each cycle.
