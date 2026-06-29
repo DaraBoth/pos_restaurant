@@ -1,10 +1,9 @@
-// DineOS Error Relay — Vercel serverless function
-// Accepts POST {source, message, app_version?, restaurant_id?} from production
-// DineOS builds, sanitizes server-side, and files a wf:error ORBIT task.
-// The real ORBIT key lives ONLY in the Vercel project env var (ORBIT_API_KEY);
-// it is never returned to the client and never baked into the desktop binary.
+// DineOS error relay — receives POST {source, message, app_version?} from
+// production desktop builds, sanitizes server-side, and files a wf:error
+// ORBIT task. The real ORBIT key lives only in this Vercel project's env
+// vars — it is never returned to the client or baked into the desktop binary.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { NextRequest, NextResponse } from 'next/server';
 
 const ORBIT_KEY = process.env.ORBIT_API_KEY ?? '';
 const ORBIT_URL = 'https://dailygoalmap.vercel.app/api/mcp';
@@ -12,8 +11,7 @@ const MAX_BODY_CHARS = 4_000;
 const MAX_PER_HOUR_PER_IP = 20;
 const MAX_PER_HOUR_GLOBAL = 100;
 
-// Best-effort in-memory rate limiting (resets when the function instance recycles).
-// A KV store would be needed for cross-instance enforcement if abuse becomes an issue.
+// Best-effort in-memory rate limiting per serverless instance.
 const _ipCounts = new Map<string, { count: number; resetAt: number }>();
 let _globalCount = 0;
 let _globalReset = 0;
@@ -30,19 +28,13 @@ function sanitize(text: string): string {
         .replace(/"pin_hash"\s*:\s*"[^"]*"/gi, '"pin_hash":"<redacted>"');
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
+export async function POST(req: NextRequest) {
     if (!ORBIT_KEY) {
-        return res.status(503).json({ error: 'Relay not configured' });
+        return NextResponse.json({ error: 'Relay not configured' }, { status: 503 });
     }
 
     const ip =
-        (req.headers['x-forwarded-for'] as string | undefined)
-            ?.split(',')[0]
-            ?.trim() ?? 'unknown';
+        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 
     const now = Date.now();
 
@@ -51,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         _globalReset = now + 3_600_000;
     }
     if (_globalCount >= MAX_PER_HOUR_GLOBAL) {
-        return res.status(429).json({ error: 'Rate limit exceeded' });
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
 
     const ipEntry = _ipCounts.get(ip) ?? { count: 0, resetAt: now + 3_600_000 };
@@ -60,21 +52,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ipEntry.resetAt = now + 3_600_000;
     }
     if (ipEntry.count >= MAX_PER_HOUR_PER_IP) {
-        return res.status(429).json({ error: 'Rate limit exceeded' });
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
     ipEntry.count++;
     _ipCounts.set(ip, ipEntry);
     _globalCount++;
 
-    const body = req.body as Record<string, unknown> | undefined;
-    if (!body || typeof body.source !== 'string' || typeof body.message !== 'string') {
-        return res.status(400).json({ error: 'source and message are required' });
+    let body: Record<string, unknown>;
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    const source = String(body.source).slice(0, 100);
+    if (typeof body.source !== 'string' || typeof body.message !== 'string') {
+        return NextResponse.json(
+            { error: 'source and message are required strings' },
+            { status: 400 },
+        );
+    }
+
+    const source = body.source.slice(0, 100);
     const appVersion = String(body.app_version ?? 'unknown').slice(0, 20);
-    const rawMessage = String(body.message).slice(0, MAX_BODY_CHARS);
-    const message = sanitize(rawMessage);
+    const message = sanitize(body.message.slice(0, MAX_BODY_CHARS));
     const firstLine = message.split('\n')[0].slice(0, 80);
 
     try {
@@ -93,11 +93,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 },
             }),
         });
+
         if (!upstream.ok) {
-            return res.status(502).json({ error: 'Upstream failed' });
+            return NextResponse.json({ error: 'Upstream failed' }, { status: 502 });
         }
-        return res.status(201).json({ ok: true });
+        return NextResponse.json({ ok: true }, { status: 201 });
     } catch {
-        return res.status(502).json({ error: 'Upstream unavailable' });
+        return NextResponse.json({ error: 'Upstream unavailable' }, { status: 502 });
     }
 }
