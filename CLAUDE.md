@@ -16,6 +16,7 @@ pnpm tauri:dev       # Full desktop app (spawns `pnpm dev` via beforeDevCommand)
 pnpm build           # next build → static export to ./out (next.config.ts: output:"export") AND runs full tsc
 pnpm tauri:build     # Production desktop bundle (consumes ./out as frontendDist)
 pnpm lint            # ESLint only — does NOT invoke tsc; type errors can still pass lint but break pnpm build
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings  # Rust lint; -D warnings = hard error on any warning
 ```
 
 There is no test framework configured. Do not invent test commands.

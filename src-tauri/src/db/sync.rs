@@ -430,7 +430,7 @@ pub async fn sync_restaurant(
     }
 
     if total > 0 {
-        println!("[Sync] restaurant={} synced {} rows (since {})", restaurant_id, total, since = global_since);
+        println!("[Sync] restaurant={} synced {} rows (since {since})", restaurant_id, total, since = global_since);
     } else {
         // Minimal heartbeat to show it's alive
         println!("[Sync] Heartbeat: restaurant={} is up to date.", restaurant_id);
