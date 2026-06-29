@@ -24,10 +24,8 @@ fn main() {
     // 2. CI/CD (GitHub Actions): secrets are injected as real environment variables.
     //    Only emit if not already provided by .env so local dev always wins.
     for key in ["DATABASE_URL", "AUTH_TOKEN"] {
-        if !found.contains(key) {
-            if let Ok(val) = std::env::var(key) {
-                println!("cargo:rustc-env={key}={val}");
-            }
+        if !found.contains(key) && let Ok(val) = std::env::var(key) {
+            println!("cargo:rustc-env={key}={val}");
         }
         // Tell cargo to re-run if these env vars change
         println!("cargo:rerun-if-env-changed={key}");

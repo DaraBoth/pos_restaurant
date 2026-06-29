@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use tauri::State;
 use std::sync::Arc;
 use libsql::{Connection, params};
@@ -21,10 +23,10 @@ fn get_f64_opt(row: &libsql::Row, idx: i32) -> Option<f64> {
 }
 
 fn calc_stock_pct(stock_qty: f64, min_stock_qty: f64, max_stock_qty: Option<f64>) -> f64 {
-    if let Some(max) = max_stock_qty {
-        if max > 0.0 {
-            return (stock_qty / max * 100.0).clamp(0.0, 100.0);
-        }
+    if let Some(max) = max_stock_qty
+        && max > 0.0
+    {
+        return (stock_qty / max * 100.0).clamp(0.0, 100.0);
     }
     if min_stock_qty <= 0.0 {
         return 100.0;
@@ -155,10 +157,7 @@ pub async fn update_inventory_item(
             "SELECT stock_qty FROM inventory_items WHERE id = ? AND restaurant_id = ?",
             params![id.clone(), restaurant_id.clone()],
         ).await.map_err(|e| e.to_string())?;
-        match rows.next().await.map_err(|e| e.to_string())? {
-            Some(row) => Some(get_f64_safe(&row, 0)),
-            None => None,
-        }
+        rows.next().await.map_err(|e| e.to_string())?.map(|row| get_f64_safe(&row, 0))
     };
 
     let query = "

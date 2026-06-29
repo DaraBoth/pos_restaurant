@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use tauri::State;
 use std::sync::Arc;
 use libsql::{Connection, params};
@@ -112,10 +114,10 @@ pub async fn create_order(
                 params![sid]
             ).await.map_err(|e| format!("Query MAX round_number error: {}", e))?;
             
-            if let Some(r_row) = round_rows.next().await.map_err(|e| e.to_string())? {
-                if let Ok(val) = r_row.get::<i64>(0) {
-                    round_number = val + 1;
-                }
+            if let Some(r_row) = round_rows.next().await.map_err(|e| e.to_string())?
+                && let Ok(val) = r_row.get::<i64>(0)
+            {
+                round_number = val + 1;
             }
         } else {
             let sid = uuid::Uuid::new_v4().to_string();
@@ -1281,26 +1283,25 @@ pub async fn delete_order_history(
     // 2. Identify target order IDs to soft-delete
     let mut order_ids: Vec<String> = Vec::new();
 
-    if let Some(ref sid) = session_id {
-        if !sid.trim().is_empty() {
-            let mut rows = pool.query(
-                "SELECT id FROM orders WHERE session_id = ? AND restaurant_id = ?",
-                params![sid.clone(), restaurant_id.clone()],
-            ).await.map_err(|e| format!("Database error fetching session orders: {}", e))?;
-            while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
-                if let Ok(id) = row.get::<String>(0) {
-                    order_ids.push(id);
-                }
+    if let Some(ref sid) = session_id
+        && !sid.trim().is_empty()
+    {
+        let mut rows = pool.query(
+            "SELECT id FROM orders WHERE session_id = ? AND restaurant_id = ?",
+            params![sid.clone(), restaurant_id.clone()],
+        ).await.map_err(|e| format!("Database error fetching session orders: {}", e))?;
+        while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+            if let Ok(id) = row.get::<String>(0) {
+                order_ids.push(id);
             }
         }
     }
 
-    if order_ids.is_empty() {
-        if let Some(ref oid) = order_id {
-            if !oid.trim().is_empty() {
-                order_ids.push(oid.clone());
-            }
-        }
+    if order_ids.is_empty()
+        && let Some(ref oid) = order_id
+        && !oid.trim().is_empty()
+    {
+        order_ids.push(oid.clone());
     }
 
     if order_ids.is_empty() {

@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use tauri::{State, Manager};
 use libsql::{Connection, params};
 use std::sync::Arc;
@@ -424,10 +426,10 @@ pub async fn login(
     let superadmin_login = is_superadmin_username(&username);
 
     // ── Lockout guard (skip superadmin — cloud-only, must never be locked out) ──
-    if !superadmin_login {
-        if let Some(mins) = lock_minutes_remaining(&pool, &username).await {
-            return Err(account_locked_message(mins));
-        }
+    if !superadmin_login
+        && let Some(mins) = lock_minutes_remaining(&pool, &username).await
+    {
+        return Err(account_locked_message(mins));
     }
 
     // ── Local-first check (for returning users who have already logged in once) ──
@@ -441,10 +443,10 @@ pub async fn login(
                     // ✅ Known user, correct password — allow offline login
                     reset_login_attempts(&pool, &username).await;
                     println!("[Auth] Local login granted for '{}'", username);
-                    if let Some(rid) = &local_record.restaurant_id {
-                        if let Some(name) = fetch_restaurant_name(&pool, rid).await {
-                            set_window_title(&app, &format!("{} - DineOS", name));
-                        }
+                    if let Some(rid) = &local_record.restaurant_id
+                        && let Some(name) = fetch_restaurant_name(&pool, rid).await
+                    {
+                        set_window_title(&app, &format!("{} - DineOS", name));
                     }
                     return Ok(to_user_session(&local_record));
                 }
@@ -521,10 +523,10 @@ pub async fn login(
 
     if verify_login_password(&password, &remote_record.password_hash).is_err() {
         // Remote-confirmed wrong password — count it against the local lockout counter.
-        if !superadmin_login {
-            if let Some(mins) = record_failed_login(&pool, &username).await {
-                return Err(account_locked_message(mins));
-            }
+        if !superadmin_login
+            && let Some(mins) = record_failed_login(&pool, &username).await
+        {
+            return Err(account_locked_message(mins));
         }
         return Err("Invalid username or password.".to_string());
     }
@@ -561,10 +563,10 @@ pub async fn login(
         // Non-fatal — user is still authenticated this session
     }
 
-    if let Some(rid) = &remote_record.restaurant_id {
-        if let Some(name) = fetch_restaurant_name(&pool, rid).await {
-            set_window_title(&app, &format!("{} - DineOS", name));
-        }
+    if let Some(rid) = &remote_record.restaurant_id
+        && let Some(name) = fetch_restaurant_name(&pool, rid).await
+    {
+        set_window_title(&app, &format!("{} - DineOS", name));
     }
 
     Ok(to_user_session(&remote_record))
@@ -615,8 +617,8 @@ pub async fn create_user(
 
     // Also mirror to remote immediately so the user can log in from any device
     // right away without waiting for the next 30-second sync cycle.
-    if let Some(remote_conn) = remote.0.as_ref() {
-        if let Err(e) = remote_conn.execute(
+    if let Some(remote_conn) = remote.0.as_ref()
+        && let Err(e) = remote_conn.execute(
             "INSERT OR IGNORE INTO users (id, restaurant_id, username, password_hash, role, full_name, khmer_name, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
             params![
@@ -628,11 +630,11 @@ pub async fn create_user(
                 final_full_name,
                 final_khmer_name
             ]
-        ).await {
-            // Non-fatal: the local insert succeeded, and the sync daemon will
-            // push it to remote on the next cycle via the updated_at timestamp.
-            eprintln!("[Auth] Warning: could not mirror new user to remote immediately: {}", e);
-        }
+        ).await
+    {
+        // Non-fatal: the local insert succeeded, and the sync daemon will
+        // push it to remote on the next cycle via the updated_at timestamp.
+        eprintln!("[Auth] Warning: could not mirror new user to remote immediately: {}", e);
     }
 
     Ok(id)
@@ -700,10 +702,10 @@ pub async fn delete_user(
         .map_err(|e| format!("Database error: {}", e))?;
 
     // Mirror soft-delete to remote immediately
-    if let Some(remote_conn) = remote.0.as_ref() {
-        if let Err(e) = remote_conn.execute(SQL, params![id.clone(), restaurant_id.clone()]).await {
-            eprintln!("[Auth] Warning: could not mirror user deletion to remote: {}", e);
-        }
+    if let Some(remote_conn) = remote.0.as_ref()
+        && let Err(e) = remote_conn.execute(SQL, params![id.clone(), restaurant_id.clone()]).await
+    {
+        eprintln!("[Auth] Warning: could not mirror user deletion to remote: {}", e);
     }
 
     rbac::write_audit_log(
@@ -758,12 +760,12 @@ pub async fn update_user(
         .map_err(|e| format!("Database error: {}", e))?;
 
         // Mirror to remote immediately so password change takes effect on all devices
-        if let Some(remote_conn) = remote.0.as_ref() {
-            if let Err(e) = remote_conn.execute(SQL, params![
+        if let Some(remote_conn) = remote.0.as_ref()
+            && let Err(e) = remote_conn.execute(SQL, params![
                 hash, role, final_full_name, final_khmer_name, final_phone, id, restaurant_id
-            ]).await {
-                eprintln!("[Auth] Warning: could not mirror user update to remote: {}", e);
-            }
+            ]).await
+        {
+            eprintln!("[Auth] Warning: could not mirror user update to remote: {}", e);
         }
     } else {
         const SQL: &str = "UPDATE users SET role = ?, full_name = ?, khmer_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ? AND restaurant_id = ?";
@@ -776,12 +778,12 @@ pub async fn update_user(
         .map_err(|e| format!("Database error: {}", e))?;
 
         // Mirror to remote immediately
-        if let Some(remote_conn) = remote.0.as_ref() {
-            if let Err(e) = remote_conn.execute(SQL, params![
+        if let Some(remote_conn) = remote.0.as_ref()
+            && let Err(e) = remote_conn.execute(SQL, params![
                 role, final_full_name, final_khmer_name, final_phone, id, restaurant_id
-            ]).await {
-                eprintln!("[Auth] Warning: could not mirror user update to remote: {}", e);
-            }
+            ]).await
+        {
+            eprintln!("[Auth] Warning: could not mirror user update to remote: {}", e);
         }
     }
 
@@ -960,7 +962,7 @@ pub async fn superadmin_update_admin(
     // Read from remote (authoritative) when available — admin may only exist in cloud.
     let read_conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
-        None => &*pool,
+        None => &pool,
     };
 
     let mut rows = read_conn.query(
@@ -1018,7 +1020,7 @@ pub async fn update_superadmin_profile(
     // Superadmin is cloud-only — read current values from remote when available.
     let read_conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
-        None => &*pool,
+        None => &pool,
     };
 
     let mut rows = read_conn.query(
@@ -1083,7 +1085,7 @@ pub async fn superadmin_get_all_users(
 ) -> Result<Vec<SuperadminUserView>, String> {
     let _conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
-        None => &*pool,
+        None => &pool,
     };
 
     const QUERY: &str =
@@ -1134,7 +1136,7 @@ pub async fn superadmin_move_user(
     // Prefer reading from remote (authoritative) — the user may only exist in the cloud.
     let read_conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
-        None => &*pool,
+        None => &pool,
     };
 
     let mut rows = read_conn.query(
@@ -1258,10 +1260,10 @@ pub async fn set_user_pin(
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-    if let Some(remote_conn) = remote.0.as_ref() {
-        if let Err(e) = remote_conn.execute(SQL, params![hash, user_id, restaurant_id]).await {
-            eprintln!("[Auth] Warning: could not mirror PIN update to remote: {}", e);
-        }
+    if let Some(remote_conn) = remote.0.as_ref()
+        && let Err(e) = remote_conn.execute(SQL, params![hash, user_id, restaurant_id]).await
+    {
+        eprintln!("[Auth] Warning: could not mirror PIN update to remote: {}", e);
     }
 
     Ok(())
@@ -1283,7 +1285,7 @@ pub async fn login_with_pin(
         "SELECT id, restaurant_id, username, pin_hash, role, full_name, khmer_name, phone
          FROM users WHERE restaurant_id = ? AND pin_hash IS NOT NULL AND pin_hash != '' AND is_deleted = 0
            AND (locked_until IS NULL OR locked_until <= datetime('now','localtime'))",
-        params![restaurant_id]
+        params![restaurant_id.clone()]
     ).await.map_err(|e| format!("Database error: {}", e))?;
 
     while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
@@ -1358,10 +1360,10 @@ pub async fn change_password(
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-    if let Some(remote_conn) = remote.0.as_ref() {
-        if let Err(e) = remote_conn.execute(SQL, params![new_hash, user_id]).await {
-            eprintln!("[Auth] Warning: could not mirror password change to remote: {}", e);
-        }
+    if let Some(remote_conn) = remote.0.as_ref()
+        && let Err(e) = remote_conn.execute(SQL, params![new_hash, user_id]).await
+    {
+        eprintln!("[Auth] Warning: could not mirror password change to remote: {}", e);
     }
 
     Ok(())
@@ -1384,7 +1386,7 @@ pub async fn create_superadmin_account(
     // Check for duplicate username in remote (authoritative source).
     let check_conn: &Connection = match remote.0.as_ref() {
         Some(r) => r,
-        None => &*pool,
+        None => &pool,
     };
     let mut dup = check_conn.query(
         "SELECT 1 FROM users WHERE username = ? AND is_deleted = 0 LIMIT 1",
@@ -1433,15 +1435,14 @@ pub async fn delete_restaurant(
     let mut resolved_actor_role: Option<String> = None;
 
     // Prefer authoritative cloud role lookup when available.
-    if let Some(remote_conn) = remote.0.as_ref() {
-        if let Ok(mut rows) = remote_conn.query(
+    if let Some(remote_conn) = remote.0.as_ref()
+        && let Ok(mut rows) = remote_conn.query(
             "SELECT role FROM users WHERE id = ? AND is_deleted = 0",
             params![actor_user_id.clone()]
-        ).await {
-            if let Ok(Some(row)) = rows.next().await {
-                resolved_actor_role = Some(rbac::normalize_role_for_session(&row.get::<String>(0).unwrap_or_default()));
-            }
-        }
+        ).await
+        && let Ok(Some(row)) = rows.next().await
+    {
+        resolved_actor_role = Some(rbac::normalize_role_for_session(&row.get::<String>(0).unwrap_or_default()));
     }
 
     // Fallback to local role lookup if cloud role was unavailable.

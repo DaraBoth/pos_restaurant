@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use tauri::State;
 use tauri::Manager;
 use libsql::{Connection, params};
@@ -102,7 +104,7 @@ pub async fn download_release_file(
     }
 
     // Decode base64 data URI  →  raw bytes
-    let base64_part = file_data.splitn(2, ',').nth(1)
+    let base64_part = file_data.split_once(',').map(|(_, b)| b)
         .ok_or("Invalid data URI format")?;
 
     use base64::{Engine as _, engine::general_purpose::STANDARD};

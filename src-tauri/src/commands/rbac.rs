@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use libsql::{params, Connection};
 
 pub const ROLE_SUPER_ADMIN: &str = "super_admin";

@@ -48,15 +48,15 @@ async fn exec_statements(conn: &Connection, sql: &str) {
 
         if is_statement_end {
             let stmt = current.trim();
-            if !stmt.is_empty() {
-                if let Err(e) = conn.execute(stmt, ()).await {
-                    let msg = e.to_string().to_lowercase();
-                    // Non-fatal errors common during incremental development
-                    if msg.contains("duplicate column") || msg.contains("already exists") { 
-                        // Ignored
-                    } else {
-                        eprintln!("[DB Migration] warning: {} — SQL: {}", msg, &stmt[..stmt.len().min(120)]);
-                    }
+            if !stmt.is_empty()
+                && let Err(e) = conn.execute(stmt, ()).await
+            {
+                let msg = e.to_string().to_lowercase();
+                // Non-fatal errors common during incremental development
+                if msg.contains("duplicate column") || msg.contains("already exists") {
+                    // Ignored
+                } else {
+                    eprintln!("[DB Migration] warning: {} — SQL: {}", msg, &stmt[..stmt.len().min(120)]);
                 }
             }
             current.clear();

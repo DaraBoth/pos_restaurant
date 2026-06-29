@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use tauri::State;
 use libsql::{Connection, params};
 use std::sync::Arc;

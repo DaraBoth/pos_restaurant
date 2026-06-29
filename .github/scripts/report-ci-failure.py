@@ -10,7 +10,11 @@ Required env vars:
   CI_SHA         — commit SHA
 
 Optional env var:
-  RUNNER_TEMP    — directory where next-build.log was written (defaults to /tmp)
+  RUNNER_TEMP    — directory where log files were written (defaults to /tmp)
+
+Log files scanned (in priority order — first file containing an error marker wins):
+  rust-build.log  — cargo clippy / cargo build output
+  next-build.log  — pnpm build (Next.js) output
 """
 
 import json
@@ -20,9 +24,22 @@ import urllib.request
 import sys
 
 ORBIT_URL = "https://dailygoalmap.vercel.app/api/mcp"
-LOG_FILENAME = "next-build.log"
 MAX_EXCERPT_BYTES = 3000
-ERROR_MARKERS = ["Failed to compile", "Type error", "error[E", "Error:"]
+
+# Checked in priority order: rust log first (more likely to be the real failure),
+# then frontend log as fallback.
+LOG_FILENAMES = ["rust-build.log", "next-build.log"]
+
+# Markers that indicate the failure block — extract context around these.
+ERROR_MARKERS = [
+    "error[E",           # Rust compile error (e.g. error[E0382])
+    "error: ",           # generic Rust/cargo error
+    "could not compile", # Rust final summary
+    "##[error]",         # GitHub Actions annotated error
+    "Failed to compile", # Next.js compile failure
+    "Type error",        # TypeScript type error
+]
+
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mKG]")
 SECRET_PATTERNS = [
     (re.compile(r"AUTH_TOKEN=\S+"), "AUTH_TOKEN=<redacted>"),
@@ -31,15 +48,8 @@ SECRET_PATTERNS = [
 ]
 
 
-def load_excerpt() -> str:
-    runner_temp = os.environ.get("RUNNER_TEMP", "/tmp")
-    log_file = os.path.join(runner_temp, LOG_FILENAME)
-    if not os.path.exists(log_file):
-        return ""
-
-    with open(log_file, "r", errors="replace") as f:
-        lines = f.readlines()
-
+def extract_excerpt(lines: list[str]) -> str:
+    """Return up to MAX_EXCERPT_BYTES of the most relevant error context."""
     lines = [ANSI_RE.sub("", l) for l in lines]
 
     result: list[str] = []
@@ -57,6 +67,44 @@ def load_excerpt() -> str:
     return excerpt[:MAX_EXCERPT_BYTES]
 
 
+def load_excerpt() -> tuple[str, str]:
+    """
+    Scan all captured log files in priority order.
+    Returns (excerpt, log_name) where log_name is the file that provided the excerpt.
+    Prefers the first log that contains a known error marker.
+    """
+    runner_temp = os.environ.get("RUNNER_TEMP", "/tmp")
+
+    candidates: list[tuple[str, str]] = []  # (excerpt, log_name)
+    for filename in LOG_FILENAMES:
+        log_file = os.path.join(runner_temp, filename)
+        if not os.path.exists(log_file):
+            continue
+        with open(log_file, "r", errors="replace") as f:
+            lines = f.readlines()
+        if not lines:
+            continue
+        # Check if this log contains any error marker
+        has_error = any(
+            any(marker in ANSI_RE.sub("", line) for marker in ERROR_MARKERS)
+            for line in lines
+        )
+        excerpt = extract_excerpt(lines)
+        candidates.append((excerpt, filename, has_error))
+
+    # Prefer a log that contains a known error marker; otherwise fall back to any log.
+    for excerpt, filename, has_error in candidates:
+        if has_error:
+            return excerpt, filename
+
+    # No log has a recognised error marker — use the first available log as-is.
+    if candidates:
+        excerpt, filename, _ = candidates[0]
+        return excerpt, filename
+
+    return "", ""
+
+
 def main() -> None:
     api_key = os.environ.get("ORBIT_API_KEY", "")
     if not api_key:
@@ -68,7 +116,7 @@ def main() -> None:
     ref = os.environ.get("CI_REF", "")
     sha = os.environ.get("CI_SHA", "")
 
-    excerpt = load_excerpt()
+    excerpt, log_source = load_excerpt()
 
     body = (
         f"**Platform:** {platform}\n"
@@ -77,7 +125,7 @@ def main() -> None:
         f"**SHA:** {sha}"
     )
     if excerpt:
-        body += f"\n\n**Build error excerpt:**\n```\n{excerpt}\n```"
+        body += f"\n\n**Build error excerpt** (from `{log_source}`):\n```\n{excerpt}\n```"
 
     payload = {
         "tool": "tasks.create",

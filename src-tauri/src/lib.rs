@@ -21,10 +21,10 @@ async fn trigger_sync(
     let mut active = active_sync.0.lock().map_err(|e| e.to_string())?;
     
     // If already syncing THIS restaurant, do nothing.
-    if let Some(current_id) = active.as_ref() {
-        if current_id == &restaurant_id {
-            return Ok(());
-        }
+    if let Some(current_id) = active.as_ref()
+        && current_id == &restaurant_id
+    {
+        return Ok(());
     }
 
     // New restaurant or first sync: update the marker and start daemon

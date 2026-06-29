@@ -1,13 +1,13 @@
-/// sync.rs — Per-restaurant selective cloud sync
-/// 
-/// Architecture overview:
-/// - PULL: reads rows from Turso remote WHERE restaurant_id = ? AND updated_at > last_sync_at
-///         and upserts them into the local SQLite.
-/// - PUSH: reads locally-changed rows (updated_at > last_push_at) WHERE restaurant_id = ?
-///         and upserts them into Turso remote.
-/// 
-/// On first login for a restaurant: full download (last_sync_at = epoch 0)
-/// On subsequent logins: incremental sync only (last_sync_at = stored timestamp)
+//! sync.rs — Per-restaurant selective cloud sync
+//!
+//! Architecture overview:
+//! - PULL: reads rows from Turso remote WHERE restaurant_id = ? AND updated_at > last_sync_at
+//!   and upserts them into the local SQLite.
+//! - PUSH: reads locally-changed rows (updated_at > last_push_at) WHERE restaurant_id = ?
+//!   and upserts them into Turso remote.
+//!
+//! On first login for a restaurant: full download (last_sync_at = epoch 0)
+//! On subsequent logins: incremental sync only (last_sync_at = stored timestamp)
 
 use libsql::{Connection, params};
 use std::sync::Arc;
@@ -177,28 +177,27 @@ pub async fn pull_table(
         }
 
         // Detect conflict: row exists locally with newer updated_at than remote
-        if let (Some(pk_i), Some(ua_i)) = (pk_idx, updated_at_idx) {
-            if let (libsql::Value::Text(row_id), libsql::Value::Text(remote_ua)) =
+        if let (Some(pk_i), Some(ua_i)) = (pk_idx, updated_at_idx)
+            && let (libsql::Value::Text(row_id), libsql::Value::Text(remote_ua)) =
                 (&vals[pk_i], &vals[ua_i])
+        {
+            let local_ua_result = local.query(
+                &format!("SELECT updated_at FROM {} WHERE {} = ?", table, _pk),
+                [row_id.clone()],
+            ).await;
+            if let Ok(mut local_rows) = local_ua_result
+                && let Ok(Some(local_row)) = local_rows.next().await
             {
-                let local_ua_result = local.query(
-                    &format!("SELECT updated_at FROM {} WHERE {} = ?", table, _pk),
-                    [row_id.clone()],
-                ).await;
-                if let Ok(mut local_rows) = local_ua_result {
-                    if let Ok(Some(local_row)) = local_rows.next().await {
-                        let local_ua = local_row.get::<String>(0).unwrap_or_default();
-                        if !local_ua.is_empty() && local_ua.as_str() > remote_ua.as_str() {
-                            let conflict_id = uuid::Uuid::new_v4().to_string();
-                            let _ = local.execute(
-                                "INSERT OR IGNORE INTO _sync_conflicts (id, table_name, row_id, local_updated_at, remote_updated_at, winner, created_at) VALUES (?, ?, ?, ?, ?, 'local', datetime('now'))",
-                                params![conflict_id, table.to_string(), row_id.clone(), local_ua.clone(), remote_ua.clone()],
-                            ).await;
-                            eprintln!("[Sync] Conflict: table={} row={} local={} remote={} — keeping local (newer)", table, row_id, local_ua, remote_ua);
-                            count += 1;
-                            continue;
-                        }
-                    }
+                let local_ua = local_row.get::<String>(0).unwrap_or_default();
+                if !local_ua.is_empty() && local_ua.as_str() > remote_ua.as_str() {
+                    let conflict_id = uuid::Uuid::new_v4().to_string();
+                    let _ = local.execute(
+                        "INSERT OR IGNORE INTO _sync_conflicts (id, table_name, row_id, local_updated_at, remote_updated_at, winner, created_at) VALUES (?, ?, ?, ?, ?, 'local', datetime('now'))",
+                        params![conflict_id, table.to_string(), row_id.clone(), local_ua.clone(), remote_ua.clone()],
+                    ).await;
+                    eprintln!("[Sync] Conflict: table={} row={} local={} remote={} — keeping local (newer)", table, row_id, local_ua, remote_ua);
+                    count += 1;
+                    continue;
                 }
             }
         }
@@ -297,12 +296,12 @@ async fn get_table_cursors(local: &Connection, table: &str, restaurant_id: &str,
         params![table.to_string(), restaurant_id.to_string()],
     ).await;
 
-    if let Ok(mut rows) = result {
-        if let Ok(Some(row)) = rows.next().await {
-            let push_at = row.get::<String>(0).unwrap_or_else(|_| global_since.to_string());
-            let pull_at = row.get::<String>(1).unwrap_or_else(|_| global_since.to_string());
-            return (push_at, pull_at);
-        }
+    if let Ok(mut rows) = result
+        && let Ok(Some(row)) = rows.next().await
+    {
+        let push_at = row.get::<String>(0).unwrap_or_else(|_| global_since.to_string());
+        let pull_at = row.get::<String>(1).unwrap_or_else(|_| global_since.to_string());
+        return (push_at, pull_at);
     }
     (global_since.to_string(), global_since.to_string())
 }
@@ -354,7 +353,7 @@ pub async fn sync_restaurant(
     let _ = handle.emit("dineos:sync-start", ());
     
     // 1. Connectivity Check
-    if let Err(_) = remote.execute("SELECT 1", ()).await {
+    if remote.execute("SELECT 1", ()).await.is_err() {
         println!("[Sync] Offline mode: restaurant={} (remote unreachable)", restaurant_id);
         let _ = handle.emit("dineos:sync-end", ());
         return 0;
