@@ -59,6 +59,30 @@
 ```
 
 ```
+  runtime / CI failure
+       │
+       │ auto-filed wf:error task
+       ▼
+  assign:code-reviewer
+       │
+       ▼
+  [ code-reviewer analyzes error ]
+  [ appends rule to .claude/docs/coder-lessons.md ]
+       │
+       │ files wf:coder-task fix spec
+       ▼
+  assign:coder
+       │
+       ▼
+  [ coder reads coder-lessons.md ]
+  [ implements fix ]
+       │
+       ▼
+  assign:code-reviewer
+       │  (same review flow as above)
+```
+
+```
   advisor prioritizes backlog
        │
        │ creates wf:coder-task
@@ -118,6 +142,8 @@
 | `wf:money-critical` | ux-agent / pos-customer | coder (on complete) | Wrong money display — financial risk |
 | `wf:needs-human` | Any agent | Human | Human decision required |
 | `wf:blocked` | Any agent | Human | Blocks a parent task |
+| `wf:error` | error ingestion pipeline | code-reviewer (on complete) | Runtime or CI failure auto-filed for root-cause analysis |
+| `wf:report` | coder (/coder-report command) | code-reviewer (on complete) | Periodic activity report filed for review |
 
 ## Agent capabilities matrix
 
@@ -130,6 +156,17 @@
 | Run Playwright screenshots | NO | NO | NO | NO | YES (read-only) |
 | Push / deploy | NO | NO | NO | NO | NO |
 | Read source | YES | YES | YES | YES | YES |
+
+## Slash commands
+
+| Command | Agent | Description |
+|---------|-------|-------------|
+| `/implement [task-id\|all]` | coder | Pick up and implement the next (or specified) `assign:coder` task |
+| `/review-before-pr [task-id]` | code-reviewer | Review a completed implementation before human deploys |
+| `/qa-task [task-id]` | qa-agent | Exercise the running app and file bug tasks |
+| `/ux-audit [task-id]` | ux-agent | Audit UI pages and file ux-bug / coder-task tasks |
+| `/sync-agent-task [agent]` | any | Show current ORBIT queue for all or one agent |
+| `/coder-report [daily\|weekly\|<date-range>]` | coder | Summarise completed coder work and file `wf:report` task to code-reviewer |
 
 ## Token discipline
 - Agents lean on `.claude/docs/project-context.md` rather than re-reading the entire repo each cycle.

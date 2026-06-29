@@ -97,6 +97,18 @@ jobs:
           releaseDraft: false
           prerelease: false
 
+      - name: Report CI failure to ORBIT
+        if: failure()
+        shell: bash
+        env:
+          ORBIT_API_KEY: ${{ secrets.ORBIT_API_KEY }}
+        run: |
+          if [ -z "$ORBIT_API_KEY" ]; then exit 0; fi
+          curl -s -X POST "https://dailygoalmap.vercel.app/api/mcp" \
+            -H "Content-Type: application/json" \
+            -H "X-Project-Api-Key: $ORBIT_API_KEY" \
+            -d "{\"tool\":\"tasks.create\",\"input\":{\"title\":\"[ci-error] Release build failed (${{ matrix.platform }})\",\"description\":\"**Platform:** ${{ matrix.platform }}\\n**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\\n**Ref:** ${{ github.ref }}\\n**SHA:** ${{ github.sha }}\",\"tags\":[\"wf:error\",\"assign:code-reviewer\",\"project:dineos\"]}}"
+
       - name: Clean up signing key (macOS)
         if: always() && runner.os == 'macOS'
         run: rm -f "${RUNNER_TEMP}/tauri.key"

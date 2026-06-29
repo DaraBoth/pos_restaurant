@@ -2,6 +2,8 @@
 // A single cached Promise means all concurrent callers on first load share
 // the same in-flight import rather than each triggering a new module load.
 
+import { reportError } from '@/lib/error-reporter';
+
 type InvokeFn = typeof import('@tauri-apps/api/core')['invoke'];
 let _invokePromise: Promise<InvokeFn> | null = null;
 
@@ -29,6 +31,11 @@ export async function call<T>(cmd: string, args?: Record<string, unknown>): Prom
     } catch {
         throw new Error('Analytics unavailable outside Tauri desktop app.');
     }
-    // Let the actual invoke error propagate naturally so we see the real error
-    return invoke<T>(cmd, args);
+    try {
+        return await invoke<T>(cmd, args);
+    } catch (err) {
+        const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+        reportError(`tauri:${cmd}`, message).catch(() => {});
+        throw err;
+    }
 }

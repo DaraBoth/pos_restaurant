@@ -52,6 +52,13 @@ async fn stop_sync(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Log panics to stderr in dev. Posting over HTTP from a synchronous panic
+    // hook is not safe (the async runtime may be torn down), so we log only;
+    // Tauri command-level errors are reported from the JS side via client.ts.
+    std::panic::set_hook(Box::new(|info| {
+        eprintln!("[DineOS PANIC] {info}");
+    }));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
