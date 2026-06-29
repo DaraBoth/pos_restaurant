@@ -113,62 +113,7 @@ jobs:
           CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           CI_REF: ${{ github.ref }}
           CI_SHA: ${{ github.sha }}
-        run: |
-          if [ -z "$ORBIT_API_KEY" ]; then exit 0; fi
-          python3 << 'PYEOF'
-import json, os, re, urllib.request
-
-log_file = os.path.join(os.environ.get('RUNNER_TEMP', '/tmp'), 'next-build.log')
-excerpt = ''
-if os.path.exists(log_file):
-    with open(log_file, 'r', errors='replace') as f:
-        lines = f.readlines()
-    # Strip ANSI escape codes
-    ansi = re.compile(r'\x1b\[[0-9;]*[mKG]')
-    lines = [ansi.sub('', l) for l in lines]
-    # Extract lines around known error markers
-    result = []
-    for i, line in enumerate(lines):
-        if any(k in line for k in ['Failed to compile', 'Type error', 'error[E', 'Error:']):
-            result.extend(lines[max(0, i - 2):min(len(lines), i + 20)])
-            if len(result) > 80:
-                break
-    excerpt = ''.join(result[-80:]) if result else ''.join(lines[-60:])
-    # Sanitize secrets
-    excerpt = re.sub(r'AUTH_TOKEN=\S+', 'AUTH_TOKEN=<redacted>', excerpt)
-    excerpt = re.sub(r'DATABASE_URL=\S+', 'DATABASE_URL=<redacted>', excerpt)
-    excerpt = re.sub(r'dgm_[A-Za-z0-9]+', '<orbit-key>', excerpt)
-    excerpt = excerpt[:3000]
-
-platform = os.environ['CI_PLATFORM']
-body = (
-    f"**Platform:** {platform}\n"
-    f"**Run:** {os.environ['CI_RUN_URL']}\n"
-    f"**Ref:** {os.environ['CI_REF']}\n"
-    f"**SHA:** {os.environ['CI_SHA']}"
-)
-if excerpt:
-    body += f"\n\n**Build error excerpt:**\n```\n{excerpt}\n```"
-
-payload = {
-    'tool': 'tasks.create',
-    'input': {
-        'title': f'[ci-error] Release build failed ({platform})',
-        'description': body,
-        'tags': ['wf:error', 'assign:code-reviewer', 'project:dineos']
-    }
-}
-req = urllib.request.Request(
-    'https://dailygoalmap.vercel.app/api/mcp',
-    data=json.dumps(payload).encode(),
-    headers={'Content-Type': 'application/json', 'X-Project-Api-Key': os.environ['ORBIT_API_KEY']}
-)
-try:
-    urllib.request.urlopen(req, timeout=15)
-    print('ORBIT error task filed.')
-except Exception as e:
-    print(f'Failed to file ORBIT task: {e}')
-PYEOF
+        run: python3 .github/scripts/report-ci-failure.py
 
       - name: Clean up signing key (macOS)
         if: always() && runner.os == 'macOS'
