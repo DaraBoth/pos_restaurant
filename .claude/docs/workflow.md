@@ -13,6 +13,7 @@
                     implements to                               │
                     acceptance criteria                         │
                     runs pnpm lint                              │
+                    runs pnpm build (tsc)                       │
                          │                                      │
                          │ tasks.complete(wf:done)              │
                          ▼                                      │
@@ -152,6 +153,7 @@
 | Edit source files | YES | NO | NO | NO | NO |
 | Create ORBIT tasks | YES (escalation only) | YES (change-request) | YES (bugs) | YES (specced tasks) | YES (ux fix tasks) |
 | Run `pnpm lint` | YES | NO | NO | NO | NO |
+| Run `pnpm build` (typecheck) | YES — **required before done** | NO | NO | NO | NO |
 | Run `pnpm tauri:dev` | NO | NO | YES | NO | NO |
 | Run Playwright screenshots | NO | NO | NO | NO | YES (read-only) |
 | Push / deploy | NO | NO | NO | NO | NO |

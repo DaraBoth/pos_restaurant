@@ -315,7 +315,7 @@ export default function MySettingsModal({ isOpen, onClose }: MySettingsModalProp
                             {fullName || user?.username}
                         </h2>
                         <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60 mt-0.5">
-                            {t(roleI18nKey(user?.role) as TranslationKey)}
+                            {t(roleI18nKey(user?.role))}
                         </span>
                     </div>
 

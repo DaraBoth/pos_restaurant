@@ -477,7 +477,7 @@ export default function ProductsManagement() {
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
                     <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
                         <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">
-                            {deleteConfirm.type === 'product' ? t('deleteProduct') : t('deleteCategory')}
+                            {deleteConfirm.type === 'product' ? t('deleteProductConfirm') : t('deleteCategory')}
                         </h3>
                         <p className="text-sm font-bold text-[var(--foreground)] truncate" title={deleteConfirm.name}>
                             &quot;{deleteConfirm.name}&quot;

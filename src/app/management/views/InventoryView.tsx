@@ -179,7 +179,7 @@ export default function InventoryView() {
                                     {t('avgCost')}
                                 </th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">
-                                    {t('management')}
+                                    {t('manageColumn')}
                                 </th>
                             </tr>
                         </thead>

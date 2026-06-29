@@ -13,9 +13,9 @@ Package manager is **pnpm** (see `pnpm-lock.yaml`). The Rust crate is in `src-ta
 ```bash
 pnpm dev             # Next.js dev server on :3000 (frontend only — Tauri IPC will throw)
 pnpm tauri:dev       # Full desktop app (spawns `pnpm dev` via beforeDevCommand)
-pnpm build           # next build → static export to ./out (next.config.ts: output:"export")
+pnpm build           # next build → static export to ./out (next.config.ts: output:"export") AND runs full tsc
 pnpm tauri:build     # Production desktop bundle (consumes ./out as frontendDist)
-pnpm lint            # ESLint (next/core-web-vitals + next/typescript)
+pnpm lint            # ESLint only — does NOT invoke tsc; type errors can still pass lint but break pnpm build
 ```
 
 There is no test framework configured. Do not invent test commands.

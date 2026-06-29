@@ -58,7 +58,9 @@ export function canEditPrice(role: string | null | undefined): boolean {
     return normalized === 'super_admin' || normalized === 'admin';
 }
 
-export function roleI18nKey(role: string | null | undefined): string {
+import type { TranslationKey } from '@/lib/i18n';
+
+export function roleI18nKey(role: string | null | undefined): TranslationKey {
     const normalized = normalizeRole(role);
     if (normalized === 'super_admin') return 'roleSuperAdmin';
     if (normalized === 'admin') return 'roleAdmin';

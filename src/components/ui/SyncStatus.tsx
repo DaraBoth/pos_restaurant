@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getDbStatus } from '@/lib/tauri-commands';
 import { getSyncConflictCount } from '@/lib/api/restaurant';
 import { useLanguage } from '@/providers/LanguageProvider';
+import type { TranslationKey } from '@/lib/i18n';
 import { Cloud, CloudOff, CloudUpload, Check, AlertTriangle } from 'lucide-react';
 
 type SyncState = 'offline' | 'syncing' | 'synced' | 'local' | 'error';
@@ -15,7 +16,7 @@ const CONFIG: Record<SyncState, { icon: React.ElementType; color: string; pulse:
     error:   { icon: CloudOff,    color: '#f97316', pulse: false },
 };
 
-function mapSyncErrorKey(msg: string): string {
+function mapSyncErrorKey(msg: string): TranslationKey {
     const lower = msg.toLowerCase();
     if (lower.includes('timeout') || lower.includes('connection') || lower.includes('network')) {
         return 'syncErrNetwork';
@@ -32,7 +33,7 @@ function mapSyncErrorKey(msg: string): string {
 export function SyncStatus({ collapsed = false }: { collapsed?: boolean }) {
     const [state, setState] = useState<SyncState>('synced');
     const [rawError, setRawError] = useState('');
-    const [friendlyKey, setFriendlyKey] = useState('syncErrGeneral');
+    const [friendlyKey, setFriendlyKey] = useState<TranslationKey>('syncErrGeneral');
     const [conflictCount, setConflictCount] = useState(0);
     const syncingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
