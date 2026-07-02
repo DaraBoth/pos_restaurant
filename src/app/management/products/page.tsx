@@ -27,6 +27,8 @@ export default function ProductsManagement() {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 50;
     const [exchangeRate, setExchangeRate] = useState(0);
     const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'product' | 'category'; id: string; name: string; warning?: string } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -38,9 +40,21 @@ export default function ProductsManagement() {
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
 
+    // Khmer must never get letter-spacing/uppercase (it shatters stacked glyphs) and
+    // needs the `khmer` font class. Use these instead of literal `uppercase tracking-*`.
+    const km = lang === 'km';
+    const labelCase = km ? 'khmer' : 'uppercase tracking-widest';
+    const labelCaseWide = km ? 'khmer' : 'uppercase tracking-wider';
+    const thClass = `px-4 py-2.5 text-[10px] font-black ${labelCase} text-[var(--text-secondary)] border-b border-[var(--border)]`;
+
     useEffect(() => {
         loadData();
     }, []);
+
+    // Reset to first page whenever the visible dataset changes.
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, activeTab]);
 
     async function loadData() {
         if (!restaurantId) return;
@@ -180,38 +194,86 @@ export default function ProductsManagement() {
 
 
 
-    const filteredProducts = products.filter(p => 
+    const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.khmer_name && p.khmer_name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
+    const filteredCategories = categories.filter(c =>
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.khmer_name && c.khmer_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    const activeCount = activeTab === 'products' ? filteredProducts.length : filteredCategories.length;
+    const totalPages = Math.max(1, Math.ceil(activeCount / PAGE_SIZE));
+    const pageSafe = Math.min(currentPage, totalPages);
+    const pageStart = (pageSafe - 1) * PAGE_SIZE;
+    const pagedProducts = filteredProducts.slice(pageStart, pageStart + PAGE_SIZE);
+    const pagedCategories = filteredCategories.slice(pageStart, pageStart + PAGE_SIZE);
+    const showPagination = activeCount > PAGE_SIZE;
+    const rangeFrom = activeCount === 0 ? 0 : pageStart + 1;
+    const rangeTo = Math.min(pageStart + PAGE_SIZE, activeCount);
+
+    const paginationBar = showPagination ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-[var(--border)] bg-[var(--bg-elevated)]">
+            <span className={`text-xs text-[var(--text-secondary)] ${km ? 'khmer' : ''}`}>
+                {t('paginationShowing')
+                    .replace('{from}', String(rangeFrom))
+                    .replace('{to}', String(rangeTo))
+                    .replace('{total}', String(activeCount))}
+            </span>
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={pageSafe <= 1}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 disabled:pointer-events-none ${km ? 'khmer' : ''}`}
+                >
+                    {t('paginationPrev')}
+                </button>
+                <span className={`text-xs font-bold text-[var(--foreground)] tabular-nums ${km ? 'khmer' : ''}`}>
+                    {t('paginationPage')
+                        .replace('{page}', String(pageSafe))
+                        .replace('{pages}', String(totalPages))}
+                </span>
+                <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={pageSafe >= totalPages}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 disabled:pointer-events-none ${km ? 'khmer' : ''}`}
+                >
+                    {t('paginationNext')}
+                </button>
+            </div>
+        </div>
+    ) : null;
+
     return (
         <div className="animate-fade-in space-y-3 pb-6">
             {/* Header */}
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[var(--accent)]/15 border border-[var(--accent)]/30">
-                        {activeTab === 'products' ? <Package size={14} className="text-[var(--accent)]" /> : <Layers size={14} className="text-[var(--accent)]" />}
-                    </div>
-                    <div>
-                        <h1 className="text-sm font-black text-[var(--foreground)] leading-none">
-                            {activeTab === 'products' ? t('products') : t('category')}
-                        </h1>
-                        <div className="flex gap-3 mt-1">
-                            <button
-                                onClick={() => setActiveTab('products')}
-                                className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'products' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                            >
-                                {t('products')}
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('categories')}
-                                className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                            >
-                                {t('category')}
-                            </button>
-                        </div>
-                    </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Segmented tab control — the primary Products/Categories switch */}
+                <div
+                    role="tablist"
+                    aria-label={t('products')}
+                    className="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]"
+                >
+                    <button
+                        role="tab"
+                        aria-selected={activeTab === 'products'}
+                        onClick={() => setActiveTab('products')}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${km ? 'khmer' : ''} ${activeTab === 'products' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                    >
+                        <Package size={14} strokeWidth={2.5} />
+                        {t('products')}
+                    </button>
+                    <button
+                        role="tab"
+                        aria-selected={activeTab === 'categories'}
+                        onClick={() => setActiveTab('categories')}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${km ? 'khmer' : ''} ${activeTab === 'categories' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                    >
+                        <Layers size={14} strokeWidth={2.5} />
+                        {t('category')}
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -222,14 +284,14 @@ export default function ProductsManagement() {
                             placeholder={t('searchItems')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors w-44"
+                            className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-2 text-xs text-[var(--foreground)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors w-44"
                         />
                     </div>
                     {activeTab === 'products' && (
                         <button
                             onClick={handleExportProducts}
                             disabled={exporting || products.length === 0}
-                            className="px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40"
+                            className={`px-3 py-2 text-xs font-bold flex items-center gap-1.5 flex-shrink-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 ${km ? 'khmer' : ''}`}
                         >
                             <Download size={13} strokeWidth={2.5} />
                             {t('exportProducts')}
@@ -240,7 +302,7 @@ export default function ProductsManagement() {
                             if (activeTab === 'products') { setEditingProduct(null); setIsProductModalOpen(true); }
                             else { setEditingCategory(null); setIsCategoryModalOpen(true); }
                         }}
-                        className="pos-btn-primary px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+                        className={`pos-btn-primary px-3 py-2 text-xs font-bold flex items-center gap-1.5 flex-shrink-0 ${km ? 'khmer' : ''}`}
                     >
                         <Plus size={13} strokeWidth={2.5} />
                         {activeTab === 'products' ? t('newProduct') : t('newCategory')}
@@ -257,16 +319,16 @@ export default function ProductsManagement() {
             {/* Products table */}
             {activeTab === 'products' ? (
                 <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[calc(100vh-260px)]">
                         <table className="w-full text-left border-collapse">
-                            <thead>
+                            <thead className="sticky top-0 z-10">
                                 <tr className="bg-[var(--bg-elevated)]">
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] w-12">{t('visualCol')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('products')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('category')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('stockCol')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right">{t('price')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">{t('actions')}</th>
+                                    <th className={`${thClass} w-12`}>{t('visualCol')}</th>
+                                    <th className={thClass}>{t('products')}</th>
+                                    <th className={thClass}>{t('category')}</th>
+                                    <th className={thClass}>{t('stockCol')}</th>
+                                    <th className={`${thClass} text-right`}>{t('price')}</th>
+                                    <th className={`${thClass} text-right w-36`}>{t('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
@@ -288,7 +350,7 @@ export default function ProductsManagement() {
                                         </td>
                                     </tr>
                                 )}
-                                {!isLoading && !fetchError && filteredProducts.map(p => (
+                                {!isLoading && !fetchError && pagedProducts.map(p => (
                                     <tr key={p.id} className="hover:bg-white/[0.03] group transition-colors">
                                         {/* Image */}
                                         <td className="px-4 py-2.5">
@@ -310,15 +372,15 @@ export default function ProductsManagement() {
                                             {p.khmer_name && <div className="text-xs text-[var(--text-secondary)] khmer mt-0.5">{p.khmer_name}</div>}
                                             {p.sku && <div className="text-[10px] text-[var(--text-secondary)]/60 font-mono mt-0.5">{p.sku}</div>}
                                             {p.is_available === 0 && (
-                                                <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold uppercase tracking-wider border border-red-500/20">{t('unavailable')}</span>
+                                                <span className={`mt-1 inline-block px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold ${labelCaseWide} border border-red-500/20`}>{t('unavailable')}</span>
                                             )}
                                             {p.sold_out_today && (
-                                                <span className="mt-1 ml-1 inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20">{t('soldOutToday')}</span>
+                                                <span className={`mt-1 ml-1 inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[9px] font-bold ${labelCaseWide} border border-amber-500/20`}>{t('soldOutToday')}</span>
                                             )}
                                         </td>
                                         {/* Category */}
                                         <td className="px-4 py-2.5">
-                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-[var(--text-secondary)]">
+                                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${labelCaseWide} px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-[var(--text-secondary)]`}>
                                                 <Box size={10} className="text-[var(--accent)]" />
                                                 {p.category_name}
                                             </span>
@@ -329,9 +391,9 @@ export default function ProductsManagement() {
                                             {p.stock_quantity == null ? (
                                                 <span className="text-xs text-[var(--text-secondary)] opacity-40">—</span>
                                             ) : p.stock_quantity === 0 ? (
-                                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 uppercase tracking-wider">{t('outOfStock')}</span>
+                                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 ${labelCaseWide}`}>{t('outOfStock')}</span>
                                             ) : p.stock_quantity <= 5 ? (
-                                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">{p.stock_quantity}</span>
+                                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 ${labelCaseWide}`}>{p.stock_quantity}</span>
                                             ) : (
                                                 <span className="text-xs text-[var(--text-secondary)]">{p.stock_quantity}</span>
                                             )}
@@ -351,14 +413,15 @@ export default function ProductsManagement() {
                                                 <button
                                                     onClick={() => handleToggleSoldOut(p)}
                                                     title={p.sold_out_today ? t('unmarkSoldOut') : t('markSoldOut')}
-                                                    className={`h-7 px-2 flex items-center gap-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                                    aria-label={p.sold_out_today ? t('unmarkSoldOut') : t('markSoldOut')}
+                                                    aria-pressed={!!p.sold_out_today}
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${
                                                         p.sold_out_today
                                                             ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
                                                             : 'bg-white/[0.05] border-white/10 text-white/50 hover:text-white hover:border-white/30'
                                                     }`}
                                                 >
-                                                    <Ban size={12} />
-                                                    {p.sold_out_today ? t('unmarkSoldOut') : t('markSoldOut')}
+                                                    <Ban size={13} />
                                                 </button>
                                                 <div className="flex items-center gap-1.5">
                                                     <button
@@ -390,20 +453,21 @@ export default function ProductsManagement() {
                             </tbody>
                         </table>
                     </div>
+                    {paginationBar}
                 </div>
             ) : (
                 <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-hidden">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[calc(100vh-260px)]">
                         <table className="w-full text-left border-collapse">
-                            <thead>
+                            <thead className="sticky top-0 z-10">
                                 <tr className="bg-[var(--bg-elevated)]">
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('categoryName')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)]">{t('products')}</th>
-                                    <th className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] border-b border-[var(--border)] text-right w-20">{t('actions')}</th>
+                                    <th className={thClass}>{t('categoryName')}</th>
+                                    <th className={thClass}>{t('products')}</th>
+                                    <th className={`${thClass} text-right w-28`}>{t('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
-                                {categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).map(c => (
+                                {pagedCategories.map(c => (
                                     <tr key={c.id} className="hover:bg-[var(--bg-elevated)] group transition-colors">
                                         <td className="py-2.5" style={{ paddingLeft: `${16 + (c.depth || 0) * 20}px`, paddingRight: '16px' }}>
                                             <div className="flex items-center gap-1.5">
@@ -444,7 +508,7 @@ export default function ProductsManagement() {
                                         </td>
                                     </tr>
                                 ))}
-                                {categories.length === 0 && (
+                                {filteredCategories.length === 0 && (
                                     <tr>
                                         <td colSpan={3} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
                                             {t('noCategories')}
@@ -454,6 +518,7 @@ export default function ProductsManagement() {
                             </tbody>
                         </table>
                     </div>
+                    {paginationBar}
                 </div>
             )}
 
@@ -476,7 +541,7 @@ export default function ProductsManagement() {
             {deleteConfirm && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60">
                     <div className="pos-card p-6 max-w-sm mx-4 space-y-4">
-                        <h3 className="text-sm font-black text-red-400 uppercase tracking-widest">
+                        <h3 className={`text-sm font-black text-red-400 ${labelCase}`}>
                             {deleteConfirm.type === 'product' ? t('deleteProductConfirm') : t('deleteCategory')}
                         </h3>
                         <p className="text-sm font-bold text-[var(--foreground)] truncate" title={deleteConfirm.name}>
@@ -488,13 +553,13 @@ export default function ProductsManagement() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setDeleteConfirm(null)}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all"
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${labelCase} border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all`}
                             >
                                 {t('cancel')}
                             </button>
                             <button
                                 onClick={executeDelete}
-                                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 transition-all"
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${labelCase} bg-red-500 text-white hover:bg-red-600 transition-all`}
                             >
                                 {t('delete')}
                             </button>

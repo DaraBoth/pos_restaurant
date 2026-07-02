@@ -23,7 +23,7 @@ const QUICK_LINKS: QuickLink[] = [
     { labelKey: 'categories',   descKey: 'categoriesDesc',   icon: Layers,           color: '#8b5cf6', tab: 'categories' },
     { labelKey: 'inventory',    descKey: 'inventoryDesc',    icon: BoxesIcon,        color: '#f59e0b', tab: 'inventory' },
     { labelKey: 'users',        descKey: 'staffDesc',        icon: Users,            color: '#a78bfa', tab: 'users' },
-    { labelKey: 'exchangeRate', descKey: 'exchangeRateDesc', icon: ArrowLeftRight,   color: '#fbbf24', href: '/management/exchange-rate' },
+    { labelKey: 'exchangeRate', descKey: 'exchangeRateDesc', icon: ArrowLeftRight,   color: '#fbbf24', href: '/settings/business/exchange-rate' },
     { labelKey: 'orderHistory', descKey: 'orderHistoryDesc', icon: ClipboardList,    color: '#f97316', tab: 'orders' },
     { labelKey: 'settings',     descKey: 'settingsDesc',     icon: Building2,        color: '#f43f5e', href: '/management/settings' },
 ];
@@ -41,7 +41,7 @@ export default function DashboardView() {
         const rid = user?.restaurant_id || undefined;
         Promise.all([
             getRevenueSummary(rid),
-            getExchangeRate(rid),
+            rid ? getExchangeRate(rid) : Promise.resolve(null),
             getInventoryItems(rid),
         ]).then(([s, r, inv]) => {
             setSummary(s);

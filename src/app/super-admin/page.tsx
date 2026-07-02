@@ -1,6 +1,7 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import {
@@ -1163,8 +1164,36 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
     const [username, setUsername] = useState(r.admin_username || '');
     const [fullName, setFullName] = useState(r.admin_full_name || '');
     const [password, setPassword] = useState('');
+    const [showPw, setShowPw] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    useOverlayBehavior(true, onClose);
+
+    // Restore focus to whatever triggered the dialog when it closes
+    useEffect(() => {
+        const trigger = document.activeElement as HTMLElement | null;
+        return () => trigger?.focus?.();
+    }, []);
+
+    // Keep Tab focus cycling inside the dialog
+    function handleTrapKeyDown(e: React.KeyboardEvent) {
+        if (e.key !== 'Tab') return;
+        const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables || focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
@@ -1179,7 +1208,7 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
             });
             onUpdated();
         } catch (err: unknown) {
-            setError(String(err));
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setLoading(false);
         }
@@ -1189,15 +1218,26 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Edit Admin Account"
+                onKeyDown={handleTrapKeyDown}
                 className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
                 style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
             >
+                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-500 to-transparent flex-shrink-0" />
                 <div className="px-5 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-elevated)]">
                     <div className="flex items-center gap-2">
-                        <User size={16} className="text-blue-400" />
-                        <h3 className="font-black text-sm">Edit Admin Account</h3>
+                        <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+                            <User size={14} className="text-blue-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-sm">Edit Admin Account</h3>
+                            <p className="text-[10px] text-[var(--text-secondary)] opacity-50">{r.name}</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]">
+                    <button onClick={onClose} aria-label="Close" className="p-1 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)]">
                         <X size={16} />
                     </button>
                 </div>
@@ -1212,33 +1252,39 @@ function EditAdminModal({ r, onClose, onUpdated }: { r: RestaurantSummary; onClo
                     
                     <div className="space-y-3">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Username</label>
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Username</label>
                             <input
                                 type="text"
-                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
+                                className="pos-input w-full"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
+                                autoFocus
                                 required
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Full Name <span className="opacity-50">(optional)</span></label>
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">Full Name <span className="opacity-50">(optional)</span></label>
                             <input
                                 type="text"
-                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
+                                className="pos-input w-full"
                                 value={fullName}
                                 onChange={e => setFullName(e.target.value)}
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">New Password <span className="opacity-50">(leave blank to keep)</span></label>
-                            <input
-                                type="password"
-                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] outline-none"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                            />
+                            <label className="block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60">New Password <span className="opacity-50">(leave blank to keep)</span></label>
+                            <div className="relative">
+                                <input
+                                    type={showPw ? 'text' : 'password'}
+                                    className="pos-input w-full pr-10"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                />
+                                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
+                                    {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                                </button>
+                            </div>
                         </div>
                     </div>
 

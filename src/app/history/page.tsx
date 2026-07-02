@@ -13,7 +13,8 @@ import { printReceipt } from '@/lib/receipt';
 import {
     History, RefreshCw, TableProperties, ChevronDown,
     ChevronUp, Download, Clock, ReceiptText,
-    LayoutList, LayoutGrid, Printer, Trash2, Loader2
+    LayoutList, LayoutGrid, Printer, Trash2, Loader2,
+    Lock, CircleDollarSign, Wallet, Boxes, TrendingUp, StickyNote, Plus
 } from 'lucide-react';
 // Dynamic import for XLSX to avoid bundling issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,6 +108,11 @@ export default function HistoryPage() {
     const { t, lang } = useLanguage();
     const { user } = useAuth();
     const restaurantId = user?.restaurant_id;
+    // Khmer must never get letter-spacing/uppercase and needs the `khmer` font class.
+    const km = lang === 'km';
+    const labelCase = km ? 'khmer' : 'uppercase tracking-widest';
+    const sectionHeadingClass = `text-[11px] font-black ${km ? 'khmer' : 'uppercase tracking-[0.18em]'} text-[var(--text-secondary)]`;
+    const thLabelClass = `text-left px-3 py-2 text-[10px] font-black ${km ? 'khmer' : 'uppercase tracking-[0.15em]'} text-[var(--text-secondary)] opacity-60`;
     const [activeTab, setActiveTab] = useState<PageTab>('orders');
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -226,11 +232,13 @@ export default function HistoryPage() {
         } catch (e) {
             console.error(e);
         }
-        try {
-            const rateData = await getExchangeRate(restaurantId || undefined);
-            if (rateData?.rate) setExchangeRateForReport(rateData.rate);
-        } catch (e) {
-            console.error(e);
+        if (restaurantId) {
+            try {
+                const rateData = await getExchangeRate(restaurantId);
+                if (rateData?.rate) setExchangeRateForReport(rateData.rate);
+            } catch (e) {
+                console.error(e);
+            }
         }
         try {
             const users = await getUsers(restaurantId || '');
@@ -856,74 +864,77 @@ export default function HistoryPage() {
                         <History size={18} className="text-[var(--accent)]" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-black uppercase tracking-widest text-[var(--foreground)]">{t('orderHistory')}</h1>
-                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">{t('transactionAuditSub')}</p>
+                        <h1 className={`text-sm font-black text-[var(--foreground)] ${labelCase}`}>{t('orderHistory')}</h1>
+                        <p className={`text-[10px] font-bold text-[var(--text-secondary)] opacity-50 ${labelCase}`}>{t('transactionAuditSub')}</p>
                     </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Quick-filter presets */}
-                    <div className="flex items-center gap-1.5">
-                        {([
-                            { key: 'today', label: t('today'), start: () => format(new Date(), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
-                            { key: 'yesterday', label: t('yesterday'), start: () => format(subDays(new Date(), 1), 'yyyy-MM-dd'), end: () => format(subDays(new Date(), 1), 'yyyy-MM-dd') },
-                            { key: 'thisWeek', label: t('thisWeek'), start: () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
-                            { key: 'thisMonth', label: t('thisMonth'), start: () => format(startOfMonth(new Date()), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
-                        ] as const).map(preset => (
-                            <button
-                                key={preset.key}
-                                onClick={() => { setStartDate(preset.start()); setEndDate(preset.end()); setActivePreset(preset.key); }}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activePreset === preset.key ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-                            >
-                                {preset.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="relative group">
+                    {/* Filter cluster — date presets + range, visually subdued */}
+                    <div className="flex flex-wrap items-center gap-2 px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)]/60 border border-[var(--border)]">
+                        <span className={`hidden lg:inline text-[10px] font-black text-[var(--text-secondary)] opacity-50 ${labelCase}`}>{t('filtersLabel')}</span>
+                        <div className="flex items-center gap-1.5">
+                            {([
+                                { key: 'today', label: t('today'), start: () => format(new Date(), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
+                                { key: 'yesterday', label: t('yesterday'), start: () => format(subDays(new Date(), 1), 'yyyy-MM-dd'), end: () => format(subDays(new Date(), 1), 'yyyy-MM-dd') },
+                                { key: 'thisWeek', label: t('thisWeek'), start: () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
+                                { key: 'thisMonth', label: t('thisMonth'), start: () => format(startOfMonth(new Date()), 'yyyy-MM-dd'), end: () => format(new Date(), 'yyyy-MM-dd') },
+                            ] as const).map(preset => (
+                                <button
+                                    key={preset.key}
+                                    onClick={() => { setStartDate(preset.start()); setEndDate(preset.end()); setActivePreset(preset.key); }}
+                                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${km ? 'khmer' : ''} ${activePreset === preset.key ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                                >
+                                    {preset.label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-1.5">
                             <input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => { setStartDate(e.target.value); setActivePreset(''); }}
-                                className="pos-input px-3 text-xs h-10 w-[160px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-black uppercase tracking-widest text-[var(--foreground)]"
+                                className="pos-input px-2.5 text-xs h-9 w-[150px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-medium text-[var(--foreground)]"
                             />
-                        </div>
-                        <span className="text-[var(--text-secondary)] font-black text-[10px] uppercase tracking-widest opacity-30">TO</span>
-                        <div className="relative group">
+                            <span className="text-[var(--text-secondary)] font-black text-[10px] uppercase tracking-widest opacity-30">TO</span>
                             <input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => { setEndDate(e.target.value); setActivePreset(''); }}
-                                className="pos-input px-3 text-xs h-10 w-[160px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-black uppercase tracking-widest text-[var(--foreground)]"
+                                className="pos-input px-2.5 text-xs h-9 w-[150px] cursor-pointer hover:border-[var(--accent)] transition-all bg-[var(--bg-card)] font-medium text-[var(--foreground)]"
                             />
                         </div>
                     </div>
 
-                    <button
-                        onClick={handlePrintSummary}
-                        disabled={loading || !filtered?.length}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
-                    >
-                        <Printer size={14} />
-                        {t('printBtn')}
-                    </button>
+                    {/* Action cluster — Print / Export / Refresh */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handlePrintSummary}
+                            disabled={loading || !filtered?.length}
+                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all disabled:opacity-30 font-bold text-xs ${km ? 'khmer' : ''}`}
+                        >
+                            <Printer size={14} />
+                            {t('printSummary')}
+                        </button>
 
-                    <button
-                        type="button"
-                        onClick={handleExport}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-xs uppercase tracking-widest"
-                    >
-                        <Download size={14} />
-                        {t('exportOrders')}
-                    </button>
+                        <button
+                            type="button"
+                            onClick={handleExport}
+                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-bold text-xs ${km ? 'khmer' : ''}`}
+                        >
+                            <Download size={14} />
+                            {t('exportOrders')}
+                        </button>
 
-                    <button
-                        onClick={loadOrders}
-                        className="p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-black transition-all group"
-                    >
-                        <RefreshCw size={15} className={loading ? 'animate-spin' : 'group-active:rotate-180 transition-transform'} />
-                    </button>
+                        <button
+                            onClick={loadOrders}
+                            title={t('refresh')}
+                            aria-label={t('refresh')}
+                            className="p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-black transition-all group"
+                        >
+                            <RefreshCw size={15} className={loading ? 'animate-spin' : 'group-active:rotate-180 transition-transform'} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -935,204 +946,198 @@ export default function HistoryPage() {
                     { label: t('voidedFilter'), value: String(allGroupedOrders.filter(g => g.status === 'void').length), accent: '#ef4444' },
                 ].map(pill => (
                     <div key={pill.label} className="pos-card px-4 py-2.5 flex items-center gap-3">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] opacity-60">{pill.label}</span>
+                        <span className={`text-[10px] font-black text-[var(--text-secondary)] opacity-60 ${labelCase}`}>{pill.label}</span>
                         <span className="text-sm font-black font-mono" style={{ color: pill.accent }}>{pill.value}</span>
                     </div>
                 ))}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('orders')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'orders'
-                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
-                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
-                        }`}
-                >
-                    {t('orderHistory')}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('reports')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'reports'
-                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
-                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
-                        }`}
-                >
-                    {t('closeDailyReportTab')}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('report-history')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'report-history'
-                        ? 'bg-[var(--accent)] text-black shadow-lg shadow-[var(--accent)]/20'
-                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)]'
-                        }`}
-                >
-                    {t('reportHistoryTab')}
-                </button>
+            {/* Primary view navigation — segmented tab control (distinct from action buttons) */}
+            <div
+                role="tablist"
+                aria-label={t('orderHistory')}
+                className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]"
+            >
+                {([
+                    { key: 'orders', label: t('ordersTab') },
+                    { key: 'reports', label: t('closeDailyReportTab') },
+                    { key: 'report-history', label: t('reportHistoryTab') },
+                ] as const).map(tab => (
+                    <button
+                        key={tab.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${km ? 'khmer' : ''} ${activeTab === tab.key
+                            ? 'bg-[var(--accent)] text-black shadow-sm'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'
+                            }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
             {activeTab === 'reports' && (
             <div className="space-y-4">
-                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+                {/* ── Header + status ── */}
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div>
-                            <h2 className="text-xs font-black uppercase tracking-[0.22em] text-[var(--foreground)]">{t('dailySalesClosing')}</h2>
-                            <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
+                            <h2 className={`text-sm font-black text-[var(--foreground)] ${labelCase}`}>{t('dailySalesClosing')}</h2>
+                            <p className={`text-[11px] font-bold text-[var(--text-secondary)] opacity-60 mt-1 ${km ? 'khmer' : ''}`}>
                                 {t('closingReportDescription')}
                             </p>
-                            <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-1">
-                                {dailyPreview?.is_closed ? `${t('reportStatusClosed')} (${dailyPreview.report_date})` : `${t('reportStatusOpen')} (${endDate})`}
-                            </p>
+                        </div>
+                        <span className={`self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black ${km ? 'khmer' : ''} ${dailyPreview?.is_closed ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}`}>
+                            {dailyPreview?.is_closed ? <Lock size={13} /> : <Clock size={13} />}
+                            {dailyPreview?.is_closed ? `${t('reportStatusClosed')} (${dailyPreview.report_date})` : `${t('reportStatusOpen')} (${endDate})`}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                    {/* ── Sales summary ── */}
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <CircleDollarSign size={15} className="text-[var(--accent)]" />
+                            <h3 className={sectionHeadingClass}>{t('todaysSalesSummary')}</h3>
+                        </div>
+                        <div className="divide-y divide-[var(--border)]">
+                            <div className="flex items-center justify-between gap-3 py-2">
+                                <span className="text-xs font-bold text-[var(--foreground)]">{t('reportDateLabel')}</span>
+                                <span className="text-xs font-mono text-[var(--foreground)]">{dailyPreview?.report_date || endDate}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 py-2">
+                                <span className="text-xs font-bold text-[var(--foreground)]">{t('paidOrdersLabel')}</span>
+                                <span className="text-xs font-mono text-[var(--foreground)]">{dailyPreview?.paid_orders ?? 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 py-2">
+                                <span className="text-xs font-bold text-[var(--foreground)]">{t('totalSalesLabel')}</span>
+                                <span className="text-sm font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.total_sales_usd ?? 0)}</span>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <span className={`${sectionHeadingClass} opacity-70`}>{t('paidReceiptsLabel')}</span>
+                            {allGroupedOrders.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-4 text-[11px] font-bold text-[var(--text-secondary)] opacity-70">
+                                    {t('noPaidReceipts')}
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                                    <table className="w-full min-w-[360px]">
+                                        <thead className="bg-[var(--bg-elevated)]">
+                                            <tr>
+                                                <th className={thLabelClass}>{t('timeLabel')}</th>
+                                                <th className={thLabelClass}>{t('receiptLabel')}</th>
+                                                <th className={thLabelClass}>{t('tableNumber')}</th>
+                                                <th className={`${thLabelClass} !text-right`}>{t('amountLabel')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {allGroupedOrders.map((receipt) => (
+                                                <tr key={receipt.id} className="border-t border-[var(--border)]">
+                                                    <td className="px-3 py-1.5 text-[11px] font-mono text-[var(--foreground)]">
+                                                        {new Date(receipt.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-[11px] font-mono font-black text-[var(--foreground)]">
+                                                        {receipt.orders[0]?.receipt_number ?? '-'}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)]">
+                                                        {receipt.table_id || t('takeout')}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-[11px] text-right font-mono font-black text-[var(--accent)]">
+                                                        {formatUsd(receipt.total_usd)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('todaysSalesSummary')}</h3>
-                        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-                            <table className="w-full min-w-[640px]">
-                                <thead className="bg-[var(--bg-elevated)]">
-                                    <tr>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('metricLabel')}</th>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('valueLabel')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('reportDateLabel')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{dailyPreview?.report_date || endDate}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('paidOrdersLabel')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{dailyPreview?.paid_orders ?? 0}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('totalSalesLabel')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.total_sales_usd ?? 0)}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)] align-top">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('paidReceiptsLabel')}</td>
-                                        <td className="px-3 py-2">
-                                            {allGroupedOrders.length === 0 ? (
-                                                <span className="text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('noPaidReceipts')}</span>
-                                            ) : (
-                                                <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-                                                    <table className="w-full min-w-[420px]">
-                                                        <thead className="bg-[var(--bg-card)]">
-                                                            <tr>
-                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('timeLabel')}</th>
-                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('receiptLabel')}</th>
-                                                                <th className="text-left px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('tableNumber')}</th>
-                                                                <th className="text-right px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)] opacity-60">{t('amountLabel')}</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {allGroupedOrders.map((receipt) => (
-                                                                <tr key={receipt.id} className="border-t border-[var(--border)]">
-                                                                    <td className="px-2 py-1.5 text-[11px] font-mono text-[var(--foreground)]">
-                                                                        {new Date(receipt.created_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                                    </td>
-                                                                    <td className="px-2 py-1.5 text-[11px] font-mono font-black text-[var(--foreground)]">
-                                                                        {receipt.orders[0]?.receipt_number ?? '-'}
-                                                                    </td>
-                                                                    <td className="px-2 py-1.5 text-[11px] font-bold text-[var(--foreground)]">
-                                                                        {receipt.table_id || t('takeout')}
-                                                                    </td>
-                                                                    <td className="px-2 py-1.5 text-[11px] text-right font-mono font-black text-[var(--accent)]">
-                                                                        {formatUsd(receipt.total_usd)}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    {/* ── Cash count / drawer reconciliation ── */}
+                    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Wallet size={15} className="text-[var(--accent)]" />
+                            <h3 className={sectionHeadingClass}>{t('drawerReconciliation')}</h3>
+                        </div>
+                        <div className="divide-y divide-[var(--border)]">
+                            <div className="flex items-center justify-between gap-3 py-2">
+                                <span className="text-xs font-bold text-[var(--foreground)]">{t('expectedCashUsd')}</span>
+                                <span className="text-xs font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.cash_usd_cents ?? 0)}</span>
+                            </div>
+                            {(dailyPreview?.cash_khr_riels ?? 0) > 0 && (
+                                <div className="flex items-center justify-between gap-3 py-2">
+                                    <span className="text-xs font-bold text-[var(--foreground)]">{t('expectedCashKhr')}</span>
+                                    <span className="text-xs font-mono font-black text-[var(--accent)]">{formatKhr(dailyPreview?.cash_khr_riels ?? 0)}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between gap-3 py-2">
+                                <span className="text-xs font-bold text-[var(--foreground)]">{t('actualCounted')}</span>
+                                <div className="relative w-[150px]">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--text-secondary)]/50">$</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={actualCountedCashUsd}
+                                        onChange={e => setActualCountedCashUsd(e.target.value)}
+                                        disabled={!!dailyPreview?.is_closed}
+                                        placeholder="0.00"
+                                        className="w-full text-right bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg pl-6 pr-3 py-1.5 text-xs font-mono font-black text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all disabled:opacity-50"
+                                    />
+                                </div>
+                            </div>
+                            {actualCountedCashUsd !== '' && (
+                                <div className="flex items-center justify-between gap-3 py-2">
+                                    <span className="text-xs font-bold text-[var(--foreground)]">{t('cashVariance')}</span>
+                                    {(() => {
+                                        const counted = Math.round(parseFloat(actualCountedCashUsd || '0') * 100);
+                                        const expected = dailyPreview?.cash_usd_cents ?? 0;
+                                        const variance = counted - expected;
+                                        return (
+                                            <span className={`text-xs font-mono font-black ${variance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                {variance >= 0 ? '+' : ''}{formatUsd(Math.abs(variance))} {variance > 0 ? `(${t('cashVarianceOver')})` : variance < 0 ? `(${t('cashVarianceShort')})` : ''}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                            )}
                         </div>
                     </div>
+                </div>
 
-                    {/* Drawer Reconciliation */}
-                    <div className="space-y-3">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('drawerReconciliation')}</h3>
-                        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-                            <table className="w-full min-w-[480px]">
-                                <tbody>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('expectedCashUsd')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(dailyPreview?.cash_usd_cents ?? 0)}</td>
-                                    </tr>
-                                    {(dailyPreview?.cash_khr_riels ?? 0) > 0 && (
-                                        <tr className="border-t border-[var(--border)]">
-                                            <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('expectedCashKhr')}</td>
-                                            <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatKhr(dailyPreview?.cash_khr_riels ?? 0)}</td>
-                                        </tr>
-                                    )}
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('actualCounted')}</td>
-                                        <td className="px-3 py-2">
-                                            <div className="relative max-w-[160px]">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--text-secondary)]/50">$</span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    value={actualCountedCashUsd}
-                                                    onChange={e => setActualCountedCashUsd(e.target.value)}
-                                                    placeholder="0.00"
-                                                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg pl-6 pr-3 py-1.5 text-xs font-mono font-black text-[var(--foreground)] focus:border-[var(--accent)] outline-none transition-all"
-                                                />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {actualCountedCashUsd !== '' && (
-                                        <tr className="border-t border-[var(--border)]">
-                                            <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('cashVariance')}</td>
-                                            <td className="px-3 py-2">
-                                                {(() => {
-                                                    const counted = Math.round(parseFloat(actualCountedCashUsd || '0') * 100);
-                                                    const expected = dailyPreview?.cash_usd_cents ?? 0;
-                                                    const variance = counted - expected;
-                                                    return (
-                                                        <span className={`text-xs font-mono font-black ${variance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                            {variance >= 0 ? '+' : ''}{formatUsd(Math.abs(variance))} {variance > 0 ? `(${t('cashVarianceOver')})` : variance < 0 ? `(${t('cashVarianceShort')})` : ''}
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                {/* ── Expenses editor ── */}
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3 relative z-20">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <ReceiptText size={15} className="text-[var(--accent)]" />
+                            <h3 className={sectionHeadingClass}>{t('todaysExpenses')}</h3>
                         </div>
+                        <button
+                            type="button"
+                            onClick={addAdjustmentRow}
+                            disabled={!!dailyPreview?.is_closed}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 font-bold text-[11px] ${km ? 'khmer' : ''}`}
+                        >
+                            <Plus size={13} />
+                            {t('addExpense')}
+                        </button>
                     </div>
 
-                    <div className="space-y-3 relative z-20">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('todaysExpenses')}</h3>
-                            <button
-                                type="button"
-                                onClick={addAdjustmentRow}
-                                disabled={!!dailyPreview?.is_closed}
-                                className="px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest"
-                            >
-                                + {t('addExpense')}
-                            </button>
-                        </div>
-
-                    <div className="overflow-visible">
-                        <table className="w-full min-w-[680px] border-separate border-spacing-y-2">
+                    <div className="overflow-x-auto overflow-y-visible">
+                        <table className="w-full min-w-[560px] border-separate border-spacing-y-2">
                             <thead>
                                 <tr>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('dateLabel')}</th>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('category')}</th>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('description')}</th>
-                                    <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60 w-[180px]">{t('amountLabel')}</th>
-                                    <th className="px-3 py-2 w-[72px]"></th>
+                                    <th className={thLabelClass}>{t('dateLabel')}</th>
+                                    <th className={thLabelClass}>{t('category')}</th>
+                                    <th className={thLabelClass}>{t('description')}</th>
+                                    <th className={`${thLabelClass} w-[150px]`}>{t('amountLabel')}</th>
+                                    <th className="px-3 py-2 w-[64px]"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1144,7 +1149,7 @@ export default function HistoryPage() {
                                                 value={row.date}
                                                 onChange={(e) => updateAdjustmentRow(row.id, 'date', e.target.value)}
                                                 disabled={!!dailyPreview?.is_closed}
-                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black uppercase tracking-widest text-[var(--foreground)]"
+                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-medium text-[var(--foreground)]"
                                             />
                                         </td>
                                         <td className="px-1">
@@ -1163,7 +1168,7 @@ export default function HistoryPage() {
                                                 onChange={(e) => updateAdjustmentRow(row.id, 'description', e.target.value)}
                                                 disabled={!!dailyPreview?.is_closed}
                                                 placeholder={t('phExpenseExample')}
-                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black text-[var(--foreground)]"
+                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
                                             />
                                         </td>
                                         <td className="px-1">
@@ -1175,7 +1180,7 @@ export default function HistoryPage() {
                                                 onChange={(e) => updateAdjustmentRow(row.id, 'price', e.target.value)}
                                                 disabled={!!dailyPreview?.is_closed}
                                                 placeholder="0.00"
-                                                className="pos-input px-3 py-2 h-11 text-xs w-full bg-[var(--bg-elevated)] font-black font-mono text-[var(--foreground)]"
+                                                className="pos-input px-3 py-2 h-11 text-xs w-full text-right bg-[var(--bg-elevated)] font-black font-mono text-[var(--foreground)]"
                                             />
                                         </td>
                                         <td className="px-1 text-right">
@@ -1183,9 +1188,11 @@ export default function HistoryPage() {
                                                 type="button"
                                                 onClick={() => removeAdjustmentRow(row.id)}
                                                 disabled={!!dailyPreview?.is_closed}
-                                                className="h-11 px-3 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all font-black text-[10px] uppercase tracking-widest"
+                                                title={t('removeBtn')}
+                                                aria-label={t('removeBtn')}
+                                                className="h-11 w-11 inline-flex items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-red-400 hover:border-red-400/50 transition-all disabled:opacity-40"
                                             >
-                                                {t('removeBtn')}
+                                                <Trash2 size={14} />
                                             </button>
                                         </td>
                                     </tr>
@@ -1193,126 +1200,138 @@ export default function HistoryPage() {
                             </tbody>
                         </table>
                     </div>
-                    </div>
+                </div>
 
-                    <div className="space-y-3 pt-1 relative z-0">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('inventoryUsageSummary')}</h3>
-                        {inventoryUsageRows.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-4 text-[11px] font-bold text-[var(--text-secondary)] opacity-70">
-                                {t('noInventoryUsage')}
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-                                <table className="w-full min-w-[680px]">
-                                    <thead className="bg-[var(--bg-elevated)]">
-                                        <tr>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('inventoryItemLabel')}</th>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('usedQtyLabel')}</th>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('costPerUnit')}</th>
-                                            <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('totalCostLabel')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {inventoryUsageRows.map((item) => (
-                                            <tr key={item.inventory_item_id} className="border-t border-[var(--border)]">
-                                                <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{item.inventory_item_name}</td>
-                                                <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{item.used_quantity.toFixed(2)} {item.unit_label}</td>
-                                                <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">${item.cost_per_unit.toFixed(2)}</td>
-                                                <td className="px-3 py-2 text-xs font-mono font-black text-[var(--accent)]">{formatUsd(item.total_cost_usd)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                {/* ── Inventory usage ── */}
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3 relative z-0">
+                    <div className="flex items-center gap-2">
+                        <Boxes size={15} className="text-[var(--accent)]" />
+                        <h3 className={sectionHeadingClass}>{t('inventoryUsageSummary')}</h3>
                     </div>
-
-                    <div className="space-y-3 pt-1">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('businessSummary')}</h3>
+                    {inventoryUsageRows.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-4 text-[11px] font-bold text-[var(--text-secondary)] opacity-70">
+                            {t('noInventoryUsage')}
+                        </div>
+                    ) : (
                         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-                            <table className="w-full min-w-[760px]">
+                            <table className="w-full min-w-[560px]">
                                 <thead className="bg-[var(--bg-elevated)]">
                                     <tr>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('metricLabel')}</th>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('valueLabel')}</th>
-                                        <th className="text-left px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('editLabel')}</th>
+                                        <th className={thLabelClass}>{t('inventoryItemLabel')}</th>
+                                        <th className={thLabelClass}>{t('usedQtyLabel')}</th>
+                                        <th className={thLabelClass}>{t('costPerUnit')}</th>
+                                        <th className={`${thLabelClass} !text-right`}>{t('totalCostLabel')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('totalSalesLabel')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-[var(--foreground)]">{formatUsd(totalSalesCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('autoFromPaidOrders')}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('totalExpensesLabel')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-orange-400">{formatUsd(adjustmentTotalCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('editableInExpenses')}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)]">
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{t('inventoryUsageCost')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-sky-300">{formatUsd(inventoryUsageCostCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-70">{t('autoFromInventory')}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)] bg-emerald-500/10">
-                                        <td className="px-3 py-2 text-xs font-black text-emerald-200">{t('operationalProfit')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-emerald-300">{formatUsd(netProfitCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-emerald-200/80">{t('operationalProfitFormula')}</td>
-                                    </tr>
-                                    <tr className="border-t border-[var(--border)] bg-violet-500/10">
-                                        <td className="px-3 py-2 text-xs font-black text-violet-200">{t('estimatedProfitAfterInventory')}</td>
-                                        <td className="px-3 py-2 text-xs font-mono font-black text-violet-300">{formatUsd(estimatedProfitAfterInventoryCents)}</td>
-                                        <td className="px-3 py-2 text-xs font-bold text-violet-200/80">{t('estimatedProfitFormula')}</td>
-                                    </tr>
+                                    {inventoryUsageRows.map((item) => (
+                                        <tr key={item.inventory_item_id} className="border-t border-[var(--border)]">
+                                            <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{item.inventory_item_name}</td>
+                                            <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">{item.used_quantity.toFixed(2)} {item.unit_label}</td>
+                                            <td className="px-3 py-2 text-xs font-mono text-[var(--foreground)]">${item.cost_per_unit.toFixed(2)}</td>
+                                            <td className="px-3 py-2 text-xs text-right font-mono font-black text-[var(--accent)]">{formatUsd(item.total_cost_usd)}</td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
-                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60">{t('inventoryUsageCostNote')}</p>
-                    </div>
+                    )}
+                </div>
 
-                    <div className="space-y-2 pt-1">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('dailyNotesLabel')}</h3>
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-60">{t('dailyNotesLabel')}</label>
-                        <textarea
-                            value={reportNotes}
-                            onChange={(e) => setReportNotes(e.target.value)}
-                            rows={4}
-                            disabled={!!dailyPreview?.is_closed}
-                            placeholder={t('phExpenseNoteExample')}
-                            className="pos-input px-3 py-2 text-xs w-full bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
-                        />
+                {/* ── Business summary / profit ── */}
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <TrendingUp size={15} className="text-[var(--accent)]" />
+                        <h3 className={sectionHeadingClass}>{t('businessSummary')}</h3>
                     </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3 py-2 border-b border-[var(--border)]">
+                            <div>
+                                <div className="text-xs font-bold text-[var(--foreground)]">{t('totalSalesLabel')}</div>
+                                <div className={`text-[10px] font-bold text-[var(--text-secondary)] opacity-60 ${km ? 'khmer' : ''}`}>{t('autoFromPaidOrders')}</div>
+                            </div>
+                            <span className="text-sm font-mono font-black text-[var(--foreground)]">{formatUsd(totalSalesCents)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 py-2 border-b border-[var(--border)]">
+                            <div>
+                                <div className="text-xs font-bold text-[var(--foreground)]">{t('totalExpensesLabel')}</div>
+                                <div className={`text-[10px] font-bold text-[var(--text-secondary)] opacity-60 ${km ? 'khmer' : ''}`}>{t('editableInExpenses')}</div>
+                            </div>
+                            <span className="text-sm font-mono font-black text-orange-400">{formatUsd(adjustmentTotalCents)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 py-2 border-b border-[var(--border)]">
+                            <div>
+                                <div className="text-xs font-bold text-[var(--foreground)]">{t('inventoryUsageCost')}</div>
+                                <div className={`text-[10px] font-bold text-[var(--text-secondary)] opacity-60 ${km ? 'khmer' : ''}`}>{t('autoFromInventory')}</div>
+                            </div>
+                            <span className="text-sm font-mono font-black text-sky-300">{formatUsd(inventoryUsageCostCents)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-emerald-500/10">
+                            <div>
+                                <div className="text-xs font-black text-emerald-200">{t('operationalProfit')}</div>
+                                <div className={`text-[10px] font-bold text-emerald-200/80 ${km ? 'khmer' : ''}`}>{t('operationalProfitFormula')}</div>
+                            </div>
+                            <span className="text-sm font-mono font-black text-emerald-300">{formatUsd(netProfitCents)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-violet-500/10">
+                            <div>
+                                <div className="text-xs font-black text-violet-200">{t('estimatedProfitAfterInventory')}</div>
+                                <div className={`text-[10px] font-bold text-violet-200/80 ${km ? 'khmer' : ''}`}>{t('estimatedProfitFormula')}</div>
+                            </div>
+                            <span className="text-sm font-mono font-black text-violet-300">{formatUsd(estimatedProfitAfterInventoryCents)}</span>
+                        </div>
+                    </div>
+                    <p className={`text-[10px] font-bold text-[var(--text-secondary)] opacity-60 ${km ? 'khmer' : ''}`}>{t('inventoryUsageCostNote')}</p>
+                </div>
 
-                    <div className="space-y-3 border-t border-[var(--border)] mt-3 pt-4">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-secondary)] opacity-70">{t('actions')}</h3>
+                {/* ── Daily notes ── */}
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <StickyNote size={15} className="text-[var(--accent)]" />
+                        <h3 className={sectionHeadingClass} id="daily-notes-label">{t('dailyNotesLabel')}</h3>
+                    </div>
+                    <textarea
+                        value={reportNotes}
+                        onChange={(e) => setReportNotes(e.target.value)}
+                        rows={4}
+                        disabled={!!dailyPreview?.is_closed}
+                        aria-labelledby="daily-notes-label"
+                        placeholder={t('phExpenseNoteExample')}
+                        className="pos-input px-3 py-2 text-xs w-full bg-[var(--bg-elevated)] font-bold text-[var(--foreground)]"
+                    />
+                </div>
+
+                {/* ── Actions ── */}
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
                                 onClick={handleSaveDraft}
                                 disabled={!!dailyPreview?.is_closed}
-                                className="px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 font-black text-xs uppercase tracking-widest"
+                                className={`px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all disabled:opacity-40 font-bold text-xs ${km ? 'khmer' : ''}`}
                             >
                                 {t('saveDraft')}
                             </button>
                             <button
                                 type="button"
                                 onClick={handlePrintPreview}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all font-black text-xs uppercase tracking-widest"
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-all font-bold text-xs ${km ? 'khmer' : ''}`}
                             >
                                 <Printer size={14} />
                                 {t('printPreviewBtn')}
                             </button>
-                            {canCloseShiftReport(user?.role) && (
-                                <button
-                                    onClick={handleCloseReport}
-                                    disabled={closingReport || loading || !allGroupedOrders?.length || !!dailyPreview?.is_closed}
-                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-black hover:brightness-110 transition-all disabled:opacity-30 font-black text-xs uppercase tracking-widest"
-                                >
-                                    <Printer size={14} />
-                                    {closingReport ? t('closingLabel') : t('closeReportBtn')}
-                                </button>
-                            )}
                         </div>
+                        {canCloseShiftReport(user?.role) && (
+                            <button
+                                onClick={handleCloseReport}
+                                disabled={closingReport || loading || !allGroupedOrders?.length || !!dailyPreview?.is_closed}
+                                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[var(--accent)] text-black hover:brightness-110 shadow-lg shadow-[var(--accent)]/25 transition-all disabled:opacity-30 disabled:shadow-none font-black text-sm ${km ? 'khmer' : 'uppercase tracking-wider'}`}
+                            >
+                                {closingReport ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+                                {closingReport ? t('closingLabel') : t('closeReportBtn')}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1411,7 +1430,7 @@ export default function HistoryPage() {
                                         <button
                                             type="button"
                                             onClick={() => handleReopenReport(report)}
-                                            className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 font-black text-[10px] uppercase tracking-widest transition-all"
+                                            className={`px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 font-bold text-[11px] transition-all ${km ? 'khmer' : ''}`}
                                         >
                                             {t('reopenReport')}
                                         </button>
@@ -1419,16 +1438,18 @@ export default function HistoryPage() {
                                     <button
                                         type="button"
                                         onClick={() => handleExportDailyReport(report)}
-                                        className="px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] font-black text-[10px] uppercase tracking-widest transition-all"
+                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)] font-bold text-[11px] transition-all ${km ? 'khmer' : ''}`}
                                     >
-                                        {t('exportBtn')}
+                                        <Download size={13} />
+                                        {t('exportReport')}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handlePrintDailyReport(report)}
-                                        className="px-3 py-2 rounded-xl bg-[var(--accent)] text-black font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all"
+                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-black font-bold text-[11px] hover:brightness-110 transition-all ${km ? 'khmer' : ''}`}
                                     >
-                                        {t('printBtn')}
+                                        <Printer size={13} />
+                                        {t('printReport')}
                                     </button>
                                 </div>
                             </div>

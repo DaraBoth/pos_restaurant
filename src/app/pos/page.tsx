@@ -126,7 +126,7 @@ export default function POSPage() {
                 {rateIsDefault && (
                     <button
                         type="button"
-                        onClick={() => router.push('/management/exchange-rate')}
+                        onClick={() => router.push('/settings/business/exchange-rate')}
                         className="flex-shrink-0 w-full flex items-center gap-2 px-4 py-2 bg-amber-500/15 border-b border-amber-500/40 text-amber-400 text-xs font-bold text-left hover:bg-amber-500/25 transition-colors"
                     >
                         <AlertTriangle size={14} className="flex-shrink-0" />

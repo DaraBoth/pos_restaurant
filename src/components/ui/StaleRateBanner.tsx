@@ -5,20 +5,22 @@ import { useOrder } from '@/providers/OrderProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { AlertTriangle, X } from 'lucide-react';
 
-const TODAY = new Date().toISOString().slice(0, 10);
-const DISMISS_KEY = `dineos.rate.dismissed.${TODAY}`;
 const STALE_MS = 24 * 60 * 60 * 1000;
 
 export default function StaleRateBanner() {
     const { rateEffectiveFrom } = useOrder();
     const { t } = useLanguage();
 
+    // Compute per-day dismissal key at render time so it stays correct across midnight.
+    const today = new Date().toISOString().slice(0, 10);
+    const dismissKey = `dineos.rate.dismissed.${today}`;
+
     const [mountMs] = useState<number>(() =>
         typeof window !== 'undefined' ? Date.now() : 0
     );
     const [dismissed, setDismissed] = useState<boolean>(() =>
         typeof window !== 'undefined'
-            ? localStorage.getItem(DISMISS_KEY) === '1'
+            ? localStorage.getItem(dismissKey) === '1'
             : true
     );
 
@@ -31,7 +33,7 @@ export default function StaleRateBanner() {
 
     function handleDismiss() {
         if (typeof window !== 'undefined') {
-            localStorage.setItem(DISMISS_KEY, '1');
+            localStorage.setItem(dismissKey, '1');
         }
         setDismissed(true);
     }
@@ -39,7 +41,7 @@ export default function StaleRateBanner() {
     return (
         <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-400 text-xs font-bold">
             <AlertTriangle size={13} className="flex-shrink-0" />
-            <Link href="/management/exchange-rate" className="flex-1 hover:underline">
+            <Link href="/settings/business/exchange-rate" className="flex-1 hover:underline">
                 {t('staleRateWarning')}
             </Link>
             <button

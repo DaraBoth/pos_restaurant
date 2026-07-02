@@ -63,7 +63,11 @@ export function SyncStatus({ collapsed = false }: { collapsed?: boolean }) {
                 setFriendlyKey(key);
                 setRawError(status.error_message);
                 if (!status.connected) {
-                    console.error('[SyncStatus]', status.error_message);
+                    // Transient/expected sync hiccups (e.g. Hrana "stream not found",
+                    // network drops) are already surfaced via the error pill and
+                    // self-recover on the next poll — log at warn level so they don't
+                    // trip the Next.js error overlay or the error relay as crashes.
+                    console.warn('[SyncStatus]', status.error_message);
                 }
             } else {
                 setRawError('');

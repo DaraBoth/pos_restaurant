@@ -5,7 +5,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { checkoutOrder, checkoutSession, getOrderItems, getRestaurant, PaymentInput, OrderItem } from '@/lib/tauri-commands';
 import { formatUsd, formatKhr, roundKhr, parseToCents, formatUsdNumeric } from '@/lib/currency';
-import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag, Printer } from 'lucide-react';
+import { X, CheckCircle, CreditCard, Banknote, QrCode, Tag, Printer, AlertTriangle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import useOverlayBehavior from '@/hooks/useOverlayBehavior';
 import { printReceipt, ReceiptPrintPayload } from '@/lib/receipt';
 import { canApplyDiscount } from '@/lib/permissions';
@@ -17,9 +18,10 @@ export default function CheckoutModal({
     onClose: () => void;
     onComplete: (payload: ReceiptPrintPayload) => void;
 }) {
-    const { orderId, totals, exchangeRate, clearOrder, items, tableId, sessionId, rounds, refreshRate, orderNote } = useOrder();
+    const { orderId, totals, exchangeRate, rateIsDefault, clearOrder, items, tableId, sessionId, rounds, refreshRate, orderNote } = useOrder();
     const { user } = useAuth();
     const { t } = useLanguage();
+    const router = useRouter();
 
     const [usdInput, setUsdInput] = useState<string>('');
     const [khrInput, setKhrInput] = useState<string>('');
@@ -30,6 +32,7 @@ export default function CheckoutModal({
     const [discountUsdInput, setDiscountUsdInput] = useState<string>('');
     const [discountMode, setDiscountMode] = useState<'pct' | 'fixed'>('pct');
     const [bakongReference, setBakongReference] = useState<string>('');
+    const [rateConfirmed, setRateConfirmed] = useState(false);
 
     const [combinedItems, setCombinedItems] = useState<OrderItem[]>(items);
     const [combinedTotals, setCombinedTotals] = useState(totals);
@@ -86,64 +89,63 @@ export default function CheckoutModal({
 
     // Split payment logic (applied against discounted total)
     const usdInputCents = usdInput ? parseToCents(usdInput) : 0;
+    const khrInputRiels = parseInt(khrInput) || 0;
 
-    // Amount still owed
+    // KHR cash expressed in USD cents at the current rate, so USD + KHR cash can be tendered together
+    const khrAsUsdCents = khrInputRiels > 0 ? Math.round(khrInputRiels / exchangeRate * 100) : 0;
+    const combinedCashCents = usdInputCents + khrAsUsdCents;
+    const anyCashEntered = usdInputCents > 0 || khrInputRiels > 0;
+
+    // Amount still owed after USD cash (used for the khqr/card split remainder)
     const remainingUsdCents = Math.max(0, discountedTotals.totalUsdCents - usdInputCents);
     const remainingKhr = roundKhr(remainingUsdCents, exchangeRate);
 
-    // Change due if they overpay in USD cash
-    const changeUsdCents = Math.max(0, usdInputCents - discountedTotals.totalUsdCents);
+    // Single net change: from combined cash tender for cash, or USD overpay for other methods
+    const changeUsdCents = method === 'cash'
+        ? Math.max(0, combinedCashCents - discountedTotals.totalUsdCents)
+        : Math.max(0, usdInputCents - discountedTotals.totalUsdCents);
+    const changeKhrRiels = changeUsdCents > 0 ? roundKhr(changeUsdCents, exchangeRate) : 0;
 
-    // Cash underpayment guard: only applies when method is cash and some USD has been entered
-    const isUnderpaid = method === 'cash' && usdInputCents > 0 && usdInputCents < discountedTotals.totalUsdCents;
-    const shortfallCents = isUnderpaid ? discountedTotals.totalUsdCents - usdInputCents : 0;
+    // Cash underpayment guard: block only when the COMBINED tender is still short of the bill
+    const isUnderpaid = method === 'cash' && anyCashEntered && combinedCashCents < discountedTotals.totalUsdCents;
+    const shortfallCents = isUnderpaid ? discountedTotals.totalUsdCents - combinedCashCents : 0;
 
-    const khrInputRiels = parseInt(khrInput) || 0;
-    const khrChangeRiels = khrInputRiels > 0 ? khrInputRiels - discountedTotals.totalKhr : 0;
-    const isKhrUnderpaid = khrInputRiels > 0 && khrInputRiels < discountedTotals.totalKhr;
-    const mixedCashWarning = usdInputCents > 0 && khrInputRiels > 0;
+    function buildPayments(): PaymentInput[] {
+        const payments: PaymentInput[] = [];
+        if (method === 'cash') {
+            // Allocate USD cash first, remainder of the bill to KHR, so recorded rows sum to the bill (not the over-tendered amount)
+            const billCents = discountedTotals.totalUsdCents;
+            const usdPortionCents = Math.min(usdInputCents, billCents);
+            const remainingBillCents = billCents - usdPortionCents;
+            const khrPortionRiels = remainingBillCents > 0
+                ? Math.min(khrInputRiels, roundKhr(remainingBillCents, exchangeRate))
+                : 0;
+            if (usdPortionCents > 0) payments.push({ method: 'cash', currency: 'USD', amount: usdPortionCents });
+            if (khrPortionRiels > 0) payments.push({ method: 'cash', currency: 'KHR', amount: khrPortionRiels });
+            // Exact-cash fast path: nothing typed means the bill was paid in exact USD cash
+            if (payments.length === 0) payments.push({ method: 'cash', currency: 'USD', amount: billCents });
+        } else {
+            if (usdInputCents > 0) {
+                payments.push({ method: 'cash', currency: 'USD', amount: Math.min(usdInputCents, discountedTotals.totalUsdCents) });
+            }
+            if (remainingUsdCents > 0) {
+                if (method === 'khqr') {
+                    payments.push({ method: 'khqr', currency: 'KHR', amount: remainingKhr, bakong_transaction_hash: bakongReference.trim() || undefined });
+                } else {
+                    payments.push({ method, currency: 'USD', amount: remainingUsdCents });
+                }
+            }
+        }
+        return payments;
+    }
 
     async function handleConfirm() {
         if (!orderId) return;
+        if (rateIsDefault && !rateConfirmed) return;
         setLoading(true);
 
         try {
-            const payments: PaymentInput[] = [];
-
-            if (khrInputRiels > 0 && usdInputCents === 0) {
-                // KHR cash only
-                payments.push({
-                    method: 'cash',
-                    currency: 'KHR',
-                    amount: Math.min(khrInputRiels, discountedTotals.totalKhr)
-                });
-            } else {
-                if (usdInputCents > 0) {
-                    // They paid some/all in USD Cash
-                    payments.push({
-                        method: 'cash',
-                        currency: 'USD',
-                        amount: Math.min(usdInputCents, discountedTotals.totalUsdCents)
-                    });
-                }
-
-                if (remainingUsdCents > 0) {
-                    if (method === 'khqr') {
-                        payments.push({
-                            method: 'khqr',
-                            currency: 'KHR',
-                            amount: remainingKhr,
-                            bakong_transaction_hash: bakongReference.trim() || undefined
-                        });
-                    } else {
-                        payments.push({
-                            method,
-                            currency: 'USD',
-                            amount: remainingUsdCents
-                        });
-                    }
-                }
-            }
+            const payments = buildPayments();
 
             let customerName, customerPhone, receiptNumber: string | undefined;
             let takeoutCounter: number | undefined;
@@ -161,7 +163,6 @@ export default function CheckoutModal({
             }
 
             const restaurant = await getRestaurant(user?.restaurant_id || '');
-            const changeKhr = changeUsdCents > 0 ? Math.round(changeUsdCents / 100 * exchangeRate) : undefined;
             const payload: ReceiptPrintPayload = {
                 restaurant,
                 orderId,
@@ -171,9 +172,9 @@ export default function CheckoutModal({
                 customerPhone: customerPhone,
                 cashierName: user?.full_name || user?.username,
                 receivedCents: usdInputCents > 0 ? usdInputCents : undefined,
-                receivedKhr: khrInputRiels > 0 && usdInputCents === 0 ? khrInputRiels : undefined,
+                receivedKhr: khrInputRiels > 0 ? khrInputRiels : undefined,
                 changeCents: changeUsdCents > 0 ? changeUsdCents : undefined,
-                changeKhr: changeUsdCents > 0 ? changeKhr : (khrChangeRiels > 0 ? khrChangeRiels : undefined),
+                changeKhr: changeKhrRiels > 0 ? changeKhrRiels : undefined,
                 discountPct: discountMode === 'pct' && discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
                 takeoutCounter,
@@ -198,30 +199,7 @@ export default function CheckoutModal({
 
     function handlePreviewPrint() {
         if (!orderId) return;
-        const payments: PaymentInput[] = [];
-        if (usdInputCents > 0) {
-            payments.push({
-                method: 'cash',
-                currency: 'USD',
-                amount: Math.min(usdInputCents, discountedTotals.totalUsdCents)
-            });
-        }
-        if (remainingUsdCents > 0) {
-            if (method === 'khqr') {
-                payments.push({
-                    method: 'khqr',
-                    currency: 'KHR',
-                    amount: remainingKhr,
-                    bakong_transaction_hash: bakongReference.trim() || undefined
-                });
-            } else {
-                payments.push({
-                    method,
-                    currency: 'USD',
-                    amount: remainingUsdCents
-                });
-            }
-        }
+        const payments = buildPayments();
 
         getRestaurant(user?.restaurant_id || '').then(restaurant => {
             const currentOrder = rounds.find(r => r.id === orderId);
@@ -233,6 +211,9 @@ export default function CheckoutModal({
                 customerPhone: currentOrder?.customer_phone,
                 cashierName: user?.full_name || user?.username,
                 receivedCents: usdInputCents > 0 ? usdInputCents : undefined,
+                receivedKhr: khrInputRiels > 0 ? khrInputRiels : undefined,
+                changeCents: changeUsdCents > 0 ? changeUsdCents : undefined,
+                changeKhr: changeKhrRiels > 0 ? changeKhrRiels : undefined,
                 discountPct: discountMode === 'pct' && discountPct > 0 ? discountPct : undefined,
                 discountCents: discountCents > 0 ? discountCents : undefined,
                 items: combinedItems,
@@ -308,8 +289,13 @@ export default function CheckoutModal({
                             <div className="text-base font-bold font-mono text-[var(--text-secondary)] opacity-60 mt-1">
                                 {formatKhr(discountedTotals.totalKhr)}
                             </div>
-                            <div className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40 mt-0.5">
-                                $1 = {formatKhr(Math.round(exchangeRate))}
+                            <div className={`text-[10px] font-bold mt-0.5 flex items-center gap-1.5 ${rateIsDefault ? 'text-amber-500 opacity-90' : 'text-[var(--text-secondary)] opacity-40'}`}>
+                                <span>$1 = {formatKhr(Math.round(exchangeRate))}</span>
+                                {rateIsDefault && (
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-500 text-[8px] font-black uppercase tracking-widest">
+                                        {t('rateDefaultBadge')}
+                                    </span>
+                                )}
                             </div>
                             {discountCents > 0 && (
                                 <div className="mt-1.5 text-[10px] font-bold text-yellow-600">
@@ -318,6 +304,29 @@ export default function CheckoutModal({
                                 </div>
                             )}
                         </div>
+
+                        {/* Default-rate guard: unset exchange rate can freeze wrong KHR totals onto the receipt */}
+                        {rateIsDefault && (
+                            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/settings/business/exchange-rate')}
+                                    className="w-full flex items-start gap-2 text-left text-amber-500 hover:text-amber-400 transition-colors"
+                                >
+                                    <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                                    <span className="flex-1 text-[11px] font-bold leading-snug">{t('rateDefaultCheckoutWarning')}</span>
+                                </button>
+                                <label className="flex items-start gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={rateConfirmed}
+                                        onChange={e => setRateConfirmed(e.target.checked)}
+                                        className="mt-0.5 w-4 h-4 flex-shrink-0 accent-amber-500 cursor-pointer"
+                                    />
+                                    <span className="flex-1 text-[11px] font-bold text-[var(--foreground)] leading-snug">{t('rateDefaultConfirm')}</span>
+                                </label>
+                            </div>
+                        )}
 
                         {/* Discount — admin/manager only */}
                         <div className="space-y-1.5">
@@ -479,18 +488,13 @@ export default function CheckoutModal({
                                 </div>
                             </div>
 
-                            {changeUsdCents > 0 ? (
-                                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/25">
-                                    <div className="text-xs font-bold text-green-600">{t('change')}</div>
-                                    <div className="text-xl font-black font-mono text-green-700">{formatUsd(changeUsdCents)}</div>
-                                </div>
-                            ) : remainingUsdCents > 0 && usdInputCents > 0 ? (
+                            {method !== 'cash' && remainingUsdCents > 0 && usdInputCents > 0 && (
                                 <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/25">
                                     <div className="text-xs font-bold text-orange-600">{t('remainingVia')} {method.toUpperCase()}</div>
                                     <div className="text-xl font-black font-mono text-orange-700">{formatUsd(remainingUsdCents)}</div>
                                     <div className="text-xs font-mono text-orange-600/70 mt-0.5">{formatKhr(remainingKhr)}</div>
                                 </div>
-                            ) : null}
+                            )}
 
                             {/* KHR Cash input */}
                             <div>
@@ -521,21 +525,16 @@ export default function CheckoutModal({
                                         </button>
                                     ))}
                                 </div>
-                                {mixedCashWarning && (
-                                    <p className="text-[10px] text-amber-400 font-bold mt-1.5 text-center">{t('mixedCashWarning')}</p>
-                                )}
-                                {khrChangeRiels > 0 && !mixedCashWarning && (
-                                    <div className="mt-2 p-3 rounded-xl bg-green-500/10 border border-green-500/25">
-                                        <div className="text-xs font-bold text-green-600">{t('change')}</div>
-                                        <div className="text-xl font-black font-mono text-green-700">{formatKhr(khrChangeRiels)}</div>
-                                    </div>
-                                )}
-                                {isKhrUnderpaid && !mixedCashWarning && (
-                                    <p className="text-[10px] text-red-400 font-bold mt-1.5 text-center">
-                                        Short {formatKhr(discountedTotals.totalKhr - khrInputRiels)}
-                                    </p>
-                                )}
                             </div>
+
+                            {/* Combined cash tender summary — single net change shown in both currencies */}
+                            {method === 'cash' && anyCashEntered && changeUsdCents > 0 && (
+                                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/25">
+                                    <div className="text-xs font-bold text-green-600">{t('change')}</div>
+                                    <div className="text-xl font-black font-mono text-green-700">{formatUsd(changeUsdCents)}</div>
+                                    <div className="text-xs font-mono text-green-600/70 mt-0.5">{formatKhr(changeKhrRiels)}</div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-2">
@@ -550,7 +549,7 @@ export default function CheckoutModal({
                             <div className="flex-1 flex flex-col gap-1">
                                 {isUnderpaid && (
                                     <p className="text-[10px] text-red-400 font-bold text-center">
-                                        {t('paymentShort')} {formatUsd(shortfallCents)}
+                                        {t('paymentShort')} {formatUsd(shortfallCents)} · {formatKhr(roundKhr(shortfallCents, exchangeRate))}
                                     </p>
                                 )}
                                 {paymentError && (
@@ -560,7 +559,7 @@ export default function CheckoutModal({
                                 )}
                                 <button
                                     onClick={handleConfirm}
-                                    disabled={loading || isUnderpaid || isKhrUnderpaid || mixedCashWarning}
+                                    disabled={loading || isUnderpaid || (rateIsDefault && !rateConfirmed)}
                                     className="pos-btn-primary w-full py-4 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 uppercase tracking-widest active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? (

@@ -20,9 +20,10 @@ export default function SetupPage() {
     async function handleSaveRate() {
         const rate = parseFloat(rateInput);
         if (!(rate > 0)) return;
+        if (!user?.restaurant_id) return;
         setSavingRate(true);
         try {
-            await setExchangeRate(rate, user?.restaurant_id || undefined);
+            await setExchangeRate(rate, user.restaurant_id);
             setRateSaved(true);
         } catch (e) {
             console.error('Failed to set exchange rate during setup:', e);

@@ -357,6 +357,31 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                         <EditableField label={t('settingsBizNameKh')} value={info.khmer_name || ''} onSave={val => saveField('khmer_name', val)} placeholder="ហាងកាហ្វេវ៉ុល" icon={Building2} />
                         <EditableField label={t('settingsPhoneNumber')} value={info.phone || ''} onSave={val => saveField('phone', val)} placeholder="+855 12 345 678" icon={Phone} />
                         <EditableField label={t('settingsWebsiteUrl')} value={info.website || ''} onSave={val => saveField('website', val)} placeholder="voltcoffee.kh" icon={Globe} />
+
+                        {/* VAT Registration Toggle — grouped with the other business-registration fields */}
+                        <div className="space-y-4 p-4 border border-[var(--border)] rounded-2xl">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1">
+                                    <p className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">{t('settingsVatRegistration')}</p>
+                                    <p className="text-[10px] text-[var(--text-secondary)] opacity-70 max-w-md">
+                                        {t('settingsVatDesc')}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        const newVal = (info.vat_enabled ?? 0) === 1 ? 0 : 1;
+                                        await saveField('vat_enabled', newVal);
+                                    }}
+                                    className="focus:outline-none transition-all hover:scale-105 active:scale-95 flex-shrink-0"
+                                >
+                                    {(info.vat_enabled ?? 0) === 1 ? (
+                                        <ToggleRight size={38} className="text-[var(--accent-blue)]" />
+                                    ) : (
+                                        <ToggleLeft size={38} className="text-[var(--text-secondary)]" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -508,31 +533,6 @@ export default function RestaurantSettingsForm({ mode, activeSection, onSaved, o
                     </div>
                 )}
 
-            </div>
-
-            {/* VAT Registration Toggle */}
-            <div className="space-y-4 mt-4 p-4 border border-[var(--border)] rounded-2xl">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                        <p className="text-xs font-black text-[var(--foreground)] uppercase tracking-widest">{t('settingsVatRegistration')}</p>
-                        <p className="text-[10px] text-[var(--text-secondary)] opacity-70 max-w-md">
-                            {t('settingsVatDesc')}
-                        </p>
-                    </div>
-                    <button
-                        onClick={async () => {
-                            const newVal = (info.vat_enabled ?? 0) === 1 ? 0 : 1;
-                            await saveField('vat_enabled', newVal);
-                        }}
-                        className="focus:outline-none transition-all hover:scale-105 active:scale-95 flex-shrink-0"
-                    >
-                        {(info.vat_enabled ?? 0) === 1 ? (
-                            <ToggleRight size={38} className="text-[var(--accent-blue)]" />
-                        ) : (
-                            <ToggleLeft size={38} className="text-[var(--text-secondary)]" />
-                        )}
-                    </button>
-                </div>
             </div>
 
             {/* Setup-mode footer — tab advance + final "Get Started" */}

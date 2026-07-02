@@ -110,7 +110,7 @@ export default function AnalyticsPage() {
                     getTopProducts(period, restaurantId || undefined),
                     getRevenueByCategory(period, restaurantId || undefined),
                     getPeakHours(period, restaurantId || undefined),
-                    getExchangeRate(restaurantId || undefined).catch(() => null),
+                    restaurantId ? getExchangeRate(restaurantId).catch(() => null) : Promise.resolve(null),
                 ]);
                 setSummary(s);
                 setChartData(d);

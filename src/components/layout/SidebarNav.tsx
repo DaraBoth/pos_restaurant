@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon, Pencil, Hash, ArrowLeftRight, X, AlertTriangle } from 'lucide-react';
+import { LogOut, LayoutGrid, Settings, History, Globe, Store, Building2, UtensilsCrossed, ArrowLeftToLine, ArrowRightToLine, Sun, Moon, Pencil, Hash, ArrowLeftRight, X, AlertTriangle, ChevronUp } from 'lucide-react';
 import { getRestaurant, Restaurant } from '@/lib/tauri-commands';
 import { stopSync } from '@/lib/api/system';
 import { loginWithPin, resetWindowTitle } from '@/lib/api/auth';
@@ -13,7 +13,6 @@ import { SyncStatus } from '@/components/ui/SyncStatus';
 import { UpdateStatus } from '@/components/ui/UpdateStatus';
 import { canAccessAdminConsole, roleI18nKey } from '@/lib/permissions';
 import Link from 'next/link';
-import MySettingsModal from '@/components/layout/MySettingsModal';
 import { useOrder } from '@/providers/OrderProvider';
 
 const NavItem = ({
@@ -76,14 +75,34 @@ export default function SidebarNav() {
     const searchStr = searchParams.toString() ? '?' + searchParams.toString() : '';
     const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
     const [collapsed, setCollapsed] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isLogoutOpen, setIsLogoutOpen] = useState(false);
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const [isSwitchOpen, setIsSwitchOpen] = useState(false);
     const [switchPin, setSwitchPin] = useState('');
     const [switchError, setSwitchError] = useState('');
     const [switchLoading, setSwitchLoading] = useState(false);
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+    const accountMenuRef = useRef<HTMLDivElement>(null);
     const cartHasItems = items.length > 0 || localCart.length > 0;
+
+    // Close the account popover on outside-click or Escape
+    useEffect(() => {
+        if (!isAccountMenuOpen) return;
+        function onPointerDown(e: MouseEvent) {
+            if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+                setIsAccountMenuOpen(false);
+            }
+        }
+        function onKeyDown(e: KeyboardEvent) {
+            if (e.key === 'Escape') setIsAccountMenuOpen(false);
+        }
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [isAccountMenuOpen]);
 
     useEffect(() => {
         if (user) {
@@ -226,91 +245,99 @@ export default function SidebarNav() {
             </nav>
 
             {/* Footer */}
-            <div className={`mt-2 space-y-1.5 ${collapsed ? 'px-1' : 'px-2'}`}>
-                {/* Sync status — compact dot in collapsed state */}
-                <SyncStatus collapsed={collapsed} />
-
-                {/* Update status — compact dot in collapsed state when update available */}
-                <UpdateStatus collapsed={collapsed} />
-
-                {/* Exchange rate shortcut */}
-                {exchangeRate > 0 && (
-                    <Link
-                        href="/management/exchange-rate"
-                        className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] w-full rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all group ${collapsed ? 'justify-center' : ''}`}
-                        title={`1 USD = ${Math.round(exchangeRate).toLocaleString()} ៛`}
-                    >
-                        {!collapsed ? (
-                            <>
-                                <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] flex-1 truncate">
-                                    1 USD = {Math.round(exchangeRate).toLocaleString()} ៛
-                                </span>
-                                <Pencil size={10} className="text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 flex-shrink-0" />
-                            </>
-                        ) : (
-                            <span className="text-[9px] font-mono font-black text-[var(--text-secondary)]">៛</span>
-                        )}
-                    </Link>
-                )}
-
-                {/* Switch User button */}
-                <button
-                    onClick={() => { setIsSwitchOpen(true); setSwitchPin(''); setSwitchError(''); }}
-                    className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-transparent hover:bg-[var(--bg-elevated)] transition-all ${collapsed ? 'justify-center' : ''}`}
-                    title={t('switchUser')}
-                >
-                    <ArrowLeftRight size={13} />
-                    {!collapsed && <span className="text-[11px] font-bold">{t('switchUser')}</span>}
-                </button>
-
-                <div className="border-t border-[var(--border)] my-0.5 mx-1 opacity-50" />
-
-                {/* Logout button */}
-                <button
-                    onClick={handleLogout}
-                    className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-red-500 hover:text-red-400 border border-transparent hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
-                    title={t('logout')}
-                >
-                    <LogOut size={13} />
-                    {!collapsed && <span className="text-[11px] font-bold">{t('logout')}</span>}
-                </button>
-
-                {/* Unified profile settings button */}
-                <button
-                    onClick={() => setIsSettingsOpen(true)}
-                    className={`group flex items-center gap-2.5 px-3 py-2 min-h-[44px] w-full rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent-blue)]/50 transition-all cursor-pointer ${collapsed ? 'justify-center' : ''}`}
-                    title="My Settings"
-                >
-                    <div className="w-7 h-7 rounded-xl border border-[var(--border)] flex items-center justify-center font-black text-xs flex-shrink-0 relative overflow-hidden">
-                        {userAvatar ? (
-                            <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 flex items-center justify-center font-black">
-                                {user?.full_name?.charAt(0).toUpperCase() || user?.username.charAt(0).toUpperCase()}
-                            </div>
-                        )}
-                    </div>
-                    {!collapsed && (
-                        <>
-                            <div className="text-left min-w-0 flex-1">
-                                <p className="text-[11px] font-black text-[var(--foreground)] truncate leading-none">
-                                    {user?.full_name || user?.username}
-                                </p>
-                                <p className="text-[9px] font-black text-[var(--text-secondary)] opacity-60 uppercase tracking-widest leading-none mt-1.5">
-                                    {t(roleI18nKey(user?.role))}
-                                </p>
-                            </div>
-                            <Settings size={12} className="text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 flex-shrink-0 transition-opacity" />
-                        </>
+            <div className={`mt-2 space-y-2 ${collapsed ? 'px-1' : 'px-2'}`}>
+                {/* ── Status cluster: ambient info, grouped & visually distinct from actions ── */}
+                <div className={`rounded-xl bg-[var(--bg-dark)] border border-[var(--border)] ${collapsed ? 'p-1 space-y-1' : 'p-1.5 space-y-1'}`}>
+                    <SyncStatus collapsed={collapsed} />
+                    <UpdateStatus collapsed={collapsed} />
+                    {exchangeRate > 0 && (
+                        <Link
+                            href="/settings/business/exchange-rate"
+                            className={`flex items-center gap-2 px-2 py-2 min-h-[40px] w-full rounded-lg hover:bg-[var(--bg-elevated)] transition-all group ${collapsed ? 'justify-center' : ''}`}
+                            title={`1 USD = ${Math.round(exchangeRate).toLocaleString()} ៛`}
+                        >
+                            {!collapsed ? (
+                                <>
+                                    <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] flex-1 truncate">
+                                        1 USD = {Math.round(exchangeRate).toLocaleString()} ៛
+                                    </span>
+                                    <Pencil size={10} className="text-[var(--text-secondary)] opacity-40 group-hover:opacity-80 flex-shrink-0" />
+                                </>
+                            ) : (
+                                <span className="text-[9px] font-mono font-black text-[var(--text-secondary)]">៛</span>
+                            )}
+                        </Link>
                     )}
-                </button>
-            </div>
+                </div>
 
-            {/* Premium Settings Modal */}
-            <MySettingsModal
-                isOpen={isSettingsOpen}
-                onClose={() => setIsSettingsOpen(false)}
-            />
+                {/* ── Account: single entry point, actions grouped in a popover ── */}
+                <div className="relative" ref={accountMenuRef}>
+                    <button
+                        onClick={() => setIsAccountMenuOpen(o => !o)}
+                        aria-label={t('accountMenu')}
+                        aria-haspopup="menu"
+                        aria-expanded={isAccountMenuOpen}
+                        className={`group flex items-center gap-2.5 px-3 py-2 min-h-[44px] w-full rounded-2xl bg-[var(--bg-elevated)] border transition-all cursor-pointer ${isAccountMenuOpen ? 'border-[var(--accent-blue)]/50' : 'border-[var(--border)] hover:border-[var(--accent-blue)]/50'} ${collapsed ? 'justify-center' : ''}`}
+                        title={t('accountMenu')}
+                    >
+                        <div className="w-7 h-7 rounded-xl border border-[var(--border)] flex items-center justify-center font-black text-xs flex-shrink-0 relative overflow-hidden">
+                            {userAvatar ? (
+                                <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 flex items-center justify-center font-black">
+                                    {user?.full_name?.charAt(0).toUpperCase() || user?.username.charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+                        {!collapsed && (
+                            <>
+                                <div className="text-left min-w-0 flex-1">
+                                    <p className="text-[11px] font-black text-[var(--foreground)] truncate leading-none">
+                                        {user?.full_name || user?.username}
+                                    </p>
+                                    <p className="text-[9px] font-black text-[var(--text-secondary)] opacity-60 uppercase tracking-widest leading-none mt-1.5">
+                                        {t(roleI18nKey(user?.role))}
+                                    </p>
+                                </div>
+                                <ChevronUp size={13} className={`text-[var(--text-secondary)] opacity-50 flex-shrink-0 transition-transform ${isAccountMenuOpen ? '' : 'rotate-180'}`} />
+                            </>
+                        )}
+                    </button>
+
+                    {isAccountMenuOpen && (
+                        <div
+                            role="menu"
+                            className={`absolute bottom-full mb-2 z-50 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] shadow-2xl p-1.5 ${collapsed ? 'left-0 w-52' : 'left-0 right-0'}`}
+                        >
+                            <button
+                                role="menuitem"
+                                onClick={() => { setIsAccountMenuOpen(false); router.push('/settings/profile'); }}
+                                className="flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-all text-left"
+                            >
+                                <Settings size={14} className="flex-shrink-0" />
+                                <span className="text-[11px] font-bold">{t('mySettings')}</span>
+                            </button>
+                            <button
+                                role="menuitem"
+                                onClick={() => { setIsAccountMenuOpen(false); setIsSwitchOpen(true); setSwitchPin(''); setSwitchError(''); }}
+                                className="flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-elevated)] transition-all text-left"
+                            >
+                                <ArrowLeftRight size={14} className="flex-shrink-0" />
+                                <span className="text-[11px] font-bold">{t('switchUser')}</span>
+                            </button>
+                            <div className="border-t border-[var(--border)] my-1 mx-1 opacity-50" />
+                            <button
+                                role="menuitem"
+                                onClick={() => { setIsAccountMenuOpen(false); handleLogout(); }}
+                                className="flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] w-full rounded-xl text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-all text-left"
+                            >
+                                <LogOut size={14} className="flex-shrink-0" />
+                                <span className="text-[11px] font-bold">{t('logout')}</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {/* Switch User PIN Modal */}
             {isSwitchOpen && (

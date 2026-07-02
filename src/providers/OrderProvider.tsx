@@ -111,8 +111,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const refreshRate = useCallback(async () => {
+        if (!restaurantId) return;
         try {
-            const rate = await getExchangeRate(restaurantId || undefined);
+            const rate = await getExchangeRate(restaurantId);
             setExchangeRate(rate.rate);
             setRateEffectiveFrom(rate.effective_from ?? null);
             setRateIsDefault(!!rate.is_default);

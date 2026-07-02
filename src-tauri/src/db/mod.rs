@@ -682,6 +682,38 @@ async fn ensure_critical_columns(conn: &Connection) {
             ()
         ).await;
     }
+
+    // ── Migration 007: legacy products.stock_quantity 0 → NULL ──────────────────
+    // Before stock became nullable the column was `INTEGER NOT NULL DEFAULT 0`, so
+    // every legacy product carries 0. Under the current semantics (NULL = stock not
+    // tracked, 0 = sold out) that made ALL legacy products show "Out of Stock" and be
+    // blocked in the POS. Convert the blanket zeros to NULL once so untracked products
+    // become sellable again; deliberate sold-outs are set to 0 explicitly from now on.
+    // A separate migration id is required because installs that already ran 006 will
+    // never re-run it. Scoped to `products` only: product_variants.stock_quantity was
+    // nullable from baseline (never force-defaulted to 0), so a 0 there means a
+    // deliberate sold-out and must NOT be reset.
+    let needs_zero_to_null = {
+        let mut r = conn.query(
+            "SELECT 1 FROM _migrations WHERE id = '007_products_zero_stock_to_null'",
+            ()
+        ).await;
+        match r {
+            Ok(ref mut rows) => rows.next().await.ok().flatten().is_none(),
+            Err(_) => false,
+        }
+    };
+    if needs_zero_to_null {
+        if let Err(e) = conn.execute("UPDATE products SET stock_quantity = NULL WHERE stock_quantity = 0", ()).await {
+            eprintln!("[DB] Migration 007 error: {}", e);
+        } else {
+            println!("[DB] Migration 007: legacy zero product stock converted to NULL (not-tracked) ✓");
+        }
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO _migrations (id) VALUES ('007_products_zero_stock_to_null')",
+            ()
+        ).await;
+    }
 }
 
 // ─── Public structs exposed to lib.rs ───────────────────────────────────────
